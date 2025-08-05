@@ -922,13 +922,21 @@ def api_auto_asignar(request):
         if not semestre_activo:
             return JsonResponse({'status': 'error', 'message': 'No hay un semestre activo.'}, status=400)
 
-        # Filtramos los cursos por especialidad Y semestre cursado
+        # Filtramos los cursos por especialidad Y semestre cursado, incluyendo los generales del grupo
+        especialidad_obj = Especialidad.objects.get(id=especialidad_id)
+        grupo_obj = especialidad_obj.grupo
+
+        q_cursos_por_asignar = (
+            Q(especialidad_id=especialidad_id) |
+            Q(tipo_curso='GENERAL', especialidad__grupo=grupo_obj)
+        )
+
         cursos_por_asignar = list(Curso.objects.filter(
+            q_cursos_por_asignar,
             semestre=semestre_activo,
-            especialidad_id=especialidad_id,
             semestre_cursado=semestre_cursado,
             dia__isnull=True
-        ).order_by('-duracion_bloques'))
+        ).distinct().order_by('-duracion_bloques'))
 
         franjas_horarias = list(FranjaHoraria.objects.order_by('hora_inicio'))
         dias_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']

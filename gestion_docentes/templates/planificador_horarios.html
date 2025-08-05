@@ -160,15 +160,36 @@ document.addEventListener('DOMContentLoaded', function () {
     function createCourseElement(curso, isAssigned = false) {
         const docenteNombre = `${curso.docente__first_name || ''} ${curso.docente__last_name || ''}`.trim();
         const div = document.createElement('div');
-        div.className = `p-2 rounded-lg text-sm transition-all duration-300 cursor-grab active:cursor-grabbing border`;
+        div.className = `relative p-2 rounded-lg text-sm transition-all duration-300 cursor-grab active:cursor-grabbing border`;
         div.dataset.cursoId = curso.id;
         div.dataset.duracion = curso.duracion_bloques;
         div.dataset.fullData = JSON.stringify(curso);
 
-        let colors = isAssigned ? 'bg-primary/10 border-primary/20 text-primary-content' : 'bg-base-200 border-base-300';
+        // 1. Color Coding based on course type
+        let colors = '';
+        if (curso.tipo_curso === 'GENERAL') {
+            colors = 'bg-purple-500/10 border-purple-500/20 text-purple-800 dark:text-purple-300';
+        } else { // ESPECIALIDAD
+            colors = 'bg-sky-500/10 border-sky-500/20 text-sky-800 dark:text-sky-300';
+        }
+        // Unassigned courses have a neutral background
+        if (!isAssigned) {
+            colors = 'bg-base-200 border-base-300';
+        }
         div.classList.add(...colors.split(' '));
 
-        div.innerHTML = `<p class="font-bold truncate">${curso.nombre}</p><p class="text-xs opacity-70 truncate">${docenteNombre}</p><p class="text-xs opacity-50">${curso.duracion_bloques} bloque(s)</p>`;
+        let deleteButtonHTML = '';
+        if (isAssigned) {
+            // 2. Add 'X' button to assigned courses
+            deleteButtonHTML = `<button class="absolute top-1 right-1 btn btn-xs btn-circle btn-ghost text-error/50 hover:text-error hover:bg-error/10 delete-course-btn" data-curso-id="${curso.id}"><i class="fas fa-times"></i></button>`;
+        }
+
+        div.innerHTML = `
+            ${deleteButtonHTML}
+            <p class="font-bold truncate pr-4">${curso.nombre}</p>
+            <p class="text-xs opacity-70 truncate">${docenteNombre}</p>
+            <p class="text-xs opacity-50">${curso.duracion_bloques} bloque(s)</p>
+        `;
         return div;
     }
 
@@ -259,19 +280,33 @@ document.addEventListener('DOMContentLoaded', function () {
 
         sortableInstances.push(new Sortable(DOMElements.trash, {
             ...sharedConfig,
-            onAdd: async (evt) => {
-                const { item, from } = evt;
-                try {
-                    await callApi('/api/desasignar-horario/', 'POST', { curso_id: item.dataset.cursoId });
-                    item.remove();
-                    revertVisualSpan(from, item.dataset.duracion);
-                    await loadPlannerData(); // Reload all data to refresh unassigned list
-                } catch (error) {
-                    Toast.fire({ icon: 'error', title: error.message });
-                    from.appendChild(item);
-                }
-            }
+            onAdd: (evt) => handleDeassign(evt.item, evt.from)
         }));
+    }
+
+    async function handleDeassign(courseElement, fromCell = null) {
+        const cursoId = courseElement.dataset.cursoId;
+        if (!cursoId) return;
+
+        try {
+            await callApi('/api/desasignar-horario/', 'POST', { curso_id: cursoId });
+            Toast.fire({ icon: 'info', title: 'Curso desasignado' });
+
+            // If the element came from a cell, revert its span. Otherwise, just remove.
+            if (fromCell) {
+                revertVisualSpan(fromCell, courseElement.dataset.duracion);
+            }
+            courseElement.remove();
+
+            // Reload all data to refresh the unassigned list correctly
+            await loadPlannerData();
+        } catch (error) {
+            Toast.fire({ icon: 'error', title: `Error al desasignar: ${error.message}` });
+            // If dragging failed, put it back. This part is tricky if not a drag op.
+            if (fromCell) {
+                fromCell.appendChild(courseElement);
+            }
+        }
     }
 
     async function highlightConflicts(cursoId) {
@@ -337,6 +372,29 @@ document.addEventListener('DOMContentLoaded', function () {
     DOMElements.especialidad.addEventListener('change', loadPlannerData);
     DOMElements.semestre.addEventListener('change', loadPlannerData);
     DOMElements.autoAssignBtn.addEventListener('click', handleAutoAssign);
+
+    // Event Delegation for delete buttons
+    DOMElements.grid.addEventListener('click', function(e) {
+        const deleteButton = e.target.closest('.delete-course-btn');
+        if (deleteButton) {
+            const courseElement = deleteButton.closest('[data-curso-id]');
+            const cellElement = courseElement.parentElement;
+            Swal.fire({
+                title: '¿Desasignar curso?',
+                text: `"${courseElement.querySelector('.font-bold').textContent}" volverá a la lista de pendientes.`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Sí, desasignar',
+                cancelButtonText: 'No'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    handleDeassign(courseElement, cellElement);
+                }
+            });
+        }
+    });
 
     DOMElements.searchInput.addEventListener('input', (e) => {
         const searchTerm = e.target.value.toLowerCase();
