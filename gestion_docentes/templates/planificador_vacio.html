@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block title %}Planificador de Horarios{% endblock %}
+
+{% block content %}
+<div class="bg-white p-6 rounded-lg shadow-lg">
+    <h1 class="text-3xl font-bold mb-2">Planificador de Horarios</h1>
+    <p class="text-gray-600 mb-6">Herramienta para la asignación de horarios por especialidad.</p>
+
+    <div class="p-4 mb-4 text-sm text-red-800 rounded-lg bg-red-50" role="alert">
+        <span class="font-medium">¡Atención!</span> No se puede planificar porque no hay ningún semestre en estado "Activo". Por favor, active un semestre en el panel de administración.
+    </div>
+</div>
+{% endblock %}

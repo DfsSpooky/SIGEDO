@@ -1,0 +1,189 @@
+{% load static %} <!DOCTYPE html>
+<html lang="es" data-theme="dark"> <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Gestión Docente{% endblock %} - Sistema de Gestión</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.2/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Scrollbar estilizado (sin cambios, ya está bien) */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: hsl(var(--b2)); }
+        ::-webkit-scrollbar-thumb { background-color: hsl(var(--b3)); border-radius: 4px; }
+
+        /* Animación para la entrada del contenido principal */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+
+        /* Animación para la salida de las alertas */
+        @keyframes fadeOut {
+            from { opacity: 1; transform: translateX(0); }
+            to { opacity: 0; transform: translateX(20px); }
+        }
+        .animate-fade-out {
+            animation: fadeOut 0.5s ease-in forwards;
+        }
+    </style>
+</head>
+<body class="bg-base-200">
+
+    <div class="drawer lg:drawer-open">
+        <input id="my-drawer-2" type="checkbox" class="drawer-toggle" />
+        
+        <div class="drawer-content flex flex-col bg-base-200">
+
+            <div class="navbar bg-base-100/80 backdrop-blur-md sticky top-0 z-30 shadow-sm lg:hidden">
+                <div class="flex-none">
+                    <label for="my-drawer-2" class="btn btn-square btn-ghost transition-colors duration-300">
+                        <i class="fas fa-bars text-xl"></i>
+                    </label>
+                </div>
+                <div class="flex-1">
+                    <a class="btn btn-ghost text-xl">Gestión Docente</a>
+                </div>
+            </div>
+
+            <div class="navbar bg-base-100/80 backdrop-blur-md sticky top-0 z-30 shadow-sm hidden lg:flex border-b border-base-300/50">
+                <div class="flex-1">
+                    <div class="text-sm breadcrumbs">
+                        <ul>
+                          <li><a><i class="fas fa-home mr-2"></i> Inicio</a></li> 
+                          <li><a>{% block breadcrumb %}{% endblock %}</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="flex-none gap-4">
+                    <label class="swap swap-rotate btn btn-ghost btn-circle">
+                        <input type="checkbox" id="theme-toggle" />
+                        <i class="fas fa-sun swap-on fill-current w-5 h-5 transition-transform duration-300 ease-in-out"></i>
+                        <i class="fas fa-moon swap-off fill-current w-5 h-5 transition-transform duration-300 ease-in-out"></i>
+                    </label>
+                    
+                    <div class="dropdown dropdown-end">
+                        <label tabindex="0" class="btn btn-ghost btn-circle avatar">
+                            <div class="w-10 rounded-full ring-2 ring-offset-2 ring-offset-base-100 ring-transparent hover:ring-primary transition-shadow duration-300">
+                                <img src="{% if user.foto %}{{ user.foto.url }}{% else %}{% static 'placeholder.png' %}{% endif %}" />
+                            </div>
+                        </label>
+                        <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52">
+                            <li class="p-2 font-semibold">{{ user.first_name }}</li>
+                            <div class="divider my-0"></div>
+                            <li><a href="{% url 'perfil' %}" class="transition-colors duration-200"><i class="fas fa-user-circle fa-fw"></i> Mi Perfil</a></li>
+                            <li>
+                                <form method="post" action="{% url 'logout' %}" class="w-full">
+                                    {% csrf_token %}
+                                    <button type="submit" class="w-full text-left p-2 hover:bg-error hover:text-error-content rounded-lg transition-colors duration-200">
+                                        <i class="fas fa-sign-out-alt fa-fw"></i>Cerrar Sesión
+                                    </button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <main class="flex-1 p-6 lg:p-8 animate-fade-in">
+                
+                {% if messages %}
+                <div id="message-container" class="fixed top-24 right-5 z-50 w-full max-w-sm space-y-3">
+                    {% for message in messages %}
+                    <div class="alert shadow-lg text-white animate-fade-in {% if message.tags == 'success' %}bg-success{% elif message.tags == 'error' %}bg-error{% elif message.tags == 'warning' %}bg-warning{% else %}bg-info{% endif %}">
+                        <div class="flex items-center w-full">
+                            {% if message.tags == 'success' %}<i class="fas fa-check-circle"></i>{% elif message.tags == 'error' %}<i class="fas fa-times-circle"></i>{% elif message.tags == 'warning' %}<i class="fas fa-exclamation-triangle"></i>{% else %}<i class="fas fa-info-circle"></i>{% endif %}
+                            <span class="flex-grow mx-3">{{ message }}</span>
+                            <button type="button" class="ml-auto" onclick="this.closest('.alert').remove()"><i class="fas fa-times text-sm"></i></button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        const messageContainer = document.getElementById('message-container');
+                        if (messageContainer) {
+                            setTimeout(() => {
+                                const alerts = messageContainer.querySelectorAll('.alert');
+                                alerts.forEach(alert => {
+                                    // 1. Añade la clase para la animación de salida
+                                    alert.classList.add('animate-fade-out');
+                                    // 2. Espera a que termine la animación para eliminar el elemento
+                                    alert.addEventListener('animationend', () => alert.remove());
+                                });
+                                // Opcional: eliminar el contenedor si se queda vacío
+                                setTimeout(() => {
+                                    if (!messageContainer.children.length) {
+                                        messageContainer.remove();
+                                    }
+                                }, 500); // 500ms es la duración de la animación
+                            }, 5000);
+                        }
+                    });
+                </script>
+                {% endif %}
+
+                {% block content %}
+                {% endblock %}
+            </main>
+        </div> 
+        
+        <div class="drawer-side">
+            <label for="my-drawer-2" aria-label="close sidebar" class="drawer-overlay"></label> 
+            <ul class="menu p-4 w-72 min-h-full bg-base-100 text-base-content">
+                <li class="text-2xl font-bold p-4 mb-4">
+                    <a href="{% url 'dashboard' %}" class="hover:text-primary transition-colors duration-300">
+                        <i class="fas fa-university text-primary"></i>
+                        Gestión Docente
+                    </a>
+                </li>
+                
+                <li class="menu-title"><span class="opacity-60">Principal</span></li>
+                <li><a href="{% url 'dashboard' %}" class="group transition-all duration-300"><i class="fas fa-tachometer-alt fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Dashboard</a></li>
+                <li><a href="{% url 'perfil' %}" class="group transition-all duration-300"><i class="fas fa-user-circle fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Mi Perfil</a></li>
+                <li><a href="{% url 'lista_documentos' %}" class="group transition-all duration-300"><i class="fas fa-file-alt fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Mis Documentos</a></li>
+
+                {% if user.is_staff %}
+                <li class="menu-title"><span class="opacity-60 pt-4">Administración</span></li>
+                <li><a href="{% url 'planificador_horarios' %}" class="group transition-all duration-300"><i class="fas fa-calendar-alt fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Planificador</a></li>
+                <li><a href="{% url 'lista_credenciales' %}" class="group transition-all duration-300"><i class="fas fa-id-card fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Credenciales</a></li>
+                <li><a href="{% url 'reporte_asistencia' %}" class="group transition-all duration-300"><i class="fas fa-chart-bar fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Reportes</a></li>
+                <li><a href="/admin" target="_blank" class="group transition-all duration-300"><i class="fas fa-cogs fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Panel de Admin</a></li>
+                {% endif %}
+
+                <li class="menu-title"><span class="opacity-60 pt-4">Vistas Públicas</span></li>
+                <li><a href="{% url 'kiosco_page' %}" target="_blank" class="group transition-all duration-300"><i class="fas fa-qrcode fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Kiosco</a></li>
+                <li><a href="{% url 'vista_publica_horarios' %}" class="group transition-all duration-300"><i class="fas fa-clock fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Horarios Públicos</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const themeToggle = document.getElementById('theme-toggle');
+        const html = document.documentElement;
+        const currentTheme = localStorage.getItem('theme') || 'dark';
+        html.setAttribute('data-theme', currentTheme);
+        themeToggle.checked = currentTheme === 'light';
+        themeToggle.addEventListener('change', function() {
+            const newTheme = this.checked ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+        });
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

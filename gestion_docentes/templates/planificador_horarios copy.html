@@ -1,0 +1,375 @@
+{% extends 'base.html' %}
+{% load template_extras %}
+{% block title %}Planificador de Horarios{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<style>
+    .drop-zone.conflict-cell {
+        background-color: rgba(239, 68, 68, 0.1);
+        border: 2px dashed #EF4444;
+        cursor: not-allowed;
+    }
+    .draggable-course.sortable-ghost {
+        @apply bg-blue-500 bg-opacity-30 border-2 border-blue-500 opacity-70;
+    }
+    .assigned-course {
+        @apply p-2 rounded-lg text-sm transition-all duration-300 cursor-grab;
+    }
+    .unassigned-course-card {
+        @apply p-3 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-md transition-shadow duration-300;
+    }
+    .droppable-cell {
+        @apply transition-colors duration-300;
+    }
+</style>
+
+<div class="p-6 rounded-lg shadow-lg bg-white dark:bg-gray-800 transition-colors duration-500">
+    <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800 dark:text-gray-100">Planificador de Horarios</h1>
+            <p class="text-gray-600 dark:text-gray-400">Semestre Activo: <span class="font-semibold text-blue-600 dark:text-blue-400">{{ semestre_activo.nombre }} ({{ semestre_activo.get_tipo_display }})</span></p>
+        </div>
+        
+        <div class="flex items-center gap-4 p-2 bg-gray-50 dark:bg-gray-700 rounded-xl shadow-inner">
+            <div>
+                <label for="especialidad" class="text-sm font-medium text-gray-700 dark:text-gray-300">Especialidad:</label>
+                <select name="especialidad" id="especialidad" class="mt-1 block w-full pl-3 pr-10 py-2 border-gray-300 dark:border-gray-600 dark:bg-gray-800 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">-- Seleccione --</option>
+                    {% for esp in especialidades %}
+                    <option value="{{ esp.id }}" {% if especialidad_seleccionada_id == esp.id|stringformat:"s" %}selected{% endif %}>{{ esp.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+             <div>
+                <label for="semestre_cursado" class="text-sm font-medium text-gray-700 dark:text-gray-300">Semestre:</label>
+                <select name="semestre_cursado" id="semestre_cursado" class="mt-1 block w-full pl-3 pr-10 py-2 border-gray-300 dark:border-gray-600 dark:bg-gray-800 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">-- Seleccione --</option>
+                    {% for sem_num in semestres_validos %}
+                    <option value="{{ sem_num }}" {% if semestre_seleccionado == sem_num|stringformat:"s" %}selected{% endif %}>Semestre {{ sem_num }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div id="planner-body" class="hidden">
+        <div class="flex flex-col lg:flex-row gap-6 mt-8">
+            <main class="flex-grow">
+                <div class="overflow-x-auto rounded-lg shadow-md">
+                    <table class="min-w-full border-collapse bg-white dark:bg-gray-800">
+                        <thead class="bg-gray-50 dark:bg-gray-700">
+                            <tr>
+                                <th class="py-3 px-4 border border-gray-200 dark:border-gray-700 w-32 text-sm font-semibold text-gray-600 dark:text-gray-300">Horas</th>
+                                {% for dia in dias_semana %}
+                                <th class="py-3 px-4 border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-300">{{ dia }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody id="schedule-grid">
+                            {% for franja in franjas_horarias %}
+                            <tr data-franja-id="{{ franja.id }}">
+                                <td class="py-2 px-3 border border-gray-200 dark:border-gray-700 text-center text-xs font-medium text-gray-500 dark:text-gray-400 align-top h-24">
+                                    {{ franja.hora_inicio|time:"h:i" }} - {{ franja.hora_fin|time:"h:i A" }}
+                                </td>
+                                {% for dia in dias_semana %}
+                                    <td class="p-1 border border-gray-200 dark:border-gray-700 align-top relative drop-zone droppable-cell" data-dia="{{ dia }}" data-franja-id="{{ franja.id }}"></td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </main>
+            <aside class="lg:w-80 flex-shrink-0">
+                <div class="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-lg h-full">
+                    <h3 class="font-bold text-lg mb-4 text-gray-800 dark:text-gray-100">Acciones</h3>
+                    <div class="space-y-4">
+                        <button id="auto-assign-btn" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition duration-300 flex items-center justify-center gap-2 shadow-md">
+                            <i class="fas fa-magic"></i>
+                            Rellenar Automáticamente
+                        </button>
+                        <div id="trash-zone" class="p-4 text-center border-2 border-dashed border-red-300 dark:border-red-600 rounded-lg bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-200 min-h-[80px] hover:bg-red-100 dark:hover:bg-red-800 transition duration-300">
+                            <i class="fas fa-trash-alt mr-2"></i>
+                            <p class="font-semibold">Arrastra un curso aquí para desasignarlo</p>
+                        </div>
+                    </div>
+                    <h3 class="font-bold text-lg mb-2 mt-6 text-gray-800 dark:text-gray-100">Cursos por Asignar</h3>
+                    <div class="mb-4">
+                        <div class="relative">
+                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                            <input type="text" id="course-search-input" placeholder="Buscar..." class="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+                    <div id="unassigned-courses" class="space-y-3 min-h-[100px]"></div>
+                </div>
+            </aside>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // --- ELEMENTOS DEL DOM ---
+    const especialidadSelector = document.getElementById('especialidad');
+    const semestreSelector = document.getElementById('semestre_cursado');
+    const plannerBody = document.getElementById('planner-body');
+    const scheduleGrid = document.getElementById('schedule-grid');
+    const unassignedCoursesContainer = document.getElementById('unassigned-courses');
+    const trashZone = document.getElementById('trash-zone');
+    const autoAssignBtn = document.getElementById('auto-assign-btn');
+    const searchInput = document.getElementById('course-search-input');
+
+    // --- FUNCIONES DE AYUDA ---
+    const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, timerProgressBar: true, didOpen: (toast) => { toast.addEventListener('mouseenter', Swal.stopTimer); toast.addEventListener('mouseleave', Swal.resumeTimer); } });
+
+    async function callApi(url, body) {
+        const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }, body: JSON.stringify(body) });
+        const data = await response.json();
+        if (!response.ok) { throw new Error(data.message || 'Error en el servidor'); }
+        return data;
+    }
+
+    function applyVisualSpan(cell, duration) {
+        if (!cell || duration < 2) return;
+        cell.setAttribute('rowspan', duration);
+        let currentRow = cell.parentElement;
+        for (let i = 1; i < duration; i++) {
+            currentRow = currentRow.nextElementSibling;
+            if (currentRow) {
+                const cellToHide = currentRow.querySelector(`[data-dia="${cell.dataset.dia}"]`);
+                if (cellToHide) cellToHide.style.display = 'none';
+            }
+        }
+    }
+
+    function revertVisualSpan(cell, duration) {
+        if (!cell || duration < 2) return;
+        cell.setAttribute('rowspan', 1);
+        let currentRow = cell.parentElement;
+        for (let i = 1; i < duration; i++) {
+            currentRow = currentRow.nextElementSibling;
+            if (currentRow) {
+                const cellToShow = currentRow.querySelector(`[data-dia="${cell.dataset.dia}"]`);
+                if (cellToShow) cellToShow.style.display = '';
+            }
+        }
+    }
+    
+    async function highlightConflicts(cursoId) {
+        const response = await fetch(`/api/get-teacher-conflicts/?curso_id=${cursoId}`);
+        const data = await response.json();
+        if (data.status === 'success') {
+            data.conflicts.forEach(conflict => {
+                const cell = document.querySelector(`td[data-dia="${conflict.dia}"][data-franja-id="${conflict.franja_id}"]`);
+                if (cell) cell.classList.add('conflict-cell');
+            });
+        }
+    }
+
+    function clearConflicts() {
+        document.querySelectorAll('.conflict-cell').forEach(cell => cell.classList.remove('conflict-cell'));
+    }
+
+    // --- FUNCIONES DE RENDERIZADO (DIBUJO) ---
+    function createCourseElement(curso, isAssigned = false) {
+        const especialidadSeleccionada = especialidadSelector.value;
+        const docenteNombre = `${curso.docente__first_name || ''} ${curso.docente__last_name || ''}`.trim();
+        const cardClasses = ['rounded-lg', 'shadow-sm', 'border', 'border-gray-200', 'dark:border-gray-700', 'transition-all', 'duration-300'];
+        const innerClasses = ['p-3', 'flex', 'flex-col', 'gap-1'];
+        let bgColor = '';
+        let borderColor = '';
+        let textColor = '';
+
+        if (isAssigned) {
+            if (curso.tipo_curso === 'GENERAL') {
+                bgColor = 'bg-purple-100 dark:bg-purple-800';
+                borderColor = 'border-purple-200 dark:border-purple-700';
+                textColor = 'text-purple-800 dark:text-purple-200';
+            } else if (curso.especialidad__id == especialidadSeleccionada) {
+                bgColor = 'bg-blue-100 dark:bg-blue-800';
+                borderColor = 'border-blue-200 dark:border-blue-700';
+                textColor = 'text-blue-800 dark:text-blue-200';
+            } else {
+                bgColor = 'bg-gray-100 dark:bg-gray-700';
+                borderColor = 'border-gray-200 dark:border-gray-600';
+                textColor = 'text-gray-500 dark:text-gray-300';
+            }
+        } else { // No asignado
+            bgColor = 'bg-yellow-50 dark:bg-yellow-900';
+            borderColor = 'border-yellow-200 dark:border-yellow-700';
+            textColor = 'text-yellow-800 dark:text-yellow-200';
+        }
+
+        const div = document.createElement('div');
+        div.className = `${isAssigned ? 'assigned-course' : 'unassigned-course-card'} ${bgColor} ${borderColor} ${textColor} cursor-grab active:cursor-grabbing`;
+        div.dataset.cursoId = curso.id;
+        div.dataset.duracion = curso.duracion_bloques;
+        div.setAttribute('draggable', 'true');
+
+        const innerHTML = `
+            <div class="flex justify-between items-center">
+                <p class="font-bold text-sm">${curso.nombre} ${!isAssigned ? `(Sem. ${curso.semestre_cursado})` : ''}</p>
+                <i class="fas fa-arrows-alt text-xs text-gray-400 dark:text-gray-500"></i>
+            </div>
+            <p class="text-xs font-medium text-gray-700 dark:text-gray-300">Docente: ${docenteNombre}</p>
+            ${isAssigned ? `<p class="text-xs italic text-gray-600 dark:text-gray-400">(${curso.especialidad__nombre})</p>` : `<p class="text-xs text-gray-500 dark:text-gray-400">Duración: ${curso.duracion_bloques} bloque(s)</p>`}
+        `;
+        div.innerHTML = innerHTML;
+        return div;
+    }
+
+    function redrawPlanner(data) {
+        document.querySelectorAll('.drop-zone').forEach(dz => {
+            dz.innerHTML = ''; dz.style.display = ''; dz.setAttribute('rowspan', 1);
+        });
+        unassignedCoursesContainer.innerHTML = '';
+
+        data.cursos_no_asignados.forEach(curso => {
+            unassignedCoursesContainer.appendChild(createCourseElement(curso, false));
+        });
+        
+        data.cursos_asignados.forEach(curso => {
+            if (!curso.franja_id_inicio) return;
+            const cell = scheduleGrid.querySelector(`td[data-dia="${curso.dia}"][data-franja-id="${curso.franja_id_inicio}"]`);
+            if (cell) {
+                cell.appendChild(createCourseElement(curso, true));
+                applyVisualSpan(cell, curso.duracion_bloques);
+            }
+        });
+    }
+
+    // --- FUNCIÓN CENTRAL PARA INICIALIZAR EL DRAG-AND-DROP ---
+    function initializeDragAndDrop() {
+        const unassignedCourses = new Sortable(unassignedCoursesContainer, {
+            group: { name: 'shared', pull: 'clone', put: false }, animation: 150,
+            sort: false, handle: '.unassigned-course-card',
+        });
+        
+        document.querySelectorAll('.drop-zone').forEach(zone => {
+            new Sortable(zone, {
+                group: 'shared', animation: 150,
+                onStart: (evt) => highlightConflicts(evt.item.dataset.cursoId),
+                onEnd: () => clearConflicts(),
+                onAdd: async (evt) => {
+                    const item = evt.item;
+                    const dia = evt.to.dataset.dia;
+                    const franjaId = evt.to.dataset.franjaId;
+                    const fromZone = evt.from;
+                    const duration = parseInt(item.dataset.duracion) || 1;
+
+                    if (evt.to.classList.contains('conflict-cell') || (evt.to.children.length > 1 && !evt.to.children[0].classList.contains('sortable-ghost'))) {
+                        fromZone.appendChild(item);
+                        Toast.fire({ icon: 'error', title: 'No se puede asignar en este espacio.' });
+                        return;
+                    }
+
+                    try {
+                        const data = await callApi('/api/asignar-horario/', { curso_id: item.dataset.cursoId, dia: dia, franja_id: franjaId });
+                        Toast.fire({ icon: 'success', title: data.message });
+                        applyVisualSpan(evt.to, duration);
+                        evt.item.classList.remove('unassigned-course-card');
+                        evt.item.classList.add('assigned-course');
+                        evt.item.setAttribute('draggable', 'true');
+                        // No es necesario desasignar desde el otro lado, la API ya lo maneja
+                    } catch (error) {
+                        Toast.fire({ icon: 'error', title: error.message });
+                        fromZone.appendChild(item);
+                        revertVisualSpan(evt.to, duration);
+                    }
+                },
+                onRemove: (evt) => {
+                    const item = evt.item;
+                    const fromZone = evt.from;
+                    const duration = parseInt(item.dataset.duracion) || 1;
+                    revertVisualSpan(fromZone, duration);
+                }
+            });
+        });
+
+        new Sortable(trashZone, {
+            group: 'shared', animation: 150,
+            onAdd: async (evt) => {
+                const item = evt.item;
+                const fromZone = evt.from;
+                const duration = parseInt(item.dataset.duracion) || 1;
+
+                try {
+                    const data = await callApi('/api/desasignar-horario/', { curso_id: item.dataset.cursoId });
+                    Toast.fire({ icon: 'success', title: data.message });
+                    item.parentNode.removeChild(item); // Eliminar del DOM
+                    revertVisualSpan(fromZone, duration);
+                    loadAndInitialize(); // Recargar para refrescar la lista de no asignados
+                } catch (error) {
+                    Toast.fire({ icon: 'error', title: error.message });
+                    fromZone.appendChild(item);
+                }
+            }
+        });
+    }
+
+    // --- LÓGICA DE CARGA Y EVENTOS ---
+    async function loadAndInitialize() {
+        const especialidadId = especialidadSelector.value;
+        const semestreNum = semestreSelector.value;
+
+        if (!especialidadId || !semestreNum) {
+            plannerBody.classList.add('hidden');
+            unassignedCoursesContainer.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">Seleccione una especialidad y un semestre.</p>';
+            return;
+        }
+        
+        plannerBody.classList.remove('hidden');
+        Swal.fire({ title: 'Cargando Horario...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
+        try {
+            const response = await fetch(`/api/get-cursos-no-asignados/?especialidad_id=${especialidadId}&semestre_cursado=${semestreNum}`);
+            const data = await response.json();
+            redrawPlanner(data);
+            initializeDragAndDrop();
+            Swal.close();
+        } catch (error) {
+             Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo cargar la información del horario.' });
+        }
+    }
+
+    especialidadSelector.addEventListener('change', loadAndInitialize);
+    semestreSelector.addEventListener('change', loadAndInitialize);
+    
+    autoAssignBtn.addEventListener('click', async function() {
+        const especialidadId = especialidadSelector.value;
+        const semestreNum = semestreSelector.value;
+        if (!especialidadId || !semestreNum) { Swal.fire('Atención', 'Seleccione una especialidad y un semestre primero.', 'warning'); return; }
+        Swal.fire({ title: 'Asignando horarios...', text: 'Por favor espere...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
+        try {
+            const data = await callApi('/api/auto-asignar/', { especialidad_id: especialidadId, semestre_cursado: semestreNum });
+            await loadAndInitialize(); // Recargar para mostrar los cambios
+            Swal.close();
+            Toast.fire({ icon: 'success', title: data.message });
+        } catch (error) {
+            Swal.fire({ icon: 'error', title: 'Error', text: error.message });
+        }
+    });
+
+    searchInput.addEventListener('input', function() {
+        const searchTerm = searchInput.value.toLowerCase().trim();
+        const courseCards = unassignedCoursesContainer.querySelectorAll('.unassigned-course-card');
+        courseCards.forEach(card => {
+            const cardText = card.textContent.toLowerCase();
+            if (cardText.includes(searchTerm)) {
+                card.style.display = '';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    });
+
+    // Carga inicial
+    if (especialidadSelector.value && semestreSelector.value) {
+        loadAndInitialize();
+    }
+});
+</script>
+
+{% endblock %}

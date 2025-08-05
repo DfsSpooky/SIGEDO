@@ -1,0 +1,180 @@
+{% extends 'base.html' %}
+{% block title %}Mi Carpeta Pedagógica{% endblock %}
+
+{% block content %}
+<style>
+    /* --- Paleta de Colores Pastel Definitiva --- */
+    :root {
+        /* Fondos */
+        --page-bg: #f7f8fc;
+        --card-bg: #ffffff;
+
+        /* Colores de Estado (Fondo de Badge, Borde de Tarjeta) */
+        --status-approved: #c8f7e1;
+        --status-review: #ffe9d6;
+        --status-observed: #fedde1;
+        --status-received: #dce7ff;
+
+        /* Colores de Texto para Badges (Más oscuros para contraste) */
+        --text-approved: #2b7a5a;
+        --text-review: #9c5a20;
+        --text-observed: #9d3a44;
+        --text-received: #3a5b9d;
+
+        /* Botones y UI */
+        --btn-primary-bg: #6c63ff;
+        --btn-primary-text: #ffffff;
+        --btn-secondary-bg: #e9ecef;
+        --btn-secondary-text: #495057;
+        --btn-update-bg: #28a745; /* NUEVO: Verde para el botón de actualizar */
+        --btn-update-text: #ffffff;
+
+        /* Textos Generales */
+        --text-dark: #2c3e50;
+        --text-light: #7f8c8d;
+    }
+
+    .content-wrapper {
+        background-color: var(--page-bg);
+        padding: 2rem;
+        border-radius: 1.5rem;
+    }
+    
+    .doc-list-card {
+        display: flex;
+        background-color: var(--card-bg);
+        border-radius: 1rem;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        box-shadow: 0 4px 15px -5px rgba(0, 0, 0, 0.05);
+        overflow: hidden;
+    }
+    .doc-list-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px -10px rgba(0, 0, 0, 0.1);
+    }
+    
+    .card-status-border {
+        flex-shrink: 0;
+        width: 7px;
+    }
+
+    .status-APROBADO .card-status-border { background-color: var(--text-approved); }
+    .status-EN_REVISION .card-status-border { background-color: var(--text-review); }
+    .status-OBSERVADO .card-status-border, 
+    .status-VENCIDO .card-status-border { background-color: var(--text-observed); }
+    .status-RECIBIDO .card-status-border { background-color: var(--text-received); }
+
+    .doc-content {
+        padding: 1.25rem 1.5rem;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    
+    .badge-pastel {
+        border-radius: 9999px;
+        padding: 0.25rem 0.75rem;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+    .badge-category { background-color: #f2f2f2; color: #555; }
+    .badge-APROBADO { background-color: var(--status-approved); color: var(--text-approved); }
+    .badge-EN_REVISION { background-color: var(--status-review); color: var(--text-review); }
+    .badge-OBSERVADO, .badge-VENCIDO { background-color: var(--status-observed); color: var(--text-observed); }
+    .badge-RECIBIDO { background-color: var(--status-received); color: var(--text-received); }
+    
+    .doc-title {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin-top: 0.75rem;
+    }
+    
+    .doc-meta {
+        font-size: 0.875rem;
+        color: var(--text-light);
+        margin-top: 0.75rem;
+    }
+    .doc-meta i { margin-right: 0.5rem; }
+
+    /* Estilos de Botones */
+    .btn-main-action {
+        background-color: var(--btn-primary-bg);
+        color: var(--btn-primary-text);
+        font-weight: 600;
+        border: none;
+    }
+    .btn-main-action:hover { background-color: #5a52e0; }
+
+    .btn-secondary-action {
+        background-color: var(--btn-secondary-bg);
+        color: var(--btn-secondary-text);
+        font-weight: 600;
+        border: none;
+    }
+    .btn-secondary-action:hover { background-color: #d8dde2; }
+    
+    /* NUEVO: Estilo para el botón de actualizar */
+    .btn-update-action {
+        background-color: var(--btn-update-bg);
+        color: var(--btn-update-text);
+        font-weight: 600;
+        border: none;
+    }
+    .btn-update-action:hover { background-color: #218838; }
+
+</style>
+
+<div class="content-wrapper">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
+        <div>
+            <h1 class="text-3xl font-bold" style="color: var(--text-dark);">Mi Carpeta Pedagógica</h1>
+            <p style="color: var(--text-light);">Gestiona y revisa el estado de todos tus documentos.</p>
+        </div>
+        <a href="{% url 'subir_documento' %}" class="btn btn-main-action mt-4 sm:mt-0">
+            <i class="fas fa-plus mr-2"></i>
+            Subir Documento
+        </a>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        {% for documento in documentos %}
+        <div class="doc-list-card status-{{ documento.estado }}">
+            <div class="card-status-border"></div>
+            <div class="doc-content">
+                <div>
+                    <div class="flex justify-between items-start">
+                        <div class="badge-pastel badge-category">{{ documento.tipo_documento.nombre }}</div>
+                        <div class="badge-pastel badge-{{ documento.estado }}">{{ documento.get_estado_display }}</div>
+                    </div>
+                    <h2 class="doc-title">{{ documento.titulo }}</h2>
+                    <div class="doc-meta">
+                        <span><i class="fas fa-calendar-alt"></i>{{ documento.fecha_subida|date:"d/m/Y" }}</span>
+                    </div>
+                </div>
+                
+                {% with ultima_version=documento.versiones.first %}
+                {% if ultima_version %}
+                <div class="flex justify-end items-center gap-2 mt-4">
+                    <a href="{% url 'subir_nueva_version' documento.id %}" class="btn btn-update-action btn-sm">Actualizar</a>
+                    
+                    <a href="{{ ultima_version.archivo.url }}" target="_blank" class="btn btn-secondary-action btn-sm">
+                        Descargar Doc (v{{ ultima_version.numero_version }})
+                    </a>
+                </div>
+                {% endif %}
+                {% endwith %}
+            </div>
+        </div>
+        {% empty %}
+        <div class="xl:col-span-3 md:col-span-2 text-center py-16 bg-white rounded-lg shadow-sm border border-dashed">
+            <i class="fas fa-folder-open fa-4x text-gray-300 mb-4"></i>
+            <p class="text-2xl font-semibold text-gray-500">Tu carpeta está vacía.</p>
+            <p class="text-gray-400 mt-2">Haz clic en "Subir Documento" para empezar a organizar tus archivos.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

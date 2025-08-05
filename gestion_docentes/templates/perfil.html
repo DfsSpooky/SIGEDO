@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Mi Perfil - {{ user.first_name }}{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+    <div class="lg:col-span-4 space-y-8">
+        
+        <div class="card bg-base-100 shadow-xl sticky top-8">
+            <div class="card-body items-center text-center">
+                <div class="avatar online">
+                    <div class="w-24 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2">
+                        <img src="{% if user.foto %}{{ user.foto.url }}{% else %}{% static 'placeholder.png' %}{% endif %}" alt="Foto de {{ user.first_name }}">
+                    </div>
+                </div>
+                <h2 class="card-title text-2xl mt-4">{{ user.first_name }} {{ user.last_name }}</h2>
+                <p class="text-base-content/70">DNI: {{ user.dni }}</p>
+                <div class="divider">Especialidades</div>
+                <div class="flex flex-wrap justify-center gap-2">
+                    {% for especialidad in user.especialidades.all %}
+                        <div class="badge badge-info badge-outline">{{ especialidad.nombre }}</div>
+                    {% empty %}
+                        <p class="text-sm text-base-content/50">Sin especialidades asignadas.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h3 class="card-title">Estado de mi Carpeta ({{ total_documentos }} Doc(s))</h3>
+                <canvas id="documentosChart"></canvas>
+            </div>
+        </div>
+
+    </div>
+    <div class="lg:col-span-8">
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h3 class="card-title mb-6">Actividad Reciente</h3>
+                
+                <ul class="timeline timeline-snap-icon max-md:timeline-compact timeline-vertical">
+                    {% for item in timeline %}
+                    <li>
+                        <div class="timeline-middle">
+                            {% if item.tipo == 'asistencia_entrada' %}<i class="fas fa-sign-in-alt bg-success text-success-content text-xl p-2 rounded-full"></i>
+                            {% elif item.tipo == 'asistencia_salida' %}<i class="fas fa-sign-out-alt bg-error text-error-content text-xl p-2 rounded-full"></i>
+                            {% elif item.tipo == 'documento' %}<i class="fas fa-file-upload bg-info text-info-content text-xl p-2 rounded-full"></i>
+                            {% endif %}
+                        </div>
+                        <div class="timeline-end mb-10 p-4 bg-base-200 rounded-lg shadow">
+                            <time class="font-mono italic text-sm opacity-70">{{ item.fecha|date:"d/m/Y, h:i A" }}</time>
+                            <div class="text-lg font-black">{{ item.texto }}</div>
+                            {% if item.tipo == 'documento' and item.documento.estado == 'OBSERVADO' %}
+                                <div class="mt-2 text-warning font-semibold">
+                                    <i class="fas fa-exclamation-triangle mr-1"></i> Este documento tiene observaciones.
+                                    <a href="{% url 'lista_documentos' %}" class="link link-warning ml-2">Revisar</a>
+                                </div>
+                            {% endif %}
+                        </div>
+                        <hr/>
+                    </li>
+                    {% empty %}
+                    <li class="text-center p-8 text-base-content/60">
+                        <i class="fas fa-history fa-2x mb-4"></i><br>
+                        No hay actividad reciente para mostrar.
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    </div>
+
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const ctx = document.getElementById('documentosChart');
+        if (!ctx) return;
+
+        const data = {
+            labels: {{ documentos_labels_json|safe }},
+            datasets: [{
+                label: 'Cantidad de Documentos',
+                data: {{ documentos_status_json|safe }},
+                backgroundColor: [
+                    'rgba(34, 197, 94, 0.6)',  // APROBADO (Verde)
+                    'rgba(245, 158, 11, 0.6)', // EN_REVISION (Ámbar)
+                    'rgba(239, 68, 68, 0.6)',   // OBSERVADO (Rojo)
+                    'rgba(59, 130, 246, 0.6)'  // RECIBIDO (Azul)
+                ],
+                borderColor: [
+                    'rgba(34, 197, 94, 1)',
+                    'rgba(245, 158, 11, 1)',
+                    'rgba(239, 68, 68, 1)',
+                    'rgba(59, 130, 246, 1)'
+                ],
+                borderWidth: 1
+            }]
+        };
+
+        new Chart(ctx, {
+            type: 'doughnut', // Tipo de gráfico: dona
+            data: data,
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    title: {
+                        display: false,
+                        text: 'Estado de Documentos'
+                    }
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

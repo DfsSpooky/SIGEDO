@@ -1,0 +1,323 @@
+{% extends 'base.html' %}
+{% load template_extras %}
+{% block title %}Planificador de Horarios{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<style>
+    .drop-zone.conflict-cell { background-color: hsla(var(--er)/.2); outline: 2px dashed hsl(var(--er)); cursor: not-allowed; }
+    .sortable-ghost { @apply bg-primary/30 border-2 border-primary opacity-70 rounded-lg; }
+    .droppable-cell.sortable-drag-over { @apply bg-primary/10; }
+    #trash-zone.sortable-drag-over { @apply bg-error/20 ring-2 ring-error; transform: scale(1.05); }
+    .skeleton-loader { @apply animate-pulse bg-base-200 rounded-lg; }
+</style>
+
+<div class="card bg-base-100 shadow-xl">
+    <div class="card-body">
+        <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+            <div>
+                <h1 class="card-title text-3xl">Planificador de Horarios</h1>
+                <p class="text-base-content/70">Semestre Activo: <span class="font-semibold text-primary">{{ semestre_activo.nombre }} ({{ semestre_activo.get_tipo_display }})</span></p>
+            </div>
+            
+            <div class="flex items-center gap-4 p-2 bg-base-200 rounded-box">
+                <div class="form-control">
+                    <label class="label pb-1"><span class="label-text">Especialidad:</span></label>
+                    <select id="especialidad" class="select select-bordered">
+                        <option value="" disabled selected>-- Seleccione --</option>
+                        {% for esp in especialidades %}
+                        <option value="{{ esp.id }}" {% if especialidad_seleccionada_id == esp.id|stringformat:"s" %}selected{% endif %}>{{ esp.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                 <div class="form-control">
+                    <label class="label pb-1"><span class="label-text">Semestre:</span></label>
+                    <select id="semestre_cursado" class="select select-bordered">
+                        <option value="" disabled selected>-- Seleccione --</option>
+                        {% for sem_num in semestres_validos %}
+                        <option value="{{ sem_num }}" {% if semestre_seleccionado == sem_num|stringformat:"s" %}selected{% endif %}>Semestre {{ sem_num|roman }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div id="planner-body" class="hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mt-4">
+                
+                <main class="lg:col-span-3">
+                    <div class="overflow-x-auto rounded-lg shadow-md border border-base-300">
+                        <table class="table table-fixed w-full">
+                            <thead class="bg-base-200">
+                                <tr>
+                                    <th class="w-32">Horas</th>
+                                    {% for dia in dias_semana %}<th>{{ dia }}</th>{% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody id="schedule-grid">
+                                {% for franja in franjas_horarias %}
+                                <tr data-franja-id="{{ franja.id }}">
+                                    <td class="text-center text-xs font-medium text-base-content/60 align-top h-24 p-1 border-r border-base-300">
+                                        {{ franja.hora_inicio|time:"h:i" }} - {{ franja.hora_fin|time:"h:i A" }}
+                                    </td>
+                                    {% for dia in dias_semana %}
+                                    <td class="p-1 border-t border-r border-base-300 align-top relative drop-zone droppable-cell" data-dia="{{ dia }}" data-franja-id="{{ franja.id }}"></td>
+                                    {% endfor %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </main>
+                
+                <aside class="lg:col-span-1">
+                    <div class="p-4 bg-base-100 rounded-box border border-base-300 shadow-lg h-full space-y-4">
+                        <h3 class="font-bold text-lg">Acciones</h3>
+                        <div id="trash-zone" class="p-4 text-center border-2 border-dashed border-base-300 rounded-box bg-base-200 text-base-content/70 min-h-[80px] flex flex-col justify-center items-center transition-all duration-300">
+                            <i class="fas fa-trash-alt text-2xl mb-2"></i>
+                            <p class="font-semibold text-sm">Arrastra aquí para desasignar</p>
+                        </div>
+
+                        <div class="divider"></div>
+
+                        <h3 class="font-bold text-lg">Cursos por Asignar</h3>
+                        <input type="text" id="course-search-input" placeholder="Buscar curso..." class="input input-bordered w-full">
+                        
+                        <div id="unassigned-courses-container" class="space-y-2">
+                            <div class="skeleton-loader h-16 w-full"></div><div class="skeleton-loader h-16 w-full"></div>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </div>
+        <div id="planner-placeholder" class="text-center py-20 text-base-content/50">
+            <i class="fas fa-calendar-alt fa-4x mb-4"></i>
+            <p class="text-xl font-semibold">Selecciona una especialidad y un semestre para comenzar.</p>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const especialidadSelector = document.getElementById('especialidad');
+    const semestreSelector = document.getElementById('semestre_cursado');
+    const plannerBody = document.getElementById('planner-body');
+    const plannerPlaceholder = document.getElementById('planner-placeholder');
+    const unassignedCoursesDiv = document.getElementById('unassigned-courses-container');
+    const trashZone = document.getElementById('trash-zone');
+    const searchInput = document.getElementById('course-search-input');
+
+    const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, timerProgressBar: true, didOpen: (toast) => { toast.addEventListener('mouseenter', Swal.stopTimer); toast.addEventListener('mouseleave', Swal.resumeTimer); } });
+
+    async function callApi(url, body) {
+        const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }, body: JSON.stringify(body) });
+        const data = await response.json();
+        if (!response.ok) { throw new Error(data.message || 'Error en el servidor'); }
+        return data;
+    }
+
+    function applyVisualSpan(cell, duration) {
+        if (!cell || duration < 2) return;
+        cell.setAttribute('rowspan', duration);
+        let currentRow = cell.parentElement;
+        for (let i = 1; i < duration; i++) {
+            currentRow = currentRow.nextElementSibling;
+            if (currentRow) {
+                const cellToHide = currentRow.querySelector(`[data-dia="${cell.dataset.dia}"]`);
+                if (cellToHide) cellToHide.style.display = 'none';
+            }
+        }
+    }
+
+    function revertVisualSpan(cell, duration) {
+        if (!cell || duration < 2) return;
+        cell.setAttribute('rowspan', 1);
+        let currentRow = cell.parentElement;
+        for (let i = 1; i < duration; i++) {
+            currentRow = currentRow.nextElementSibling;
+            if (currentRow) {
+                const cellToShow = currentRow.querySelector(`[data-dia="${cell.dataset.dia}"]`);
+                if (cellToShow) cellToShow.style.display = '';
+            }
+        }
+    }
+    
+    async function highlightConflicts(cursoId) {
+        const response = await fetch(`/api/get-teacher-conflicts/?curso_id=${cursoId}`);
+        const data = await response.json();
+        if (data.status === 'success') {
+            data.conflicts.forEach(conflict => {
+                const cell = document.querySelector(`td[data-dia="${conflict.dia}"][data-franja-id="${conflict.franja_id}"]`);
+                if (cell) cell.classList.add('conflict-cell');
+            });
+        }
+    }
+
+    function clearConflicts() {
+        document.querySelectorAll('.conflict-cell').forEach(cell => cell.classList.remove('conflict-cell'));
+    }
+
+    function createCourseElement(curso, isAssigned = false) {
+        const docenteNombre = `${curso.docente__first_name || ''} ${curso.docente__last_name || ''}`.trim();
+        const div = document.createElement('div');
+        div.className = `p-2 rounded-lg text-sm transition-all duration-300 cursor-grab active:cursor-grabbing border`;
+        div.dataset.cursoId = curso.id;
+        div.dataset.duracion = curso.duracion_bloques;
+        div.dataset.fullData = JSON.stringify(curso);
+
+        let colors = '';
+        if (isAssigned) {
+            if (curso.tipo_curso === 'GENERAL') colors = 'bg-purple-500/10 border-purple-500/20 text-purple-800 dark:text-purple-300';
+            else colors = 'bg-blue-500/10 border-blue-500/20 text-blue-800 dark:text-blue-300';
+        } else {
+            colors = 'bg-base-100 dark:bg-base-300 border-base-300';
+        }
+        div.classList.add(...colors.split(' '));
+
+        div.innerHTML = `
+            <p class="font-bold truncate">${curso.nombre}</p>
+            <p class="text-xs opacity-70 truncate">${docenteNombre}</p>
+            <p class="text-xs opacity-50">${curso.duracion_bloques} bloque(s)</p>
+        `;
+        return div;
+    }
+
+    function renderUnassignedCourses(data) {
+        unassignedCoursesDiv.innerHTML = '';
+        const createAccordion = (title, courses, id) => {
+            const collapseDiv = document.createElement('div');
+            collapseDiv.className = 'collapse collapse-arrow bg-base-200';
+            const count = courses.length;
+            collapseDiv.innerHTML = `
+                <input type="checkbox" checked /> 
+                <div class="collapse-title text-md font-medium">${title} (${count})</div>
+                <div class="collapse-content">
+                    <div id="${id}" class="space-y-2 pt-2"></div>
+                </div>
+            `;
+            const courseList = collapseDiv.querySelector(`#${id}`);
+            if (count > 0) {
+                courses.forEach(curso => courseList.appendChild(createCourseElement(curso, false)));
+            } else {
+                courseList.innerHTML = '<p class="text-xs text-base-content/50 p-2">No hay cursos de este tipo.</p>';
+            }
+            return collapseDiv;
+        };
+        unassignedCoursesDiv.appendChild(createAccordion('Cursos Generales', data.generales, 'unassigned-generales'));
+        unassignedCoursesDiv.appendChild(createAccordion('Cursos de Especialidad', data.especialidad, 'unassigned-especialidad'));
+    }
+
+    function redrawPlanner(data) {
+        document.querySelectorAll('.drop-zone').forEach(dz => { dz.innerHTML = ''; dz.style.display = ''; dz.setAttribute('rowspan', 1); });
+        renderUnassignedCourses(data.cursos_no_asignados);
+        data.cursos_asignados.forEach(curso => {
+            if (!curso.franja_id_inicio) return;
+            const cell = document.querySelector(`#schedule-grid td[data-dia="${curso.dia}"][data-franja-id="${curso.franja_id_inicio}"]`);
+            if (cell) {
+                cell.appendChild(createCourseElement(curso, true));
+                applyVisualSpan(cell, curso.duracion_bloques);
+            }
+        });
+    }
+
+    function initializeDragAndDrop() {
+        const sharedConfig = { group: 'shared', animation: 150 };
+        
+        new Sortable(document.getElementById('unassigned-generales'), sharedConfig);
+        new Sortable(document.getElementById('unassigned-especialidad'), sharedConfig);
+        
+        document.querySelectorAll('.drop-zone').forEach(zone => {
+            new Sortable(zone, {
+                ...sharedConfig,
+                onStart: (evt) => highlightConflicts(evt.item.dataset.cursoId),
+                onEnd: () => clearConflicts(),
+                onAdd: async (evt) => {
+                    const item = evt.item, dia = evt.to.dataset.dia, franjaId = evt.to.dataset.franjaId;
+                    const fromZone = evt.from, duration = parseInt(item.dataset.duracion) || 1;
+
+                    if (evt.to.classList.contains('conflict-cell') || evt.to.children.length > 1) {
+                        fromZone.appendChild(item);
+                        Toast.fire({ icon: 'error', title: 'No se puede asignar en este espacio.' });
+                        return;
+                    }
+                    try {
+                        const data = await callApi('/api/asignar-horario/', { curso_id: item.dataset.cursoId, dia: dia, franja_id: franjaId });
+                        Toast.fire({ icon: 'success', title: data.message });
+                        applyVisualSpan(evt.to, duration);
+                        const cursoData = JSON.parse(item.dataset.fullData);
+                        const newElement = createCourseElement(cursoData, true);
+                        evt.to.replaceChild(newElement, item);
+                    } catch (error) {
+                        Toast.fire({ icon: 'error', title: error.message });
+                        fromZone.appendChild(item);
+                    }
+                }
+            });
+        });
+
+        new Sortable(trashZone, {
+            ...sharedConfig,
+            onAdd: async (evt) => {
+                const item = evt.item, fromZone = evt.from, duration = parseInt(item.dataset.duracion) || 1;
+                try {
+                    const data = await callApi('/api/desasignar-horario/', { curso_id: item.dataset.cursoId });
+                    Toast.fire({ icon: 'success', title: data.message });
+                    item.remove();
+                    revertVisualSpan(fromZone, duration);
+                    
+                    // --- INICIO DE LA CORRECCIÓN ---
+                    // En lugar de solo borrar, volvemos a cargar todo para que la lista se actualice.
+                    await loadAndInitialize();
+                    // --- FIN DE LA CORRECCIÓN ---
+
+                } catch (error) {
+                    Toast.fire({ icon: 'error', title: error.message });
+                    fromZone.appendChild(item);
+                }
+            }
+        });
+    }
+
+    async function loadAndInitialize() {
+        const especialidadId = especialidadSelector.value;
+        const semestreNum = semestreSelector.value;
+
+        if (!especialidadId || !semestreNum) {
+            plannerBody.classList.add('hidden');
+            plannerPlaceholder.classList.remove('hidden');
+            return;
+        }
+        
+        plannerBody.classList.remove('hidden');
+        plannerPlaceholder.classList.add('hidden');
+        unassignedCoursesDiv.innerHTML = '<div class="skeleton-loader h-16 w-full"></div><div class="skeleton-loader h-16 w-full"></div>';
+        
+        try {
+            const response = await fetch(`/api/get-cursos-no-asignados/?especialidad_id=${especialidadId}&semestre_cursado=${semestreNum}`);
+            const data = await response.json();
+            redrawPlanner(data);
+            initializeDragAndDrop();
+        } catch (error) {
+             Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo cargar la información del horario.' });
+        }
+    }
+
+    especialidadSelector.addEventListener('change', loadAndInitialize);
+    semestreSelector.addEventListener('change', loadAndInitialize);
+    
+    searchInput.addEventListener('input', function() {
+        const searchTerm = searchInput.value.toLowerCase().trim();
+        document.querySelectorAll('#unassigned-courses-container .p-2.rounded-lg').forEach(card => {
+            card.style.display = card.textContent.toLowerCase().includes(searchTerm) ? '' : 'none';
+        });
+    });
+
+    if (especialidadSelector.value && semestreSelector.value) {
+        loadAndInitialize();
+    }
+});
+</script>
+
+{% endblock %}

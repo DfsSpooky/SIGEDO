@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block breadcrumb %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl md:text-3xl font-semibold text-base-content">Bienvenido, {{ user.first_name }}</h1>
+    <p class="text-base-content/70">Aquí tienes un resumen de tu actividad y próximos eventos.</p>
+</div>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+    <div class="card bg-base-100 shadow-lg">
+        <div class="card-body">
+            <div class="flex items-center gap-4">
+                <div class="bg-primary/10 text-primary p-3 rounded-full">
+                    <i class="fas fa-chalkboard-teacher text-2xl"></i>
+                </div>
+                <div>
+                    <p class="text-base-content/70">Cursos Programados Hoy</p>
+                    <p class="text-2xl font-bold">{{ cursos_hoy_count }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="card bg-base-100 shadow-lg">
+        <div class="card-body">
+            <div class="flex items-center gap-4">
+                <div class="bg-success/10 text-success p-3 rounded-full">
+                    <i class="fas fa-user-check text-2xl"></i>
+                </div>
+                <div>
+                    <p class="text-base-content/70">Asistencias Marcadas</p>
+                    <p class="text-2xl font-bold">{{ asistencias_count }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="card {% if documentos_observados_count > 0 %}bg-warning/10{% else %}bg-base-100{% endif %} shadow-lg">
+        <div class="card-body">
+            <div class="flex items-center gap-4">
+                <div class="{% if documentos_observados_count > 0 %}text-warning{% else %}text-base-content/70{% endif %} p-3 rounded-full">
+                    <i class="fas fa-file-circle-exclamation text-2xl"></i>
+                </div>
+                <div>
+                    <p class="text-base-content/70">Documentos Observados</p>
+                    <p class="text-2xl font-bold">{{ documentos_observados_count }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    
+    <div class="lg:col-span-2 space-y-8">
+        
+        <div class="card bg-primary text-primary-content shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title text-xl"><i class="fas fa-hourglass-half mr-2"></i> Próxima Clase Hoy</h2>
+                {% if proximo_curso %}
+                    <p class="text-3xl font-bold mt-2">{{ proximo_curso.nombre }}</p>
+                    <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                        <p><i class="fas fa-clock fa-fw mr-2 opacity-70"></i> <strong>Hora:</strong> {{ proximo_curso.horario_inicio|time:"h:i A" }} - {{ proximo_curso.horario_fin|time:"h:i A" }}</p>
+                        <p><i class="fas fa-book fa-fw mr-2 opacity-70"></i> <strong>Carrera:</strong> {{ proximo_curso.carrera.nombre }}</p>
+                    </div>
+                {% else %}
+                    <div class="text-center py-8">
+                        <i class="fas fa-coffee fa-3x opacity-50"></i>
+                        <p class="mt-4 text-lg">No tienes más clases programadas para hoy.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title text-xl mb-4">Actividad Reciente</h2>
+                <ul class="space-y-4">
+                    {% for item in actividad_reciente %}
+                    <li class="flex items-center gap-4">
+                        <div class="bg-base-200 p-3 rounded-full">
+                            <i class="fas {% if item.tipo == 'asistencia' %}fa-user-check text-success{% else %}fa-file-alt text-info{% endif %}"></i>
+                        </div>
+                        <div class="flex-grow">
+                            <p>{{ item.texto }}</p>
+                            <p class="text-xs text-base-content/60">{{ item.fecha|timesince }} atrás</p>
+                        </div>
+                    </li>
+                    {% empty %}
+                    <li class="text-center text-base-content/60 py-4">No hay actividad reciente.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="lg:col-span-1 space-y-8">
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title text-xl mb-4">Accesos Rápidos</h2>
+                <div class="space-y-2">
+                    <a href="{% url 'perfil' %}" class="btn btn-ghost justify-start w-full"><i class="fas fa-user-circle fa-fw mr-2"></i> Mi Perfil</a>
+                    <a href="{% url 'lista_documentos' %}" class="btn btn-ghost justify-start w-full"><i class="fas fa-folder-open fa-fw mr-2"></i> Mi Carpeta Pedagógica</a>
+                    <a href="{% url 'asistencia' %}" class="btn btn-ghost justify-start w-full"><i class="fas fa-fingerprint fa-fw mr-2"></i> Registrar Asistencia</a>
+                </div>
+            </div>
+        </div>
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title text-xl mb-4">Mis Horarios</h2>
+                {% if carreras %}
+                    <ul class="space-y-2">
+                    {% for carrera in carreras %}
+                        <li><a href="{% url 'ver_horarios' carrera.id %}" class="link link-primary">{{ carrera.nombre }}</a></li>
+                    {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-sm text-base-content/60">No tienes cursos asignados.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    </div>
+{% endblock %}

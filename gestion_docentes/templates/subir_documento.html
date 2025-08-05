@@ -1,0 +1,216 @@
+{% extends 'base.html' %}
+{% block title %}Subir Nuevo Documento{% endblock %}
+
+{% block content %}
+<style>
+    /* --- Nuevo Diseño de Tarjeta con Colores Pastel --- */
+    .doc-card {
+        position: relative;
+        overflow: hidden;
+        border-radius: 1.25rem; /* Bordes más redondeados */
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        padding: 3px; /* Espacio para el borde degradado */
+        cursor: pointer;
+    }
+
+    .doc-card:hover {
+        transform: translateY(-8px) scale(1.03);
+        box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.1);
+    }
+
+    .doc-card-inner {
+        background-color: #ffffff; /* Un fondo blanco puro para que los pasteles resalten */
+        padding: 1.5rem;
+        height: 100%;
+        border-radius: 1rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    /* Definición de la Paleta Pastel */
+    /* Color 1: Menta Suave */
+    .doc-card.color-1 { background: linear-gradient(145deg, #a8e6cf, #dcedc1); }
+    .doc-card.color-1 .doc-card-icon, .doc-card.color-1 .doc-card-action { color: #2c7a6b; }
+    
+    /* Color 2: Lavanda */
+    .doc-card.color-2 { background: linear-gradient(145deg, #d3cce3, #e9e4f0); }
+    .doc-card.color-2 .doc-card-icon, .doc-card.color-2 .doc-card-action { color: #5a4f78; }
+
+    /* Color 3: Melocotón */
+    .doc-card.color-3 { background: linear-gradient(145deg, #ffaaa5, #ffd3b6); }
+    .doc-card.color-3 .doc-card-icon, .doc-card.color-3 .doc-card-action { color: #a64f4a; }
+
+    /* Estilos comunes */
+    .doc-card-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 0.75rem;
+        display: grid;
+        place-items: center;
+        margin-bottom: 1.5rem;
+        background-color: rgba(255, 255, 255, 0.5); /* Ícono sobre un fondo semitransparente */
+        font-size: 1.75rem;
+    }
+    
+    .doc-card-title {
+        font-weight: 700;
+        font-size: 1.25rem;
+        line-height: 1.2;
+        color: #1f2937; /* Texto principal oscuro para legibilidad */
+    }
+    
+    .doc-card-description {
+        font-size: 0.875rem;
+        color: #4b5563; /* Texto de descripción más suave */
+        margin-top: 0.5rem;
+        flex-grow: 1;
+    }
+
+    .doc-card-action {
+        margin-top: 1.5rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: gap 0.3s ease;
+    }
+
+    .doc-card:hover .doc-card-action {
+        gap: 0.75rem;
+    }
+    
+    /* Estilo para Drag & Drop */
+    .doc-card.drag-over {
+        transform: translateY(-8px) scale(1.05);
+        box-shadow: 0 10px 40px -5px rgba(0,0,0,0.2);
+    }
+    .doc-card.drag-over .doc-card-inner {
+        background-color: #f9fafb; /* Un ligero cambio de color al arrastrar */
+    }
+</style>
+
+<input type="checkbox" id="upload-modal-toggle" class="modal-toggle" />
+<div class="modal" role="dialog">
+  <div class="modal-box">
+    <form method="post" enctype="multipart/form-data" class="space-y-4">
+        {% csrf_token %}
+        <h3 class="font-bold text-lg">Subir Documento a: <span id="modal-category-title" class="text-primary"></span></h3>
+        <div id="file-preview" class="text-center p-4 bg-base-200 rounded-lg hidden"><i class="fas fa-file-alt text-2xl mb-2"></i><p class="font-semibold" id="file-name"></p></div>
+        {{ form.tipo_documento }}
+        <div class="form-control w-full">
+            <label class="label" for="{{ form.titulo.id_for_label }}"><span class="label-text">Título del Documento</span></label>
+            {{ form.titulo }}
+        </div>
+        <div class="hidden">{{ form.archivo }}</div>
+        <div class="modal-action">
+          <label for="upload-modal-toggle" class="btn btn-ghost">Cancelar</label>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save mr-2"></i> Guardar Documento</button>
+        </div>
+    </form>
+  </div>
+  <label class="modal-backdrop" for="upload-modal-toggle">Cerrar</label>
+</div>
+
+<div class="max-w-5xl mx-auto text-center">
+    <h1 class="text-3xl font-bold mb-2">Subir Nuevo Documento</h1>
+    <p class="text-base-content/70 mb-10">Haz clic en una categoría o arrastra y suelta un archivo sobre ella.</p>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+        {% for tipo in tipos_documento %}
+        <div class="doc-card category-card {% cycle 'color-1' 'color-2' 'color-3' %}" data-id="{{ tipo.id }}" data-nombre="{{ tipo.nombre }}">
+            <div class="doc-card-inner">
+                <div>
+                    <div class="doc-card-icon">
+                        <i class="fas fa-file-upload"></i>
+                    </div>
+                    <h2 class="doc-card-title">{{ tipo.nombre }}</h2>
+                    <p class="doc-card-description">
+                        Sube aquí los archivos correspondientes a esta categoría. Se aceptan PDF y DOCX.
+                    </p>
+                </div>
+                <div class="doc-card-action">
+                    <span>Seleccionar Archivo</span>
+                    <i class="fas fa-arrow-right"></i>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    <input type="file" id="file-selector-input" class="hidden" accept=".pdf,.docx">
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const modalToggle = document.getElementById('upload-modal-toggle');
+    const formTipoDocumento = document.querySelector('#{{ form.tipo_documento.id_for_label }}');
+    const formTitulo = document.querySelector('#{{ form.titulo.id_for_label }}');
+    const formArchivo = document.querySelector('#{{ form.archivo.id_for_label }}');
+    const modalCategoryTitle = document.getElementById('modal-category-title');
+    const categoryCards = document.querySelectorAll('.category-card');
+    const fileSelectorInput = document.getElementById('file-selector-input');
+    const fileNameDisplay = document.getElementById('file-name');
+    const filePreview = document.getElementById('file-preview');
+
+    formTitulo.classList.add('input', 'input-bordered', 'w-full');
+
+    let activeCategory = null;
+
+    const openUploadModal = (file, categoryId, categoryName) => {
+        if (!file) {
+            activeCategory = { id: categoryId, name: categoryName };
+            fileSelectorInput.click();
+            return;
+        }
+
+        if (!['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(file.type)) {
+            Swal.fire({ icon: 'error', title: 'Formato no válido', text: 'Solo se permiten archivos PDF o DOCX.' });
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) { // 5MB
+            Swal.fire({ icon: 'error', title: 'Archivo demasiado grande', text: 'El archivo no debe exceder los 5MB.' });
+            return;
+        }
+
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        formArchivo.files = dataTransfer.files;
+        formTipoDocumento.value = categoryId;
+        formTitulo.value = file.name.split('.').slice(0, -1).join('.');
+        modalCategoryTitle.textContent = categoryName;
+        fileNameDisplay.textContent = file.name;
+        filePreview.classList.remove('hidden');
+        modalToggle.checked = true;
+    };
+
+    categoryCards.forEach(card => {
+        card.addEventListener('click', function() {
+            openUploadModal(null, this.dataset.id, this.dataset.nombre);
+        });
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            card.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); });
+        });
+        ['dragenter', 'dragover'].forEach(eventName => {
+            card.addEventListener(eventName, () => card.classList.add('drag-over'));
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            card.addEventListener(eventName, () => card.classList.remove('drag-over'));
+        });
+        card.addEventListener('drop', function(e) {
+            const file = e.dataTransfer.files[0];
+            openUploadModal(file, this.dataset.id, this.dataset.nombre);
+        });
+    });
+
+    fileSelectorInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file && activeCategory) {
+            openUploadModal(file, activeCategory.id, activeCategory.name);
+        }
+        this.value = ''; 
+    });
+});
+</script>
+{% endblock %}

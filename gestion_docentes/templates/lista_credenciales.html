@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block title %}Generar Credenciales{% endblock %}
+
+{% block content %}
+    <h1 class="text-2xl font-bold mb-4">Generador de Credenciales</h1>
+    <p class="mb-6 text-gray-600">Selecciona un docente de la lista para generar e imprimir su credencial personalizada.</p>
+
+    <div class="bg-white p-6 rounded-lg shadow-md">
+        <ul class="space-y-4">
+            {% for docente in docentes %}
+                <li class="flex items-center justify-between p-3 border-b last:border-b-0">
+                    <div>
+                        <p class="font-semibold">{{ docente.first_name }} {{ docente.last_name }}</p>
+                        <p class="text-sm text-gray-500">DNI: {{ docente.dni }}</p>
+                    </div>
+                    <a href="{% url 'generar_credencial' docente.id %}" target="_blank" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+                        Generar Credencial
+                    </a>
+                </li>
+            {% empty %}
+                <li>No hay docentes registrados.</li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endblock %}
