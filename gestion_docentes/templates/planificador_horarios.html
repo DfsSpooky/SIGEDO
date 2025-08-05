@@ -136,8 +136,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const DOMElements = Object.fromEntries(Object.entries(selectors).map(([key, selector]) => [key, document.querySelector(selector)]));
 
     // Initial Data from Django
-    const franjasHorarias = {{ franjas_horarias|safe_json }};
-    const diasSemana = {{ dias_semana|safe_json }};
+    const franjasHorarias = {{ franjas_horarias_json|safe }};
+    const diasSemana = {{ dias_semana_json|safe }};
 
     const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, timerProgressBar: true });
 

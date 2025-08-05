@@ -704,11 +704,15 @@ def planificador_horarios(request):
     elif semestre_activo.tipo == 'PAR':
         semestres_validos = [2, 4, 6, 8, 10]
 
+    # Pre-serializar datos para JavaScript de forma segura
+    franjas_horarias_json = json.dumps(list(FranjaHoraria.objects.order_by('hora_inicio').values('id', 'hora_inicio', 'hora_fin', 'turno')))
+    dias_semana_json = json.dumps(['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'])
+
     context = {
         'semestre_activo': semestre_activo,
         'especialidades': Especialidad.objects.all(),
-        'franjas_horarias': FranjaHoraria.objects.all().order_by('hora_inicio'),
-        'dias_semana': ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'],
+        'franjas_horarias_json': franjas_horarias_json,
+        'dias_semana_json': dias_semana_json,
         'semestres_validos': semestres_validos,
         # Pasamos los filtros seleccionados para que la plantilla los recuerde
         'especialidad_seleccionada_id': request.GET.get('especialidad'),
