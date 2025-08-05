@@ -1,10 +1,57 @@
-{% extends 'base.html' %}
+{% extends 'registration/login_base.html' %}
+{% load static %}
 {% block title %}Iniciar Sesión{% endblock %}
+
 {% block content %}
-    <h1 class="text-2xl font-bold mb-4">Iniciar Sesión</h1>
-    <form method="post" class="space-y-4 max-w-md">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Iniciar Sesión</button>
-    </form>
+<div class="w-full max-w-md mx-auto">
+    <div class="text-center mb-8">
+        <i class="fas fa-university text-primary text-4xl mb-3"></i>
+        <h1 class="text-3xl font-bold text-base-content">Gestión Docente</h1>
+        <p class="text-base-content/70">Bienvenido de nuevo. Inicia sesión para continuar.</p>
+    </div>
+
+    <div class="card w-full bg-base-100 shadow-xl">
+        <div class="card-body">
+
+            <form method="post" class="space-y-4">
+                {% csrf_token %}
+
+                <div class="form-control">
+                    <label class="label" for="id_username">
+                        <span class="label-text">Usuario o DNI</span>
+                    </label>
+                    <input type="text" name="username" autofocus autocapitalize="none" autocomplete="username" maxlength="150" required id="id_username" class="input input-bordered w-full">
+                </div>
+
+                <div class="form-control">
+                    <label class="label" for="id_password">
+                        <span class="label-text">Contraseña</span>
+                    </label>
+                    <input type="password" name="password" autocomplete="current-password" required id="id_password" class="input input-bordered w-full">
+                </div>
+
+                {% if form.errors %}
+                <div class="alert alert-error text-sm p-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-5 w-5" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <span>Tus credenciales son incorrectas. Por favor, inténtalo de nuevo.</span>
+                </div>
+                {% endif %}
+
+                <div class="flex items-center justify-between mt-2">
+                    <div class="form-control">
+                        <label class="label cursor-pointer gap-2">
+                            <input type="checkbox" name="remember_me" class="checkbox checkbox-sm" id="id_remember_me">
+                            <span class="label-text text-sm">Recuérdame</span>
+                        </label>
+                    </div>
+                    <a href="#" class="text-sm text-primary hover:underline">¿Olvidaste tu contraseña?</a>
+                </div>
+
+                <div class="form-control mt-6">
+                    <button type="submit" class="btn btn-primary w-full">Iniciar Sesión</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}
