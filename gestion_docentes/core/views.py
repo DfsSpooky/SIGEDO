@@ -15,6 +15,7 @@ import io
 from django.db import models
 from django.db.models import Q
 from django.templatetags.static import static
+from django.core.serializers.json import DjangoJSONEncoder
 
 # Importamos todos los modelos, incluyendo los nuevos
 from .models import (
@@ -705,7 +706,7 @@ def planificador_horarios(request):
         semestres_validos = [2, 4, 6, 8, 10]
 
     # Pre-serializar datos para JavaScript de forma segura
-    franjas_horarias_json = json.dumps(list(FranjaHoraria.objects.order_by('hora_inicio').values('id', 'hora_inicio', 'hora_fin', 'turno')))
+    franjas_horarias_json = json.dumps(list(FranjaHoraria.objects.order_by('hora_inicio').values('id', 'hora_inicio', 'hora_fin', 'turno')), cls=DjangoJSONEncoder)
     dias_semana_json = json.dumps(['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'])
 
     context = {
