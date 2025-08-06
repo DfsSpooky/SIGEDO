@@ -91,7 +91,7 @@ class Command(BaseCommand):
         semestre = Semestre.objects.create(
             nombre=f'Semestre {date.today().year}-A',
             fecha_inicio=date(date.today().year, 3, 1),
-            fecha_fin=date(date.today().year, 7, 31),
+            fecha_fin=date(date.today().year, 8, 31),
             estado='ACTIVO',
             tipo='IMPAR'
         )

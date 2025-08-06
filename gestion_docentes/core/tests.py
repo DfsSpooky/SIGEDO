@@ -1,8 +1,10 @@
 from django.test import TestCase, Client
 from django.urls import reverse
-from .models import PersonalDocente, Notificacion, TipoDocumento, Documento, Anuncio
+from .models import PersonalDocente, Notificacion, TipoDocumento, Documento, Anuncio, Semestre
 from .utils.encryption import encrypt_id, decrypt_id
 import re
+import json
+from datetime import date, timedelta
 
 class CredentialEncryptionTest(TestCase):
 
@@ -135,6 +137,23 @@ class AdminInterfaceTest(TestCase):
         # Refresh the user from the database and check if the QR ID has changed
         self.staff_user.refresh_from_db()
         self.assertNotEqual(initial_qr_id, self.staff_user.id_qr)
+
+    def test_get_teacher_info_with_active_semester(self):
+        """Test that the kiosk API works when there is an active semester."""
+        Semestre.objects.create(
+            nombre="Test Semester",
+            fecha_inicio=date.today() - timedelta(days=30),
+            fecha_fin=date.today() + timedelta(days=30),
+            estado='ACTIVO'
+        )
+
+        url = reverse('api_get_teacher_info')
+        post_data = {'qrId': str(self.staff_user.id_qr)}
+        response = self.client.post(url, json.dumps(post_data), content_type='application/json')
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['status'], 'success')
 
 
 class AnuncioTest(TestCase):
