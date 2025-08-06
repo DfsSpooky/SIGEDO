@@ -6,7 +6,8 @@ from .models import (
     Grupo, Carrera, Especialidad, TipoDocumento, Docente, Curso,
     Documento, Asistencia, SolicitudIntercambio,
     PersonalDocente, Administrador, AsistenciaDiaria,
-    ConfiguracionInstitucion, Semestre, FranjaHoraria, DiaEspecial, VersionDocumento
+    ConfiguracionInstitucion, Semestre, FranjaHoraria, DiaEspecial, VersionDocumento,
+    Notificacion, Anuncio
 )
 
 # --- CONFIGURACIÓN DE ADMINS ---
@@ -123,6 +124,17 @@ class ConfiguracionInstitucionAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return not ConfiguracionInstitucion.objects.exists()
+
+@admin.register(Anuncio)
+class AnuncioAdmin(admin.ModelAdmin):
+    list_display = ('titulo', 'autor', 'fecha_publicacion')
+    search_fields = ('titulo', 'contenido')
+    list_filter = ('autor', 'fecha_publicacion')
+
+    def save_model(self, request, obj, form, change):
+        if not obj.autor:
+            obj.autor = request.user
+        super().save_model(request, obj, form, change)
 
 # --- REGISTRO DEL RESTO DE MODELOS ---
 admin.site.register(Grupo)

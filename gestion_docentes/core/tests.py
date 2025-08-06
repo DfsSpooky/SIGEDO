@@ -1,6 +1,6 @@
 from django.test import TestCase, Client
 from django.urls import reverse
-from .models import PersonalDocente
+from .models import PersonalDocente, Notificacion, TipoDocumento, Documento, Anuncio
 from .utils.encryption import encrypt_id, decrypt_id
 import re
 
@@ -135,3 +135,111 @@ class AdminInterfaceTest(TestCase):
         # Refresh the user from the database and check if the QR ID has changed
         self.staff_user.refresh_from_db()
         self.assertNotEqual(initial_qr_id, self.staff_user.id_qr)
+
+
+class AnuncioTest(TestCase):
+
+    def setUp(self):
+        """Set up users for announcement tests."""
+        self.admin_user = PersonalDocente.objects.create_superuser(
+            username='superadmin2',
+            password='superpassword123',
+            dni='77777777'
+        )
+        self.teacher = PersonalDocente.objects.create_user(
+            username='teacheruser2',
+            password='teacherpassword123',
+            dni='66666666'
+        )
+        self.client = Client()
+
+    def test_announcement_workflow(self):
+        """Test that an admin can create an announcement and a teacher can see it."""
+        # 1. Admin creates an announcement
+        self.client.login(username='superadmin2', password='superpassword123')
+        Anuncio.objects.create(
+            autor=self.admin_user,
+            titulo="Anuncio de Prueba",
+            contenido="Este es el contenido del anuncio."
+        )
+        self.assertEqual(Anuncio.objects.count(), 1)
+
+        # 2. Teacher logs in and views the announcement
+        self.client.login(username='teacheruser2', password='teacherpassword123')
+        response = self.client.get(reverse('ver_anuncios'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Anuncio de Prueba")
+        self.assertContains(response, "Este es el contenido del anuncio.")
+
+
+class NotificationTest(TestCase):
+
+    def setUp(self):
+        """Set up users and a document for notification tests."""
+        self.admin_user = PersonalDocente.objects.create_superuser(
+            username='superadmin',
+            password='superpassword123',
+            dni='99999999'
+        )
+        self.teacher = PersonalDocente.objects.create_user(
+            username='teacheruser',
+            password='teacherpassword123',
+            dni='88888888'
+        )
+        self.tipo_doc = TipoDocumento.objects.create(nombre='Test Type')
+        self.document = Documento.objects.create(
+            titulo='Test Document',
+            docente=self.teacher,
+            tipo_documento=self.tipo_doc
+        )
+        self.client = Client()
+
+    def test_notification_creation_on_status_change(self):
+        """Test that a notification is created when a document's status changes."""
+        # Check that there are no notifications initially
+        self.assertEqual(Notificacion.objects.count(), 0)
+
+        # Change the document status and save it
+        self.document.estado = 'APROBADO'
+        self.document.save()
+
+        # Check that one notification has been created
+        self.assertEqual(Notificacion.objects.count(), 1)
+        notification = Notificacion.objects.first()
+        self.assertEqual(notification.destinatario, self.teacher)
+        self.assertIn('aprobado', notification.mensaje)
+
+        # Test the 'OBSERVADO' case
+        self.document.estado = 'OBSERVADO'
+        self.document.save()
+        self.assertEqual(Notificacion.objects.count(), 2)
+        notification = Notificacion.objects.latest('fecha_creacion')
+        self.assertEqual(notification.destinatario, self.teacher)
+        self.assertIn('observaciones', notification.mensaje)
+
+    def test_notification_indicator_and_mark_as_read(self):
+        """Test the notification indicator and that notifications are marked as read."""
+        # Create a notification manually for the teacher
+        Notificacion.objects.create(destinatario=self.teacher, mensaje="Test notification")
+
+        # Log in as the teacher
+        self.client.login(username='teacheruser', password='teacherpassword123')
+
+        # 1. Check the dashboard for the unread count
+        dashboard_url = reverse('dashboard')
+        response = self.client.get(dashboard_url)
+        self.assertContains(response, '<span class="badge badge-sm badge-primary indicator-item">1</span>')
+
+        # 2. Visit the notifications page
+        notifications_url = reverse('ver_notificaciones')
+        response = self.client.get(notifications_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Test notification")
+
+        # 3. Check that the notification is now marked as read
+        self.assertEqual(Notificacion.objects.filter(destinatario=self.teacher, leido=True).count(), 1)
+
+        # 4. Check the dashboard again, the count should be gone
+        response = self.client.get(dashboard_url)
+        self.assertNotContains(response, 'indicator-item')
