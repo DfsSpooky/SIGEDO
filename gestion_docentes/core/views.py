@@ -202,9 +202,31 @@ def subir_nueva_version(request, documento_id):
 
 @login_required
 def lista_documentos(request):
-    # Usamos prefetch_related para cargar las versiones de forma eficiente
-    documentos = Documento.objects.filter(docente=request.user).prefetch_related('versiones').order_by('-fecha_subida')
-    return render(request, 'lista_documentos.html', {'documentos': documentos})
+    documentos_qs = Documento.objects.filter(docente=request.user).prefetch_related('versiones').order_by('-fecha_subida')
+
+    # Definir el orden de los estados
+    status_order = ['OBSERVADO', 'EN_REVISION', 'RECIBIDO', 'APROBADO', 'VENCIDO']
+
+    # Agrupar documentos por estado
+    documentos_agrupados = {status: [] for status in status_order}
+    for doc in documentos_qs:
+        if doc.estado in documentos_agrupados:
+            documentos_agrupados[doc.estado].append(doc)
+
+    # Crear una lista ordenada de tuplas (nombre_visible_estado, lista_documentos)
+    # para pasarla a la plantilla, omitiendo grupos vacíos.
+    documentos_por_seccion = []
+    estado_display_map = dict(Documento.ESTADOS_DOCUMENTO)
+
+    for status_key in status_order:
+        if documentos_agrupados[status_key]:
+            documentos_por_seccion.append({
+                'estado_key': status_key,
+                'estado_display': estado_display_map.get(status_key, status_key),
+                'documentos': documentos_agrupados[status_key]
+            })
+
+    return render(request, 'lista_documentos.html', {'documentos_por_seccion': documentos_por_seccion})
 
 @login_required
 def registrar_asistencia(request):
