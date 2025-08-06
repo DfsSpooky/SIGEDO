@@ -17,10 +17,38 @@
 
     <style>
         body { font-family: 'Inter', sans-serif; }
+        .gradient-bg {
+            background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+            background-size: 400% 400%;
+            animation: gradient 15s ease infinite;
+        }
+
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
     </style>
 </head>
-<body class="bg-base-200">
+<body class="gradient-bg">
     {% block content %}{% endblock %}
-    {% block extra_js %}{% endblock %}
+
+    {% block extra_js %}
+    <script>
+        function togglePasswordVisibility(passwordInputId, toggleIconId) {
+            const passwordInput = document.getElementById(passwordInputId);
+            const toggleIcon = document.getElementById(toggleIconId);
+            if (passwordInput.type === "password") {
+                passwordInput.type = "text";
+                toggleIcon.classList.remove('fa-eye');
+                toggleIcon.classList.add('fa-eye-slash');
+            } else {
+                passwordInput.type = "password";
+                toggleIcon.classList.remove('fa-eye-slash');
+                toggleIcon.classList.add('fa-eye');
+            }
+        }
+    </script>
+    {% endblock %}
 </body>
 </html>
