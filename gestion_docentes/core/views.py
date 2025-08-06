@@ -110,6 +110,15 @@ def dashboard(request):
     }
     return render(request, 'dashboard.html', context)
 
+@staff_member_required
+def admin_dashboard(request):
+    # This is a placeholder for the admin dashboard.
+    # We can add context data here later (e.g., stats, recent activity).
+    context = {
+        'welcome_message': 'Bienvenido al Panel de Control de Administración',
+    }
+    return render(request, 'admin_dashboard.html', context)
+
 @login_required
 def perfil(request):
     docente = request.user

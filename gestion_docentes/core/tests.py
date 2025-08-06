@@ -82,3 +82,38 @@ class CredentialEncryptionTest(TestCase):
         decrypted_id = decrypt_id(encrypted_id_from_html)
 
         self.assertEqual(decrypted_id, self.docente.id, "The encrypted ID in the link does not decrypt to the correct docente ID.")
+
+
+class AdminInterfaceTest(TestCase):
+
+    def setUp(self):
+        """Set up a staff user and a non-staff user."""
+        self.staff_user = PersonalDocente.objects.create_user(
+            username='staffuser',
+            password='staffpassword123',
+            is_staff=True,
+            dni='87654321'
+        )
+        self.non_staff_user = PersonalDocente.objects.create_user(
+            username='normaluser',
+            password='userpassword123',
+            is_staff=False,
+            dni='11223344'
+        )
+        self.client = Client()
+
+    def test_admin_dashboard_accessible_by_staff(self):
+        """Test that the admin dashboard is accessible to staff members."""
+        self.client.login(username='staffuser', password='staffpassword123')
+        url = reverse('admin_dashboard')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Bienvenido al Panel de Control de Administración")
+
+    def test_admin_dashboard_inaccessible_by_non_staff(self):
+        """Test that the admin dashboard is not accessible to non-staff members."""
+        self.client.login(username='normaluser', password='userpassword123')
+        url = reverse('admin_dashboard')
+        response = self.client.get(url)
+        # Should redirect to the normal user dashboard or login page
+        self.assertNotEqual(response.status_code, 200)

@@ -143,67 +143,71 @@ X_FRAME_OPTIONS = 'SAMEORIGIN'
 
 
 JAZZMIN_SETTINGS = {
-    # Título de la ventana (se verá en la pestaña del navegador)
-    "site_title": "Gestión Docente Admin",
-
-    # Título en la pantalla de login (puede ser corto)
+    # General settings
+    "site_title": "Gestión Docente",
     "site_header": "Gestión Docente",
-
-    # Título en el logo (puede ser más corto)
     "site_brand": "GD-Admin",
+    "welcome_sign": "Bienvenido al panel de administración",
+    "copyright": "Universidad Nacional Daniel Alcides Carrión",
+    "dashboard_url": "admin_dashboard",
 
-    # Logo para la pantalla de login
-    "login_logo": "/static/placeholder.png", # Puedes cambiar esto a la ruta de tu logo
+    # Theme settings
+    "theme": "flatly", # A clean, flat theme
+    "dark_mode_theme": "darkly", # Optional dark theme
 
-    # Logo para la barra lateral en modo oscuro
-    "site_logo_dark": "/static/placeholder.png", # Puedes cambiar esto
-
-    # Temas de Bootswatch https://bootswatch.com/
-    "theme": "darkly",
-
-    # Opciones de la interfaz de usuario
+    # UI Tweaks
     "ui_tweaks": {
         "navbar_small_text": False,
-        "footer_small_text": False,
+        "footer_small_text": True,
         "body_small_text": False,
         "brand_small_text": False,
-        "brand_colour": "navbar-dark",
+        "brand_colour": "navbar-primary",
         "accent": "accent-primary",
         "navbar": "navbar-dark",
         "no_navbar_border": False,
         "sidebar": "sidebar-dark-primary",
-        "sidebar_nav_small_text": False,
-        "sidebar_disable_expand": False,
-        "sidebar_nav_child_indent": False,
-        "sidebar_nav_compact_style": False,
-        "sidebar_nav_legacy_style": False,
-        "sidebar_nav_flat_style": False,
-        "theme": "darkly",
-        "dark_mode_theme": "darkly",
-        "button_classes": {
-            "primary": "btn-primary",
-            "secondary": "btn-secondary",
-            "info": "btn-info",
-            "warning": "btn-warning",
-            "danger": "btn-danger",
-            "success": "btn-success"
-        }
+        "sidebar_nav_flat_style": True,
+        "sidebar_nav_child_indent": True,
     },
 
-    # --- ORGANIZACIÓN DEL MENÚ LATERAL ---
+    # Menu settings
     "show_sidebar": True,
     "navigation_expanded": True,
     "order_with_respect_to": [
-        # Autenticación y Usuarios
-        "auth", "core.docente", "core.personal", "core.administrador",
-
-        # Organización Académica
-        "core.semestre", "core.carrera", "core.especialidad", "core.grupo", "core.curso",
-
-        # Asistencia y Horarios
-        "core.asistenciadiaria", "core.asistencia", "core.franjahoraria", "core.diaespecial",
-
-        # Otros
-        "core.documento", "core.tipodocumento", "core.solicitudintercambio"
+        # Group 1: Academic Management
+        "core.carrera", "core.especialidad", "core.semestre", "core.curso", "core.grupo", "core.franjahoraria",
+        # Group 2: Staff and Attendance
+        "auth.user", "auth.group", "core.docente", "core.asistencia", "core.asistenciadiaria",
+        # Group 3: Documents
+        "core.documento", "core.versiondocumento", "core.tipodocumento",
+        # Group 4: Utilities
+        "core.solicitudintercambio", "core.diaespecial",
     ],
+    "icons": {
+        # Auth
+        "auth": "fas fa-users-cog",
+        "auth.user": "fas fa-user",
+        "auth.Group": "fas fa-users",
+        # Core - Academic Management
+        "core.carrera": "fas fa-graduation-cap",
+        "core.especialidad": "fas fa-star",
+        "core.semestre": "fas fa-calendar-alt",
+        "core.curso": "fas fa-book",
+        "core.grupo": "fas fa-layer-group",
+        "core.franjahoraria": "fas fa-clock",
+        # Core - Staff and Attendance
+        "core.docente": "fas fa-chalkboard-teacher",
+        "core.personal": "fas fa-user-tie",
+        "core.administrador": "fas fa-user-shield",
+        "core.asistencia": "fas fa-check-circle",
+        "core.asistenciadiaria": "fas fa-calendar-check",
+        # Core - Documents
+        "core.documento": "fas fa-file-alt",
+        "core.versiondocumento": "fas fa-file-upload",
+        "core.tipodocumento": "fas fa-tag",
+        # Core - Utilities
+        "core.solicitudintercambio": "fas fa-exchange-alt",
+        "core.diaespecial": "fas fa-calendar-star",
+    },
+    "related_modal_active": True,
 }
