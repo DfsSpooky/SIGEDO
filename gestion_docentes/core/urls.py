@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from django.contrib.auth.views import LoginView
+from django.contrib.auth import views as auth_views
 from .utils import exports
 
 urlpatterns = [
@@ -15,10 +15,13 @@ urlpatterns = [
     path('intercambio/<int:curso_id>/', views.solicitar_intercambio, name='solicitar_intercambio'),
     path('solicitudes/', views.ver_solicitudes, name='ver_solicitudes'),
     path('solicitudes/<int:solicitud_id>/responder/', views.responder_solicitud, name='responder_solicitud'),
-    path('accounts/login/', LoginView.as_view(template_name='registration/login.html', redirect_authenticated_user=True), name='login'),
     
+    # --- Custom Login/Logout Views ---
+    path('accounts/login/', views.custom_login_view, name='login'),
+    # Django's built-in logout view is fine, as settings.py handles the redirect
+    path('accounts/logout/', auth_views.LogoutView.as_view(), name='logout'),
+
     # --- URLS PARA EL KIOSCO ---
-    
     # Esta ruta mostrará la página del kiosco
     path('kiosco/', views.kiosco_page, name='kiosco_page'),
     
@@ -46,4 +49,5 @@ urlpatterns = [
     path('reporte-asistencia/excel/', exports.exportar_reporte_excel, name='exportar_excel'),
     path('reporte-asistencia/pdf/', exports.exportar_reporte_pdf, name='exportar_pdf'),
     path('reporte-asistencia/detalle/<int:docente_id>/', views.detalle_asistencia_docente_ajax, name='detalle_asistencia_docente_ajax'),
+    path('api/reporte/chart-data/', views.api_get_report_chart_data, name='api_report_chart_data'),
 ]
