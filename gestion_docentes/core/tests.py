@@ -88,10 +88,9 @@ class AdminInterfaceTest(TestCase):
 
     def setUp(self):
         """Set up a staff user and a non-staff user."""
-        self.staff_user = PersonalDocente.objects.create_user(
+        self.staff_user = PersonalDocente.objects.create_superuser(
             username='staffuser',
             password='staffpassword123',
-            is_staff=True,
             dni='87654321'
         )
         self.non_staff_user = PersonalDocente.objects.create_user(
@@ -117,3 +116,22 @@ class AdminInterfaceTest(TestCase):
         response = self.client.get(url)
         # Should redirect to the normal user dashboard or login page
         self.assertNotEqual(response.status_code, 200)
+
+    def test_rotate_qr_code_view(self):
+        """Test that the rotate_qr_code view changes the id_qr."""
+        self.client.login(username='staffuser', password='staffpassword123')
+
+        # Get the initial QR ID
+        initial_qr_id = self.staff_user.id_qr
+
+        # Call the rotation view
+        url = reverse('rotate_qr_code', args=[self.staff_user.id])
+        response = self.client.get(url)
+
+        # Check for a successful redirect
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response['Location'], reverse('admin:core_personaldocente_change', args=[self.staff_user.id]))
+
+        # Refresh the user from the database and check if the QR ID has changed
+        self.staff_user.refresh_from_db()
+        self.assertNotEqual(initial_qr_id, self.staff_user.id_qr)

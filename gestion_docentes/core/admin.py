@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
+from django.urls import reverse
 from django.utils.html import format_html
 from .models import (
     Grupo, Carrera, Especialidad, TipoDocumento, Docente, Curso,
@@ -15,14 +16,21 @@ class DocenteAdmin(UserAdmin):
     list_display = ['username', 'first_name', 'last_name', 'get_especialidades', 'disponibilidad', 'is_staff']
     
     fieldsets = UserAdmin.fieldsets + (
-        ('Información Adicional', {'fields': ('dni', 'especialidades', 'disponibilidad', 'id_qr', 'foto', 'vista_previa_foto')}),
+        ('Información Adicional', {'fields': ('dni', 'especialidades', 'disponibilidad', 'id_qr', 'foto', 'vista_previa_foto', 'rotate_qr_code_button')}),
     )
     add_fieldsets = UserAdmin.add_fieldsets + (
         ('Información Adicional', {'fields': ('dni', 'especialidades', 'disponibilidad', 'foto')}),
     )
     
-    readonly_fields = ('id_qr', 'vista_previa_foto',)
+    readonly_fields = ('id_qr', 'vista_previa_foto', 'rotate_qr_code_button',)
     filter_horizontal = ('especialidades',)
+
+    def rotate_qr_code_button(self, obj):
+        if obj.pk:
+            url = reverse('rotate_qr_code', args=[obj.pk])
+            return format_html('<a class="button" href="{}">Generar Nuevo Código QR</a>', url)
+        return "No disponible para nuevos docentes"
+    rotate_qr_code_button.short_description = "Regenerar QR"
 
     def vista_previa_foto(self, obj):
         if obj.foto and hasattr(obj.foto, 'url'):

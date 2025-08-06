@@ -29,6 +29,8 @@ from .utils.encryption import decrypt_id
 import qrcode
 from django.contrib.auth import login, authenticate
 from django.contrib.auth.forms import AuthenticationForm
+from django.urls import reverse
+import uuid
 
 
 def custom_login_view(request):
@@ -638,6 +640,18 @@ def generar_credencial_docente(request, encrypted_id):
     }
     
     return render(request, 'credencial.html', context)
+
+@staff_member_required
+def rotate_qr_code(request, docente_id):
+    """
+    Generates a new id_qr for a given docente, effectively invalidating the old one.
+    """
+    docente = get_object_or_404(Docente, id=docente_id)
+    docente.id_qr = uuid.uuid4()
+    docente.save()
+    messages.success(request, f"Se ha generado un nuevo código QR para {docente.get_full_name()}. La credencial anterior ya no es válida.")
+    # Redirect back to the admin change page for that user
+    return redirect(reverse('admin:core_personaldocente_change', args=[docente.id]))
 
 
 # --- VISTA PARA REPORTES ---
