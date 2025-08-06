@@ -5,9 +5,14 @@
 {% block content %}
 <div class="w-full max-w-md mx-auto">
     <div class="text-center mb-8">
-        <i class="fas fa-university text-primary text-4xl mb-3"></i>
-        <h1 class="text-3xl font-bold text-base-content">Gestión Docente</h1>
-        <p class="text-base-content/70">Bienvenido de nuevo. Inicia sesión para continuar.</p>
+        {% if configuracion.logo %}
+            <img src="{{ configuracion.logo.url }}" alt="Logo de la Institución" class="w-24 h-24 mx-auto mb-4 object-contain">
+        {% else %}
+            <i class="fas fa-university text-primary text-4xl mb-3"></i>
+        {% endif %}
+
+        <h1 class="text-3xl font-bold text-white">{{ configuracion.nombre_institucion|default:"Gestión Docente" }}</h1>
+        <p class="text-gray-300">Bienvenido de nuevo. Inicia sesión para continuar.</p>
     </div>
 
     <div class="card w-full bg-base-100 shadow-xl">
@@ -17,17 +22,17 @@
                 {% csrf_token %}
 
                 <div class="form-control">
-                    <label class="label" for="id_username">
+                    <label class="label" for="{{ form.username.id_for_label }}">
                         <span class="label-text">Usuario o DNI</span>
                     </label>
-                    <input type="text" name="username" autofocus autocapitalize="none" autocomplete="username" maxlength="150" required id="id_username" class="input input-bordered w-full">
+                    {{ form.username }}
                 </div>
 
                 <div class="form-control">
-                    <label class="label" for="id_password">
+                    <label class="label" for="{{ form.password.id_for_label }}">
                         <span class="label-text">Contraseña</span>
                     </label>
-                    <input type="password" name="password" autocomplete="current-password" required id="id_password" class="input input-bordered w-full">
+                    {{ form.password }}
                 </div>
 
                 {% if form.errors %}
@@ -36,16 +41,6 @@
                     <span>Tus credenciales son incorrectas. Por favor, inténtalo de nuevo.</span>
                 </div>
                 {% endif %}
-
-                <div class="flex items-center justify-between mt-2">
-                    <div class="form-control">
-                        <label class="label cursor-pointer gap-2">
-                            <input type="checkbox" name="remember_me" class="checkbox checkbox-sm" id="id_remember_me">
-                            <span class="label-text text-sm">Recuérdame</span>
-                        </label>
-                    </div>
-                    <a href="#" class="text-sm text-primary hover:underline">¿Olvidaste tu contraseña?</a>
-                </div>
 
                 <div class="form-control mt-6">
                     <button type="submit" class="btn btn-primary w-full">Iniciar Sesión</button>
