@@ -3,71 +3,69 @@
 {% block title %}Iniciar Sesión{% endblock %}
 
 {% block content %}
-<div class="flex flex-col md:flex-row min-h-screen w-full">
-    <!-- Left Panel (Branding) -->
-    <div class="w-full md:w-1/2 bg-primary text-primary-content flex flex-col justify-center items-center p-12">
-        <div class="text-center">
+<div class="flex items-stretch min-h-screen bg-base-200">
+    <!-- Left Panel: Branding & Welcome -->
+    <div class="w-1/2 lg:w-5/12 hidden md:flex flex-col justify-center items-center text-white p-12 relative overflow-hidden" style="background: linear-gradient(135deg, #4f46e5 0%, #8b5cf6 100%);">
+        <div class="absolute top-0 left-0 w-full h-full bg-cover opacity-10" style="background-image: url('{% static 'bg-pattern.svg' %}');"></div>
+        <div class="z-10 text-center">
             {% if configuracion.logo %}
-                <img src="{{ configuracion.logo.url }}" alt="Logo de la Institución" class="w-32 h-32 mx-auto mb-6 object-contain">
-            {% else %}
-                <div class="w-32 h-32 mx-auto mb-6 bg-black/20 rounded-full flex items-center justify-center">
-                    <i class="fas fa-university text-5xl"></i>
-                </div>
+                <img src="{{ configuracion.logo.url }}" alt="Logo Institución" class="w-28 h-28 mx-auto mb-6 object-contain bg-white/20 p-2 rounded-full shadow-lg">
             {% endif %}
-            <h1 class="text-4xl font-bold">{{ configuracion.nombre_institucion|default:"Gestión Docente" }}</h1>
-            <p class="text-lg opacity-80 mt-2">Sistema de Gestión y Asistencia</p>
+            <h1 class="text-4xl font-bold tracking-tight">{{ configuracion.nombre_institucion|default:"Gestión Docente" }}</h1>
+            <p class="text-lg opacity-80 mt-4 max-w-md">
+                Una plataforma unificada para la gestión académica y el seguimiento de la asistencia docente.
+            </p>
+        </div>
+        <div class="absolute bottom-6 text-sm opacity-60">
+            &copy; {% now "Y" %} {{ configuracion.nombre_institucion }}. Todos los derechos reservados.
         </div>
     </div>
 
-    <!-- Right Panel (Login Form) -->
-    <div class="w-full md:w-1/2 bg-base-100 flex justify-center items-center p-8">
-        <div class="w-full max-w-sm">
-            <h2 class="text-3xl font-bold mb-2 text-center">Iniciar Sesión</h2>
-            <p class="text-center text-base-content/70 mb-8">Bienvenido de nuevo.</p>
+    <!-- Right Panel: Login Form -->
+    <div class="w-full md:w-1/2 lg:w-7/12 flex justify-center items-center p-6 lg:p-12">
+        <div class="w-full max-w-md">
+            <div class="card bg-base-100 shadow-2xl">
+                <div class="card-body p-8 lg:p-12">
+                    <h2 class="card-title text-3xl font-bold mb-2">Bienvenido de Nuevo</h2>
+                    <p class="text-base-content/60 mb-8">Por favor, inicia sesión para continuar.</p>
 
-            <form method="post" class="space-y-8">
-                {% csrf_token %}
+                    <form method="post" class="space-y-6">
+                        {% csrf_token %}
 
-                <!-- Floating Label Username Input -->
-                <div class="relative">
-                    <input type="text" id="{{ form.username.id_for_label }}" name="{{ form.username.name }}" placeholder=" " class="floating-input peer">
-                    <label for="{{ form.username.id_for_label }}" class="floating-label">Usuario o DNI</label>
+                        <div class="form-control">
+                            <label for="{{ form.username.id_for_label }}" class="label">
+                                <span class="label-text">Usuario o DNI</span>
+                            </label>
+                            <input type="text" id="{{ form.username.id_for_label }}" name="{{ form.username.name }}"
+                                   placeholder="Ingresa tu usuario"
+                                   class="input input-bordered input-lg w-full">
+                        </div>
+
+                        <div class="form-control">
+                            <label for="{{ form.password.id_for_label }}" class="label">
+                                <span class="label-text">Contraseña</span>
+                            </label>
+                            <input type="password" id="{{ form.password.id_for_label }}" name="{{ form.password.name }}"
+                                   placeholder="Ingresa tu contraseña"
+                                   class="input input-bordered input-lg w-full">
+                        </div>
+
+                        {% if form.errors %}
+                        <div role="alert" class="alert alert-error text-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            <span>Credenciales incorrectas. Por favor, verifica tus datos.</span>
+                        </div>
+                        {% endif %}
+
+                        <div class="pt-4">
+                            <button type="submit" class="btn btn-primary btn-lg w-full">
+                                Iniciar Sesión
+                            </button>
+                        </div>
+                    </form>
                 </div>
-
-                <!-- Floating Label Password Input -->
-                <div class="relative">
-                    <input type="password" id="{{ form.password.id_for_label }}" name="{{ form.password.name }}" placeholder=" " class="floating-input peer">
-                    <label for="{{ form.password.id_for_label }}" class="floating-label">Contraseña</label>
-                </div>
-
-                {% if form.errors %}
-                <div class="alert alert-error text-sm p-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    <span>Tus credenciales son incorrectas. Por favor, inténtalo de nuevo.</span>
-                </div>
-                {% endif %}
-
-                <div class="form-control pt-4">
-                    <button type="submit" class="btn btn-primary w-full text-base">
-                        Ingresar
-                    </button>
-                </div>
-            </form>
+            </div>
         </div>
     </div>
 </div>
-
-<style>
-    .floating-input {
-        @apply block w-full px-3 py-4 text-base-content bg-transparent rounded-md border-2 border-base-300 appearance-none;
-        @apply focus:outline-none focus:ring-0 focus:border-primary;
-    }
-
-    .floating-label {
-        @apply absolute text-sm text-base-content/70 duration-300 transform -translate-y-4 scale-75 top-4 z-10 origin-[0] bg-base-100 px-2;
-        @apply peer-focus:px-2 peer-focus:text-primary;
-        @apply peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2;
-        @apply peer-focus:top-4 peer-focus:scale-75 peer-focus:-translate-y-4 left-1;
-    }
-</style>
 {% endblock %}
