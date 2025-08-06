@@ -142,19 +142,19 @@
         <div class="flex justify-center mt-6">
              {% if page_obj.has_other_pages %}
             <div class="join">
-                <a href="?page=1&{{ request.GET.urlencode|rem_page }}" class="join-item btn">«</a>
+                <a href="?page=1&{{ filter_params }}" class="join-item btn">«</a>
                 {% if page_obj.has_previous %}
-                    <a href="?page={{ page_obj.previous_page_number }}&{{ request.GET.urlencode|rem_page }}" class="join-item btn">‹</a>
+                    <a href="?page={{ page_obj.previous_page_number }}&{{ filter_params }}" class="join-item btn">‹</a>
                 {% else %}
                     <button class="join-item btn btn-disabled">‹</button>
                 {% endif %}
-                <button class="join-item btn">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</button>
+                <button class="join-item btn btn-active">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</button>
                 {% if page_obj.has_next %}
-                    <a href="?page={{ page_obj.next_page_number }}&{{ request.GET.urlencode|rem_page }}" class="join-item btn">›</a>
+                    <a href="?page={{ page_obj.next_page_number }}&{{ filter_params }}" class="join-item btn">›</a>
                 {% else %}
                      <button class="join-item btn btn-disabled">›</button>
                 {% endif %}
-                <a href="?page={{ page_obj.paginator.num_pages }}&{{ request.GET.urlencode|rem_page }}" class="join-item btn">»</a>
+                <a href="?page={{ page_obj.paginator.num_pages }}&{{ filter_params }}" class="join-item btn">»</a>
             </div>
             {% endif %}
         </div>

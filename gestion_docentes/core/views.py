@@ -700,6 +700,11 @@ def reporte_asistencia(request):
     except EmptyPage:
         page_obj = paginator.get_page(paginator.num_pages)
 
+    # Preparamos los parámetros de la URL para la paginación, excluyendo 'page'
+    query_params = request.GET.copy()
+    if 'page' in query_params:
+        del query_params['page']
+
     context = {
         'page_obj': page_obj,
         'reporte_data': page_obj.object_list,
@@ -714,6 +719,7 @@ def reporte_asistencia(request):
         'estado': estado,
         'curso_id': curso_id,
         'especialidad_id': especialidad_id,
+        'filter_params': query_params.urlencode(),
     }
 
     return render(request, 'reporte_asistencia.html', context)
