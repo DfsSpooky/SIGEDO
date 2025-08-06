@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load template_extras %}
 {% block title %}Generar Credenciales{% endblock %}
 {% block breadcrumb %}Credenciales{% endblock %}
 
@@ -32,7 +33,7 @@
                             </div>
                         </div>
                         <div class="card-actions justify-end mt-4">
-                            <a href="{% url 'generar_credencial' docente.id %}" target="_blank" class="btn btn-primary btn-sm">
+                            <a href="{% url 'generar_credencial' docente.id|encrypt %}" target="_blank" class="btn btn-primary btn-sm">
                                 <i class="fas fa-id-card"></i>
                                 Generar
                             </a>

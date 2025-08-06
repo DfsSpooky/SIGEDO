@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.admin.views.decorators import staff_member_required
-from django.http import JsonResponse
+from django.http import JsonResponse, Http404
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 from datetime import time, timedelta, date
@@ -25,6 +25,7 @@ from .models import (
 )
 from .forms import DocumentoForm, SolicitudIntercambioForm, VersionDocumentoForm
 from .utils.exports import exportar_reporte_excel, exportar_reporte_pdf
+from .utils.encryption import decrypt_id
 import qrcode
 from django.contrib.auth import login, authenticate
 from django.contrib.auth.forms import AuthenticationForm
@@ -597,8 +598,12 @@ def lista_docentes_credenciales(request):
     return render(request, 'lista_credenciales.html', context)
 
 @staff_member_required
-def generar_credencial_docente(request, docente_id):
-    docente = PersonalDocente.objects.get(id=docente_id)
+def generar_credencial_docente(request, encrypted_id):
+    docente_id = decrypt_id(encrypted_id)
+    if docente_id is None:
+        raise Http404("El enlace de la credencial no es válido o ha expirado.")
+
+    docente = get_object_or_404(PersonalDocente, id=docente_id)
     configuracion = ConfiguracionInstitucion.load()
 
     # Preparamos la URL absoluta para la FOTO del docente

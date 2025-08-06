@@ -31,7 +31,7 @@ urlpatterns = [
 
         # --- INICIO DE URLS PARA CREDENCIALES ---
     path('credenciales/', views.lista_docentes_credenciales, name='lista_credenciales'),
-    path('credenciales/<int:docente_id>/', views.generar_credencial_docente, name='generar_credencial'),
+    path('credenciales/<str:encrypted_id>/', views.generar_credencial_docente, name='generar_credencial'),
     # --- FIN DE URLS PARA CREDENCIALES ---
     path('reportes/asistencia/', views.reporte_asistencia, name='reporte_asistencia'),
 
