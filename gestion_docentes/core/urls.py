@@ -46,4 +46,5 @@ urlpatterns = [
     path('reporte-asistencia/excel/', exports.exportar_reporte_excel, name='exportar_excel'),
     path('reporte-asistencia/pdf/', exports.exportar_reporte_pdf, name='exportar_pdf'),
     path('reporte-asistencia/detalle/<int:docente_id>/', views.detalle_asistencia_docente_ajax, name='detalle_asistencia_docente_ajax'),
+    path('api/reporte/chart-data/', views.api_get_report_chart_data, name='api_report_chart_data'),
 ]

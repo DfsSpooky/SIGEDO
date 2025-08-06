@@ -609,6 +609,7 @@ def reporte_asistencia(request):
     fecha_fin = request.GET.get('fecha_fin')
     estado = request.GET.get('estado', 'todos')
     curso_id = request.GET.get('curso')
+    especialidad_id = request.GET.get('especialidad')
 
     # Si no se seleccionan fechas, usar la fecha actual como valor predeterminado
     if not fecha_inicio or not fecha_fin:
@@ -618,6 +619,10 @@ def reporte_asistencia(request):
 
     # Obtener todos los docentes
     docentes = Docente.objects.all().order_by('last_name', 'first_name')
+
+    # Aplicar filtro por especialidad
+    if especialidad_id:
+        docentes = docentes.filter(especialidades__id=especialidad_id)
     
     # Construir el queryset para las asistencias con el filtro de fechas
     asistencias_qs = Asistencia.objects.filter(
@@ -626,14 +631,29 @@ def reporte_asistencia(request):
 
     # Aplicar filtro por estado
     if estado == 'presente':
-        # Docentes que tienen al menos una asistencia general (sin curso)
         docentes_presentes_ids = asistencias_qs.filter(curso__isnull=True).values_list('docente_id', flat=True).distinct()
         docentes = docentes.filter(id__in=docentes_presentes_ids)
     elif estado == 'ausente':
-        # Docentes que NO tienen asistencia general (sin curso)
         docentes_presentes_ids = asistencias_qs.filter(curso__isnull=True).values_list('docente_id', flat=True).distinct()
         docentes = docentes.exclude(id__in=docentes_presentes_ids)
-    
+    elif estado == 'retardo':
+        # Definimos tardanza como entrada 10 minutos después del inicio del curso
+        from django.db.models import F, ExpressionWrapper, DurationField
+
+        # Obtenemos las asistencias que cumplen la condición de tardanza
+        asistencias_tardias = asistencias_qs.filter(
+            curso__horario_inicio__isnull=False,
+            hora_entrada__isnull=False
+        ).annotate(
+            lateness=ExpressionWrapper(
+                F('hora_entrada') - F('curso__horario_inicio'),
+                output_field=DurationField()
+            )
+        ).filter(lateness__gt=timedelta(minutes=10))
+
+        docentes_con_tardanza_ids = asistencias_tardias.values_list('docente_id', flat=True).distinct()
+        docentes = docentes.filter(id__in=docentes_con_tardanza_ids)
+
     # Aplicar filtro por curso
     if curso_id:
         docentes_con_asistencia_en_curso_ids = asistencias_qs.filter(curso_id=curso_id).values_list('docente_id', flat=True).distinct()
@@ -643,12 +663,22 @@ def reporte_asistencia(request):
     reporte_data = []
     for docente in docentes:
         asistencias_docente = asistencias_qs.filter(docente=docente)
-        asistencia_general = asistencias_docente.filter(curso__isnull=True).first()
+
+        # Marcar asistencias con tardanza
         asistencias_cursos = asistencias_docente.filter(curso__isnull=False)
+        for asis in asistencias_cursos:
+            if asis.hora_entrada and asis.curso.horario_inicio:
+                # Comparamos la hora de entrada con la hora de inicio del curso
+                hora_entrada_dt = timezone.datetime.combine(asis.fecha, asis.hora_entrada.time())
+                hora_inicio_dt = timezone.datetime.combine(asis.fecha, asis.curso.horario_inicio)
+                if (hora_entrada_dt - hora_inicio_dt) > timedelta(minutes=10):
+                    asis.es_tardanza = True
+            else:
+                asis.es_tardanza = False
 
         reporte_data.append({
             'docente': docente,
-            'asistencia_general': asistencia_general,
+            'asistencia_general': asistencias_docente.filter(curso__isnull=True).first(),
             'asistencias_cursos': asistencias_cursos,
         })
 
@@ -678,13 +708,79 @@ def reporte_asistencia(request):
         'ausentes_count': ausentes_count,
         'dia_especial': dia_especial,
         'cursos': Curso.objects.all(),
+        'especialidades': Especialidad.objects.all(),
         'fecha_inicio': fecha_inicio,
         'fecha_fin': fecha_fin,
         'estado': estado,
         'curso_id': curso_id,
+        'especialidad_id': especialidad_id,
     }
 
     return render(request, 'reporte_asistencia.html', context)
+
+@staff_member_required
+def api_get_report_chart_data(request):
+    fecha_inicio_str = request.GET.get('fecha_inicio')
+    fecha_fin_str = request.GET.get('fecha_fin')
+    especialidad_id = request.GET.get('especialidad')
+    curso_id = request.GET.get('curso')
+
+    try:
+        fecha_inicio = timezone.datetime.strptime(fecha_inicio_str, '%Y-%m-%d').date()
+        fecha_fin = timezone.datetime.strptime(fecha_fin_str, '%Y-%m-%d').date()
+    except (ValueError, TypeError):
+        today = date.today()
+        fecha_inicio = today
+        fecha_fin = today
+
+    # Base queryset
+    asistencias_qs = Asistencia.objects.filter(fecha__range=[fecha_inicio, fecha_fin])
+    docentes_qs = Docente.objects.all()
+
+    if especialidad_id:
+        docentes_qs = docentes_qs.filter(especialidades__id=especialidad_id)
+        asistencias_qs = asistencias_qs.filter(docente__in=docentes_qs)
+
+    if curso_id:
+        asistencias_qs = asistencias_qs.filter(curso_id=curso_id)
+
+    # Data for Bar Chart (daily breakdown)
+    from django.db.models.functions import TruncDate
+    from django.db.models import Count
+
+    daily_data = asistencias_qs.filter(curso__isnull=True).annotate(
+        dia=TruncDate('fecha')
+    ).values('dia').annotate(
+        present_count=Count('id')
+    ).order_by('dia')
+
+    # Data for Pie Chart (total breakdown)
+    total_docentes = docentes_qs.count()
+    total_presentes = asistencias_qs.filter(curso__isnull=True).values('docente').distinct().count()
+    total_ausentes = total_docentes - total_presentes
+
+    # Lateness calculation
+    from django.db.models import F, ExpressionWrapper, DurationField
+    asistencias_tardias_count = asistencias_qs.filter(
+        curso__horario_inicio__isnull=False, hora_entrada__isnull=False
+    ).annotate(
+        lateness=ExpressionWrapper(F('hora_entrada') - F('curso__horario_inicio'), output_field=DurationField())
+    ).filter(lateness__gt=timedelta(minutes=10)).values('docente').distinct().count()
+
+    chart_data = {
+        'bar_chart': {
+            'labels': [d['dia'].strftime('%d/%m') for d in daily_data],
+            'presentes': [d['present_count'] for d in daily_data],
+            'ausentes': [total_docentes - d['present_count'] for d in daily_data]
+        },
+        'pie_chart': {
+            'presentes': total_presentes,
+            'ausentes': total_ausentes,
+            'tardanzas': asistencias_tardias_count
+        }
+    }
+
+    return JsonResponse(chart_data)
 
 
 @staff_member_required
