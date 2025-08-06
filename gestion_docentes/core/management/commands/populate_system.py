@@ -1,10 +1,10 @@
 import random
 from django.core.management.base import BaseCommand
-from datetime import date
+from datetime import date, time
 from django.contrib.auth import get_user_model
 from core.models import (
     Carrera, Especialidad, Curso, Semestre, ConfiguracionInstitucion,
-    Grupo, Documento, TipoDocumento, Anuncio
+    Grupo, Documento, TipoDocumento, Anuncio, FranjaHoraria
 )
 
 User = get_user_model()
@@ -51,7 +51,22 @@ class Command(BaseCommand):
         esp_fil = Especialidad.objects.create(nombre='FILOSOFIA', grupo=grupo_b)
         self.stdout.write(self.style.SUCCESS('-> Grupos y Especialidades creados según especificaciones.'))
 
-        # --- 4. Crear Docentes ---
+        # --- 4. Crear Franjas Horarias ---
+        self.stdout.write('... Creando franjas horarias...')
+        franjas_data = [
+            ('MANANA', time(7, 30), time(8, 20)), ('MANANA', time(8, 20), time(9, 10)),
+            ('MANANA', time(9, 10), time(10, 00)), ('MANANA', time(10, 10), time(11, 00)),
+            ('MANANA', time(11, 00), time(11, 50)), ('MANANA', time(11, 50), time(12, 40)),
+            ('TARDE', time(14, 0), time(14, 50)), ('TARDE', time(14, 50), time(15, 40)),
+            ('TARDE', time(15, 40), time(16, 30)), ('TARDE', time(16, 40), time(17, 30)),
+            ('TARDE', time(17, 30), time(18, 20)), ('TARDE', time(18, 20), time(19, 10)),
+        ]
+        for turno, inicio, fin in franjas_data:
+            FranjaHoraria.objects.create(turno=turno, hora_inicio=inicio, hora_fin=fin)
+        self.stdout.write(self.style.SUCCESS(f'-> {len(franjas_data)} Franjas Horarias creadas.'))
+
+
+        # --- 5. Crear Docentes ---
         self.stdout.write('... Creando docentes...')
         docentes = {
             'mat': User.objects.create_user(username='h.soto', first_name='Hernán', last_name='Soto', dni='11111111', password='password'),
