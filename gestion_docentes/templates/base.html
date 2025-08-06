@@ -1,5 +1,5 @@
 {% load static %} <!DOCTYPE html>
-<html lang="es" data-theme="business"> <head>
+<html lang="es" data-theme="winter"> <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Gestión Docente{% endblock %} - Sistema de Gestión</title>
@@ -69,12 +69,6 @@
                     </div>
                 </div>
                 <div class="flex-none gap-4">
-                    <label class="swap swap-rotate btn btn-ghost btn-circle">
-                        <input type="checkbox" id="theme-toggle" />
-                        <i class="fas fa-sun swap-on fill-current w-5 h-5 transition-transform duration-300 ease-in-out"></i>
-                        <i class="fas fa-moon swap-off fill-current w-5 h-5 transition-transform duration-300 ease-in-out"></i>
-                    </label>
-                    
                     <div class="dropdown dropdown-end">
                         <label tabindex="0" class="btn btn-ghost btn-circle avatar">
                             <div class="w-10 rounded-full ring-2 ring-offset-2 ring-offset-base-100 ring-transparent hover:ring-primary transition-shadow duration-300">
@@ -172,21 +166,6 @@
         </div>
     </div>
 
-    <script>
-        const themeToggle = document.getElementById('theme-toggle');
-        const html = document.documentElement;
-        // Use 'business' for dark and 'corporate' for light
-        const darkTheme = 'business';
-        const lightTheme = 'corporate';
-        const currentTheme = localStorage.getItem('theme') || darkTheme;
-        html.setAttribute('data-theme', currentTheme);
-        themeToggle.checked = currentTheme === lightTheme;
-        themeToggle.addEventListener('change', function() {
-            const newTheme = this.checked ? lightTheme : darkTheme;
-            html.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
-        });
-    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>
