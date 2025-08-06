@@ -8,45 +8,78 @@
         {% if configuracion.logo %}
             <img src="{{ configuracion.logo.url }}" alt="Logo de la Institución" class="w-24 h-24 mx-auto mb-4 object-contain">
         {% else %}
-            <i class="fas fa-university text-primary text-4xl mb-3"></i>
+            <i class="fas fa-university text-white text-4xl mb-3"></i>
         {% endif %}
 
         <h1 class="text-3xl font-bold text-white">{{ configuracion.nombre_institucion|default:"Gestión Docente" }}</h1>
         <p class="text-gray-300">Bienvenido de nuevo. Inicia sesión para continuar.</p>
     </div>
 
-    <div class="card w-full bg-base-100 shadow-xl">
+    <!-- Glassmorphism Card -->
+    <div class="card w-full bg-white/10 backdrop-blur-lg shadow-xl border border-white/20">
         <div class="card-body">
 
-            <form method="post" class="space-y-4">
+            <form method="post" class="space-y-6">
                 {% csrf_token %}
 
+                <!-- Username Input with Icon -->
                 <div class="form-control">
                     <label class="label" for="{{ form.username.id_for_label }}">
-                        <span class="label-text">Usuario o DNI</span>
+                        <span class="label-text text-white/80">Usuario o DNI</span>
                     </label>
-                    {{ form.username }}
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3">
+                            <i class="fas fa-user text-white/50"></i>
+                        </span>
+                        {{ form.username }}
+                    </div>
                 </div>
 
+                <!-- Password Input with Icon -->
                 <div class="form-control">
                     <label class="label" for="{{ form.password.id_for_label }}">
-                        <span class="label-text">Contraseña</span>
+                        <span class="label-text text-white/80">Contraseña</span>
                     </label>
-                    {{ form.password }}
+                     <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3">
+                            <i class="fas fa-lock text-white/50"></i>
+                        </span>
+                        {{ form.password }}
+                    </div>
                 </div>
 
                 {% if form.errors %}
-                <div class="alert alert-error text-sm p-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-5 w-5" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <div class="alert alert-error text-sm p-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     <span>Tus credenciales son incorrectas. Por favor, inténtalo de nuevo.</span>
                 </div>
                 {% endif %}
 
-                <div class="form-control mt-6">
-                    <button type="submit" class="btn btn-primary w-full">Iniciar Sesión</button>
+                <div class="form-control mt-8">
+                    <button type="submit" class="btn btn-primary w-full text-lg shadow-lg hover:shadow-primary/50 transition-shadow">
+                        Iniciar Sesión
+                    </button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
+<style>
+    /* Custom styles for form inputs to accommodate icons and glass effect */
+    input[name="username"], input[name="password"] {
+        background-color: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: white;
+        padding-left: 2.5rem; /* Space for icon */
+        border-radius: var(--rounded-btn, 0.5rem);
+        width: 100%;
+        height: 3rem;
+        font-size: 1rem;
+    }
+    input[name="username"]::placeholder, input[name="password"]::placeholder {
+        color: rgba(255, 255, 255, 0.4);
+    }
+</style>
+
 {% endblock %}
