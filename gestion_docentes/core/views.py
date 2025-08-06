@@ -532,8 +532,21 @@ def mark_attendance_kiosk(request):
 
 @staff_member_required
 def lista_docentes_credenciales(request):
+    query = request.GET.get('q', '')
     docentes = PersonalDocente.objects.all()
-    return render(request, 'lista_credenciales.html', {'docentes': docentes})
+
+    if query:
+        docentes = docentes.filter(
+            Q(first_name__icontains=query) |
+            Q(last_name__icontains=query) |
+            Q(dni__icontains=query)
+        ).distinct()
+
+    context = {
+        'docentes': docentes,
+        'query': query,
+    }
+    return render(request, 'lista_credenciales.html', context)
 
 @staff_member_required
 def generar_credencial_docente(request, docente_id):

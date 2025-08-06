@@ -15,6 +15,24 @@
     .skeleton-loader { @apply animate-pulse bg-base-200 rounded-lg; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
+
+    /* SweetAlert2 Button Fix */
+    .swal2-confirm {
+        background-color: hsl(var(--p)) !important;
+        color: hsl(var(--pc)) !important;
+        border-radius: var(--rounded-btn, 0.5rem);
+        padding: 0.75rem 1.5rem;
+    }
+    .swal2-cancel {
+        background-color: transparent !important;
+        color: hsl(var(--bc)) !important;
+        border: 1px solid hsl(var(--bc) / 0.2) !important;
+        border-radius: var(--rounded-btn, 0.5rem);
+        padding: 0.75rem 1.5rem;
+    }
+    .swal2-confirm:hover, .swal2-cancel:hover {
+        opacity: 0.9;
+    }
 </style>
 
 <div class="card bg-base-100 shadow-xl">
