@@ -17,6 +17,10 @@ urlpatterns = [
     path('solicitudes/', views.ver_solicitudes, name='ver_solicitudes'),
     path('solicitudes/<int:solicitud_id>/responder/', views.responder_solicitud, name='responder_solicitud'),
     
+    # --- Justificaciones ---
+    path('justificaciones/', views.lista_justificaciones, name='lista_justificaciones'),
+    path('justificaciones/solicitar/', views.solicitar_justificacion, name='solicitar_justificacion'),
+
     # --- Custom Login/Logout Views ---
     path('accounts/login/', views.custom_login_view, name='login'),
     # Django's built-in logout view is fine, as settings.py handles the redirect

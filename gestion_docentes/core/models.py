@@ -207,3 +207,38 @@ class Anuncio(models.Model):
 
     def __str__(self):
         return self.titulo
+
+class TipoJustificacion(models.Model):
+    nombre = models.CharField(max_length=100, unique=True, help_text="Ej: Licencia Médica, Comisión de Servicio, Permiso Personal")
+
+    def __str__(self):
+        return self.nombre
+
+class Justificacion(models.Model):
+    ESTADOS_APROBACION = [
+        ('PENDIENTE', 'Pendiente'),
+        ('APROBADO', 'Aprobado'),
+        ('RECHAZADO', 'Rechazado'),
+    ]
+
+    docente = models.ForeignKey(Docente, on_delete=models.CASCADE, related_name='justificaciones')
+    tipo = models.ForeignKey(TipoJustificacion, on_delete=models.PROTECT, related_name='justificaciones')
+    fecha_inicio = models.DateField()
+    fecha_fin = models.DateField()
+    motivo = models.TextField(help_text="Explique brevemente el motivo de su ausencia.")
+    documento_adjunto = models.FileField(upload_to='justificaciones/', blank=True, null=True, help_text="Opcional: Adjunte un documento que respalde su solicitud (PDF, imagen, etc.)")
+    estado = models.CharField(max_length=20, choices=ESTADOS_APROBACION, default='PENDIENTE')
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_revision = models.DateTimeField(null=True, blank=True)
+    revisado_por = models.ForeignKey(Docente, on_delete=models.SET_NULL, null=True, blank=True, related_name='justificaciones_revisadas', limit_choices_to={'is_staff': True})
+    observaciones_revision = models.TextField(blank=True, help_text="Notas internas del administrador que revisa la solicitud.")
+
+    def __str__(self):
+        return f"Justificación de {self.docente} ({self.fecha_inicio} al {self.fecha_fin}) - {self.get_estado_display()}"
+
+    def clean(self):
+        if self.fecha_inicio > self.fecha_fin:
+            raise ValidationError("La fecha de inicio no puede ser posterior a la fecha de fin.")
+
+    class Meta:
+        ordering = ['-fecha_creacion']

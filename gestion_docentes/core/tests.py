@@ -1,6 +1,6 @@
 from django.test import TestCase, Client
 from django.urls import reverse
-from .models import PersonalDocente, Notificacion, TipoDocumento, Documento, Anuncio, Semestre, ConfiguracionInstitucion, Curso, Asistencia, Carrera
+from .models import PersonalDocente, Notificacion, TipoDocumento, Documento, Anuncio, Semestre, ConfiguracionInstitucion, Curso, Asistencia, Carrera, Justificacion, TipoJustificacion
 from .utils.encryption import encrypt_id, decrypt_id
 import re
 from django.utils import timezone
@@ -391,3 +391,147 @@ class ReporteAsistenciaTest(TestCase):
         report_data = response.context['page_obj'].object_list
         docente_report = next((r for r in report_data if r['docente'] == self.docente and r['fecha'] == tuesday), None)
         self.assertIsNone(docente_report)
+
+
+class JustificacionTest(TestCase):
+
+    def setUp(self):
+        """Set up users and objects for justification tests."""
+        self.staff_user = PersonalDocente.objects.create_superuser(
+            username='staffuser_just',
+            password='staffpassword123',
+            dni='11112222'
+        )
+        self.teacher = PersonalDocente.objects.create_user(
+            username='teacher_just',
+            password='teacherpassword123',
+            dni='33334444',
+            first_name='Justo',
+            last_name='Profesor'
+        )
+        self.tipo_justificacion = TipoJustificacion.objects.create(nombre="Licencia Médica")
+        self.client = Client()
+
+    def test_justificacion_model_creation(self):
+        """Test that a Justificacion instance can be created successfully."""
+        today = date.today()
+        justificacion = Justificacion.objects.create(
+            docente=self.teacher,
+            tipo=self.tipo_justificacion,
+            fecha_inicio=today,
+            fecha_fin=today + timedelta(days=1),
+            motivo="Cita médica.",
+            estado='PENDIENTE'
+        )
+        self.assertEqual(Justificacion.objects.count(), 1)
+        self.assertEqual(justificacion.docente.first_name, "Justo")
+        self.assertEqual(justificacion.get_estado_display(), "Pendiente")
+
+    def test_solicitar_justificacion_view_for_teacher(self):
+        """Test that a teacher can access and submit the justification form."""
+        self.client.login(username='teacher_just', password='teacherpassword123')
+        url = reverse('solicitar_justificacion')
+
+        # Test GET request
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Solicitar Justificación de Ausencia")
+
+        # Test POST request
+        today = date.today()
+        post_data = {
+            'tipo': self.tipo_justificacion.id,
+            'fecha_inicio': today.strftime('%Y-%m-%d'),
+            'fecha_fin': (today + timedelta(days=2)).strftime('%Y-%m-%d'),
+            'motivo': 'Congreso académico'
+        }
+        response = self.client.post(url, post_data)
+
+        # Should redirect to the list view after successful submission
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response['Location'], reverse('lista_justificaciones'))
+        self.assertEqual(Justificacion.objects.count(), 1)
+        self.assertEqual(Justificacion.objects.first().motivo, 'Congreso académico')
+
+    def test_lista_justificaciones_view_for_staff(self):
+        """Test that a staff member can view and approve/reject justifications."""
+        self.client.login(username='staffuser_just', password='staffpassword123')
+
+        justificacion = Justificacion.objects.create(
+            docente=self.teacher,
+            tipo=self.tipo_justificacion,
+            fecha_inicio=date.today(),
+            fecha_fin=date.today(),
+            motivo="Test motivo",
+            estado='PENDIENTE'
+        )
+
+        url = reverse('lista_justificaciones')
+
+        # Test GET request
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Gestionar Justificaciones")
+        self.assertContains(response, "Justo Profesor")
+
+        # Test POST request to approve
+        response = self.client.post(url, {'justificacion_id': justificacion.id, 'accion': 'aprobar'})
+        self.assertEqual(response.status_code, 302)
+        justificacion.refresh_from_db()
+        self.assertEqual(justificacion.estado, 'APROBADO')
+        self.assertEqual(justificacion.revisado_por, self.staff_user)
+
+        # Test POST request to reject
+        justificacion.estado = 'PENDIENTE'
+        justificacion.save()
+        response = self.client.post(url, {'justificacion_id': justificacion.id, 'accion': 'rechazar'})
+        self.assertEqual(response.status_code, 302)
+        justificacion.refresh_from_db()
+        self.assertEqual(justificacion.estado, 'RECHAZADO')
+
+    def test_reporte_asistencia_with_justificacion(self):
+        """
+        Test that an approved justification correctly changes the status from 'Falta' to 'Justificado'.
+        """
+        self.client.login(username='staffuser_just', password='staffpassword123')
+        today = date.today()
+        # Ensure today is a Monday for predictability
+        today = today - timedelta(days=today.weekday())
+
+        Semestre.objects.create(nombre="Test Semestre Just", fecha_inicio=today-timedelta(days=30), fecha_fin=today+timedelta(days=30), estado='ACTIVO')
+        carrera = Carrera.objects.create(nombre="Ingeniería de Justificaciones")
+        Curso.objects.create(
+            docente=self.teacher,
+            nombre="Curso con Falta",
+            dia='Lunes',
+            horario_inicio="14:00:00",
+            horario_fin="16:00:00",
+            semestre=Semestre.objects.first(),
+            carrera=carrera
+        )
+
+        # 1. First, confirm the status is 'Falta' without justification
+        url = reverse('reporte_asistencia') + f'?fecha_inicio={today}&fecha_fin={today}'
+        response = self.client.get(url)
+        report_data = response.context['page_obj'].object_list
+        docente_report = next((r for r in report_data if r['docente'] == self.teacher and r['fecha'] == today), None)
+        self.assertIsNotNone(docente_report)
+        self.assertEqual(docente_report['estado'], 'Falta')
+
+        # 2. Now, add an approved justification for that day
+        Justificacion.objects.create(
+            docente=self.teacher,
+            tipo=self.tipo_justificacion,
+            fecha_inicio=today,
+            fecha_fin=today,
+            motivo="Ausencia justificada",
+            estado='APROBADO',
+            revisado_por=self.staff_user
+        )
+
+        # 3. Re-fetch the report and check that the status is now 'Justificado'
+        response = self.client.get(url)
+        report_data = response.context['page_obj'].object_list
+        docente_report = next((r for r in report_data if r['docente'] == self.teacher and r['fecha'] == today), None)
+        self.assertIsNotNone(docente_report)
+        self.assertEqual(docente_report['estado'], 'Justificado')

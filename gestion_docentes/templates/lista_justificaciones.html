@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+    {% if is_admin_view %}
+        Gestionar Justificaciones
+    {% else %}
+        Mis Justificaciones
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-gray-800">
+            {% if is_admin_view %}
+                Gestionar Justificaciones
+            {% else %}
+                Mis Justificaciones
+            {% endif %}
+        </h1>
+        <a href="{% url 'solicitar_justificacion' %}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-150 ease-in-out">
+            + Nueva Solicitud
+        </a>
+    </div>
+
+    <div class="bg-white shadow-md rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full leading-normal">
+                <thead>
+                    <tr>
+                        <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Docente</th>
+                        <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Tipo</th>
+                        <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Fechas</th>
+                        <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Estado</th>
+                        <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Documento</th>
+                        {% if is_admin_view %}
+                            <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Acciones</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for justificacion in justificaciones %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                <p class="text-gray-900 whitespace-no-wrap">{{ justificacion.docente.get_full_name }}</p>
+                            </td>
+                            <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                <p class="text-gray-900 whitespace-no-wrap">{{ justificacion.tipo.nombre }}</p>
+                            </td>
+                            <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                <p class="text-gray-900 whitespace-no-wrap">{{ justificacion.fecha_inicio|date:"d/m/Y" }} - {{ justificacion.fecha_fin|date:"d/m/Y" }}</p>
+                            </td>
+                            <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                <span class="relative inline-block px-3 py-1 font-semibold leading-tight
+                                    {% if justificacion.estado == 'APROBADO' %} text-green-900 bg-green-200
+                                    {% elif justificacion.estado == 'RECHAZADO' %} text-red-900 bg-red-200
+                                    {% else %} text-yellow-900 bg-yellow-200 {% endif %} rounded-full">
+                                    <span aria-hidden class="absolute inset-0 opacity-50 rounded-full"></span>
+                                    <span class="relative">{{ justificacion.get_estado_display }}</span>
+                                </span>
+                            </td>
+                            <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                {% if justificacion.documento_adjunto %}
+                                    <a href="{{ justificacion.documento_adjunto.url }}" target="_blank" class="text-blue-600 hover:text-blue-800">
+                                        Ver Documento
+                                    </a>
+                                {% else %}
+                                    <span class="text-gray-500">N/A</span>
+                                {% endif %}
+                            </td>
+                            {% if is_admin_view and justificacion.estado == 'PENDIENTE' %}
+                                <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm text-center">
+                                    <form method="post" class="inline-block">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="justificacion_id" value="{{ justificacion.id }}">
+                                        <button type="submit" name="accion" value="aprobar" class="text-green-600 hover:text-green-900 font-bold">Aprobar</button>
+                                    </form>
+                                    <form method="post" class="inline-block ml-4">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="justificacion_id" value="{{ justificacion.id }}">
+                                        <button type="submit" name="accion" value="rechazar" class="text-red-600 hover:text-red-900 font-bold">Rechazar</button>
+                                    </form>
+                                </td>
+                            {% elif is_admin_view %}
+                                 <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm text-center text-gray-500">
+                                    Revisado
+                                 </td>
+                            {% endif %}
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="{% if is_admin_view %}6{% else %}5{% endif %}" class="text-center py-10">
+                                <p class="text-gray-500">No hay justificaciones para mostrar.</p>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

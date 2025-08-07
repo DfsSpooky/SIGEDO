@@ -2,12 +2,13 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.urls import reverse
 from django.utils.html import format_html
+from django.utils import timezone
 from .models import (
     Grupo, Carrera, Especialidad, TipoDocumento, Docente, Curso,
     Documento, Asistencia, SolicitudIntercambio,
     PersonalDocente, Administrador, AsistenciaDiaria,
     ConfiguracionInstitucion, Semestre, FranjaHoraria, DiaEspecial, VersionDocumento,
-    Notificacion, Anuncio
+    Notificacion, Anuncio, TipoJustificacion, Justificacion
 )
 
 # --- CONFIGURACIÓN DE ADMINS ---
@@ -137,6 +138,31 @@ class AnuncioAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         if not obj.autor:
             obj.autor = request.user
+        super().save_model(request, obj, form, change)
+
+@admin.register(TipoJustificacion)
+class TipoJustificacionAdmin(admin.ModelAdmin):
+    list_display = ('nombre',)
+    search_fields = ('nombre',)
+
+@admin.register(Justificacion)
+class JustificacionAdmin(admin.ModelAdmin):
+    list_display = ('docente', 'tipo', 'fecha_inicio', 'fecha_fin', 'estado')
+    list_filter = ('estado', 'tipo', 'fecha_inicio')
+    search_fields = ('docente__first_name', 'docente__last_name', 'motivo')
+    ordering = ('-fecha_creacion',)
+    readonly_fields = ('fecha_creacion', 'fecha_revision', 'revisado_por')
+
+    fieldsets = (
+        (None, {'fields': ('docente', 'tipo', 'fecha_inicio', 'fecha_fin', 'motivo')}),
+        ('Documentación', {'fields': ('documento_adjunto',)}),
+        ('Estado de la Solicitud', {'fields': ('estado', 'observaciones_revision', 'revisado_por', 'fecha_revision')}),
+    )
+
+    def save_model(self, request, obj, form, change):
+        if 'estado' in form.changed_data:
+            obj.revisado_por = request.user
+            obj.fecha_revision = timezone.now()
         super().save_model(request, obj, form, change)
 
 # --- REGISTRO DEL RESTO DE MODELOS ---

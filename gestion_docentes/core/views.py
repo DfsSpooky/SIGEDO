@@ -22,9 +22,9 @@ from .models import (
     Docente, Curso, Documento, Asistencia, Carrera, SolicitudIntercambio,
     TipoDocumento, AsistenciaDiaria, PersonalDocente, ConfiguracionInstitucion,
     Semestre, DiaEspecial, Especialidad, FranjaHoraria, VersionDocumento, Anuncio,
-    Notificacion
+    Notificacion, Justificacion, TipoJustificacion
 )
-from .forms import DocumentoForm, SolicitudIntercambioForm, VersionDocumentoForm
+from .forms import DocumentoForm, SolicitudIntercambioForm, VersionDocumentoForm, JustificacionForm
 from .utils.exports import exportar_reporte_excel, exportar_reporte_pdf
 from .utils.encryption import decrypt_id
 import qrcode
@@ -461,6 +461,55 @@ def responder_solicitud(request, solicitud_id):
     
     return render(request, 'responder_solicitud.html', {'solicitud': solicitud})
 
+@login_required
+def solicitar_justificacion(request):
+    if request.method == 'POST':
+        form = JustificacionForm(request.POST, request.FILES)
+        if form.is_valid():
+            justificacion = form.save(commit=False)
+            justificacion.docente = request.user
+            justificacion.save()
+            messages.success(request, 'Su solicitud de justificación ha sido enviada correctamente.')
+            return redirect('lista_justificaciones')
+    else:
+        form = JustificacionForm()
+
+    return render(request, 'solicitar_justificacion.html', {'form': form})
+
+@staff_member_required
+def lista_justificaciones(request):
+    # Vista para que los administradores vean y gestionen las justificaciones
+    justificaciones_qs = Justificacion.objects.select_related('docente', 'tipo').order_by('-fecha_creacion')
+
+    # Lógica de filtrado (si se añade en el futuro)
+    # status_filter = request.GET.get('estado')
+    # if status_filter:
+    #     justificaciones_qs = justificaciones_qs.filter(estado=status_filter)
+
+    # Lógica para aprobar/rechazar desde la lista
+    if request.method == 'POST':
+        justificacion_id = request.POST.get('justificacion_id')
+        accion = request.POST.get('accion')
+        justificacion = get_object_or_404(Justificacion, id=justificacion_id)
+
+        if accion == 'aprobar':
+            justificacion.estado = 'APROBADO'
+            messages.success(request, f"Se aprobó la justificación de {justificacion.docente}.")
+        elif accion == 'rechazar':
+            justificacion.estado = 'RECHAZADO'
+            messages.warning(request, f"Se rechazó la justificación de {justificacion.docente}.")
+
+        justificacion.revisado_por = request.user
+        justificacion.fecha_revision = timezone.now()
+        justificacion.save()
+        return redirect('lista_justificaciones')
+
+    context = {
+        'justificaciones': justificaciones_qs,
+        'is_admin_view': True, # Para diferenciar en la plantilla
+    }
+    return render(request, 'lista_justificaciones.html', context)
+
 
 # --- VISTAS PARA EL KIOSCO ---
 
@@ -695,6 +744,20 @@ def reporte_asistencia(request):
     configuracion = ConfiguracionInstitucion.load()
     limite_tardanza = configuracion.tiempo_limite_tardanza or timedelta(minutes=10) # Default de 10 min
 
+    justificaciones_aprobadas = Justificacion.objects.filter(
+        estado='APROBADO',
+        fecha_inicio__lte=fecha_fin,
+        fecha_fin__gte=fecha_inicio
+    )
+
+    # Crear un set para búsquedas rápidas de justificaciones por (docente_id, fecha)
+    justificaciones_set = set()
+    for just in justificaciones_aprobadas:
+        d = just.fecha_inicio
+        while d <= just.fecha_fin:
+            justificaciones_set.add((just.docente_id, d))
+            d += timedelta(days=1)
+
     dias_del_rango = [fecha_inicio + timedelta(days=i) for i in range((fecha_fin - fecha_inicio).days + 1)]
     dias_semana_map = {0: 'Lunes', 1: 'Martes', 2: 'Miércoles', 3: 'Jueves', 4: 'Viernes', 5: 'Sábado', 6: 'Domingo'}
 
@@ -731,6 +794,12 @@ def reporte_asistencia(request):
 
                     if tiene_tardanza:
                         estado_dia = 'Tardanza'
+
+                # Si después de todo, el estado es "Falta", comprobamos si hay justificación
+                if estado_dia == 'Falta':
+                    if (docente.id, dia_actual) in justificaciones_set:
+                        estado_dia = 'Justificado'
+
 
             # Aplicar el filtro de ESTADO
             if estado_filtro != 'todos' and estado_dia.lower() != estado_filtro:

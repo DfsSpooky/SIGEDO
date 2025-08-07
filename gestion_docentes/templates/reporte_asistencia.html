@@ -30,8 +30,9 @@
                     <select id="estado" name="estado" class="select select-bordered">
                         <option value="todos" {% if estado == 'todos' %}selected{% endif %}>Todos</option>
                         <option value="presente" {% if estado == 'presente' %}selected{% endif %}>Presente</option>
-                        <option value="ausente" {% if estado == 'ausente' %}selected{% endif %}>Ausente</option>
-                        <option value="retardo" {% if estado == 'retardo' %}selected{% endif %}>Con Retardo</option>
+                        <option value="falta" {% if estado == 'falta' %}selected{% endif %}>Falta</option>
+                        <option value="tardanza" {% if estado == 'tardanza' %}selected{% endif %}>Tardanza</option>
+                        <option value="justificado" {% if estado == 'justificado' %}selected{% endif %}>Justificado</option>
                     </select>
                 </div>
                 <div class="form-control">
@@ -112,6 +113,8 @@
                                 <span class="badge badge-warning font-bold">{{ record.estado }}</span>
                             {% elif record.estado == 'Falta' %}
                                 <span class="badge badge-error font-bold">{{ record.estado }}</span>
+                            {% elif record.estado == 'Justificado' %}
+                                <span class="badge badge-info font-bold">{{ record.estado }}</span>
                             {% else %}
                                 <span class="badge badge-ghost">{{ record.estado }}</span>
                             {% endif %}
