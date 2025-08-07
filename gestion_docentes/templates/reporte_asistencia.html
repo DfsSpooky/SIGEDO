@@ -122,26 +122,43 @@
 
                         <!-- Detalles de Asistencia -->
                         <td>
-                            {% if record.asistencias %}
-                                <ul class="space-y-2">
-                                    {% for asistencia in record.asistencias %}
-                                    <li class="flex flex-col p-2 bg-base-200 rounded-lg">
-                                        <strong class="font-medium text-base-content/90 text-sm">{{ asistencia.curso.nombre }}</strong>
-                                        <div class="flex justify-between items-center text-xs text-base-content/60 mt-1">
-                                            <div class="flex items-center gap-2">
-                                                <div class="flex items-center gap-1"><i class="fas fa-sign-in-alt text-success"></i><span>{{ asistencia.hora_entrada|time:"h:i A"|default:"-" }}</span></div>
-                                                {% if asistencia.es_tardanza %}<span class="badge badge-warning badge-xs font-bold">TARDANZA</span>{% endif %}
+                            <div class="space-y-2">
+                                {% if record.asistencia_diaria %}
+                                    <div class="flex items-center gap-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                                        <i class="fas fa-user-check text-blue-500 text-lg"></i>
+                                        <div>
+                                            <strong class="font-semibold text-blue-800">Asistencia General</strong>
+                                            <div class="text-xs text-blue-600">
+                                                Marcada a las: {{ record.asistencia_diaria.hora_entrada|time:"h:i:s A" }}
+                                                {% if record.asistencia_diaria.foto_verificacion %}
+                                                    <a href="{{ record.asistencia_diaria.foto_verificacion.url }}" target="_blank" class="link link-primary ml-2">[Ver Foto]</a>
+                                                {% endif %}
                                             </div>
-                                            <div class="flex items-center gap-1"><i class="fas fa-sign-out-alt text-error"></i><span>{{ asistencia.hora_salida|time:"h:i A"|default:"-" }}</span></div>
                                         </div>
-                                    </li>
-                                    {% endfor %}
-                                </ul>
-                            {% elif record.estado == 'Falta' %}
-                                <div class="text-error/70 text-sm">No se registró asistencia para los cursos programados.</div>
-                            {% else %}
-                                <span class="text-base-content/50 text-sm">N/A</span>
-                            {% endif %}
+                                    </div>
+                                {% endif %}
+
+                                {% if record.asistencias %}
+                                    <ul class="space-y-1">
+                                        {% for asistencia in record.asistencias %}
+                                        <li class="flex flex-col p-2 bg-base-200 rounded-md">
+                                            <strong class="font-medium text-base-content/90 text-sm">{{ asistencia.curso.nombre }}</strong>
+                                            <div class="flex justify-between items-center text-xs text-base-content/60 mt-1">
+                                                <div class="flex items-center gap-2">
+                                                    <div class="flex items-center gap-1"><i class="fas fa-sign-in-alt text-success"></i><span>{{ asistencia.hora_entrada|time:"h:i A"|default:"-" }}</span></div>
+                                                    {% if asistencia.es_tardanza %}<span class="badge badge-warning badge-xs font-bold">TARDANZA</span>{% endif %}
+                                                </div>
+                                                <div class="flex items-center gap-1"><i class="fas fa-sign-out-alt text-error"></i><span>{{ asistencia.hora_salida|time:"h:i A"|default:"-" }}</span></div>
+                                            </div>
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                {% elif record.estado == 'Falta' or record.estado == 'Justificado' %}
+                                    <div class="text-error/70 text-sm italic">No se registró asistencia a cursos.</div>
+                                {% elif not record.asistencia_diaria %}
+                                    <span class="text-base-content/50 text-sm">N/A</span>
+                                {% endif %}
+                            </div>
                         </td>
                         <!-- Actions -->
                         <td class="text-center">

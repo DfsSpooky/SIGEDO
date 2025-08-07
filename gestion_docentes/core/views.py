@@ -731,6 +731,9 @@ def reporte_asistencia(request):
         fecha__range=[fecha_inicio, fecha_fin]
     ).select_related('docente', 'curso')
 
+    asistencias_diarias_qs = AsistenciaDiaria.objects.filter(fecha__range=[fecha_inicio, fecha_fin]).select_related('docente')
+    asistencias_diarias_map = {(ad.docente_id, ad.fecha): ad for ad in asistencias_diarias_qs}
+
     semestre_activo = Semestre.objects.filter(estado='ACTIVO').first()
     cursos_programados_qs = Curso.objects.filter(semestre=semestre_activo, dia__isnull=False)
     if curso_id:
@@ -807,12 +810,14 @@ def reporte_asistencia(request):
 
             # Solo añadir al reporte si no es "No Requerido" o si se muestran todos
             if estado_dia != 'No Requerido' or estado_filtro == 'todos':
+                asistencia_diaria = asistencias_diarias_map.get((docente.id, dia_actual))
                 reporte_final.append({
                     'docente': docente,
                     'fecha': dia_actual,
                     'estado': estado_dia,
                     'asistencias': asistencias_del_dia,
-                    'cursos_programados': cursos_del_dia
+                    'cursos_programados': cursos_del_dia,
+                    'asistencia_diaria': asistencia_diaria
                 })
     
     # 4. CONTADORES Y PAGINACIÓN

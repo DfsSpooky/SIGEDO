@@ -44,13 +44,13 @@ class ReportePDFTemplate(BaseDocTemplate):
         logo_img = Paragraph("AQUI VA EL LOGO", STYLES['Normal'])
         
         # --- CAMBIO: Se lee la imagen desde la ruta del archivo, no desde una URL ---
-        if self.configuracion and self.configuracion.logo and hasattr(self.configuracion.logo, 'path'):
+        if self.configuracion and self.configuracion.logo and self.configuracion.logo.storage.exists(self.configuracion.logo.name):
             try:
-                # Se usa la ruta directa del archivo, que es más confiable
-                logo_path = self.configuracion.logo.path
-                logo_img = Image(logo_path, width=1.2*inch, height=1.2*inch, hAlign='CENTER')
+                logo_file = self.configuracion.logo.open('rb')
+                logo_img = Image(logo_file, width=1.2*inch, height=1.2*inch, hAlign='CENTER')
+                logo_file.close()
             except Exception as e:
-                print(f"Error cargando logo para PDF desde la ruta: {e}")
+                print(f"Error cargando logo para PDF: {e}")
         # --- FIN DEL CAMBIO ---
 
         nombre_institucion = Paragraph(self.configuracion.nombre_institucion if self.configuracion else "Nombre de Institución", STYLES['InstitutionTitle'])
@@ -112,6 +112,9 @@ def exportar_reporte_pdf(request):
         docentes_qs = docentes_qs.filter(especialidades__id=especialidad_id)
 
     asistencias_qs = Asistencia.objects.filter(fecha__range=[fecha_inicio, fecha_fin]).select_related('docente', 'curso')
+    asistencias_diarias_qs = AsistenciaDiaria.objects.filter(fecha__range=[fecha_inicio, fecha_fin]).select_related('docente')
+    asistencias_diarias_map = {(ad.docente_id, ad.fecha): ad for ad in asistencias_diarias_qs}
+
     semestre_activo = Semestre.objects.filter(estado='ACTIVO').first()
     cursos_programados_qs = Curso.objects.filter(semestre=semestre_activo, dia__isnull=False)
     if curso_id:
@@ -202,6 +205,24 @@ def exportar_reporte_pdf(request):
         estado_cell = Paragraph(record['estado'], status_styles.get(record['estado'], STYLES['TableCellCenter']))
         
         detalles_cells = []
+        asistencia_diaria = asistencias_diarias_map.get((record['docente'].id, record['fecha']))
+
+        if asistencia_diaria:
+            hora_general_str = asistencia_diaria.hora_entrada.astimezone(peru_tz).strftime('%H:%M:%S')
+            detalle_general_str = f"<b>Asistencia General: {hora_general_str}</b>"
+            detalles_cells.append(Paragraph(detalle_general_str, STYLES['TableCellSmall']))
+
+            if asistencia_diaria.foto_verificacion and asistencia_diaria.foto_verificacion.storage.exists(asistencia_diaria.foto_verificacion.name):
+                try:
+                    foto_file = asistencia_diaria.foto_verificacion.open('rb')
+                    foto_img = Image(foto_file, width=0.8*inch, height=0.8*inch, hAlign='LEFT')
+                    detalles_cells.append(foto_img)
+                    foto_file.close()
+                except Exception:
+                    detalles_cells.append(Paragraph("<i>(Error al cargar foto)</i>", STYLES['TableCellSmall']))
+            detalles_cells.append(Spacer(1, 6))
+
+
         if record['asistencias']:
             for asis in record['asistencias']:
                 hora_entrada_str = asis.hora_entrada.astimezone(peru_tz).strftime('%H:%M:%S') if asis.hora_entrada else "--:--"
@@ -209,7 +230,7 @@ def exportar_reporte_pdf(request):
                 if asis.es_tardanza:
                     detalle_str += " <font color='orange'><b>(TARDE)</b></font>"
                 detalles_cells.append(Paragraph(detalle_str, STYLES['TableCellSmall']))
-        else:
+        elif not asistencia_diaria: # Si no hay ni asistencia diaria ni a cursos
             detalles_cells.append(Paragraph("N/A", STYLES['TableCellSmall']))
 
         table_data.append([fecha_cell, docente_cell, estado_cell, detalles_cells])
