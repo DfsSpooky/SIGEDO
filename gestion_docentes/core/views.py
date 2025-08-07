@@ -980,13 +980,16 @@ def planificador_horarios(request):
         semestres_validos = [2, 4, 6, 8, 10]
 
     # Pre-serializar datos para JavaScript de forma segura
-    franjas_horarias_json = json.dumps(list(FranjaHoraria.objects.order_by('hora_inicio').values('id', 'hora_inicio', 'hora_fin', 'turno')), cls=DjangoJSONEncoder)
+    franjas = FranjaHoraria.objects.order_by('hora_inicio')
+    franjas_manana_json = json.dumps(list(franjas.filter(turno='MANANA').values('id', 'hora_inicio', 'hora_fin')), cls=DjangoJSONEncoder)
+    franjas_tarde_json = json.dumps(list(franjas.filter(turno='TARDE').values('id', 'hora_inicio', 'hora_fin')), cls=DjangoJSONEncoder)
     dias_semana_json = json.dumps(['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'])
 
     context = {
         'semestre_activo': semestre_activo,
         'especialidades': Especialidad.objects.all(),
-        'franjas_horarias_json': franjas_horarias_json,
+        'franjas_manana_json': franjas_manana_json,
+        'franjas_tarde_json': franjas_tarde_json,
         'dias_semana_json': dias_semana_json,
         'semestres_validos': semestres_validos,
         # Pasamos los filtros seleccionados para que la plantilla los recuerde
