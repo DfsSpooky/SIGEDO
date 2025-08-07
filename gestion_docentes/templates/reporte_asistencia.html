@@ -84,6 +84,7 @@
                         <th>Docente</th>
                         <th class="text-center">Estado</th>
                         <th>Detalles de Asistencia</th>
+                        <th class="text-center">Acciones</th>
                     </tr>
                 </thead>
                 <tbody class="text-base-content/80">
@@ -139,9 +140,13 @@
                                 <span class="text-base-content/50 text-sm">N/A</span>
                             {% endif %}
                         </td>
+                        <!-- Actions -->
+                        <td class="text-center">
+                            <button class="btn btn-ghost btn-sm tooltip btn-modal-trigger" data-tip="Ver detalles del docente" data-docente-id="{{ record.docente.id }}"><i class="fas fa-eye text-lg"></i></button>
+                        </td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="4" class="text-center py-8">No se encontraron registros con los filtros seleccionados.</td></tr>
+                    <tr><td colspan="5" class="text-center py-8">No se encontraron registros con los filtros seleccionados.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>

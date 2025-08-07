@@ -722,9 +722,8 @@ def reporte_asistencia(request):
                     # Verificamos si alguna de sus asistencias fue tardía
                     for asis in asistencias_del_dia:
                         if asis.hora_entrada and asis.curso.horario_inicio:
-                            hora_entrada_dt = timezone.datetime.combine(dia_actual, asis.hora_entrada.time())
-                            hora_inicio_dt = timezone.datetime.combine(dia_actual, asis.curso.horario_inicio)
-                            if (hora_entrada_dt - hora_inicio_dt) > timedelta(minutes=limite_tardanza):
+                            hora_inicio_dt = timezone.make_aware(timezone.datetime.combine(dia_actual, asis.curso.horario_inicio))
+                            if (asis.hora_entrada - hora_inicio_dt) > timedelta(minutes=limite_tardanza):
                                 asis.es_tardanza = True
                                 tiene_tardanza = True
                             else:

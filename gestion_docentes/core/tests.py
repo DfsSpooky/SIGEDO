@@ -380,14 +380,14 @@ class ReporteAsistenciaTest(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         report_data = response.context['page_obj'].object_list
-        # The report for this day for this teacher should not be generated unless 'todos' is selected
-        docente_report = next((r for r in report_data if r['docente'] == self.docente and r['fecha'] == tuesday), None)
-        self.assertIsNone(docente_report)
-
-        # Now check with 'todos' filter
-        url_todos = url + '&estado=todos'
-        response = self.client.get(url_todos)
-        report_data = response.context['page_obj'].object_list
+        # By default (filter='todos'), the "No Requerido" status should be present.
         docente_report = next((r for r in report_data if r['docente'] == self.docente and r['fecha'] == tuesday), None)
         self.assertIsNotNone(docente_report)
         self.assertEqual(docente_report['estado'], 'No Requerido')
+
+        # Now check with a different filter, it should not be present
+        url_presente = url + '&estado=presente'
+        response = self.client.get(url_presente)
+        report_data = response.context['page_obj'].object_list
+        docente_report = next((r for r in report_data if r['docente'] == self.docente and r['fecha'] == tuesday), None)
+        self.assertIsNone(docente_report)
