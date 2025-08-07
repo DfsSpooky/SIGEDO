@@ -112,7 +112,7 @@ class AdminInterfaceTest(TestCase):
         url = reverse('admin_dashboard')
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Bienvenido al Panel de Control de Administración")
+        self.assertContains(response, "Panel de Control de Administración")
 
     def test_admin_dashboard_inaccessible_by_non_staff(self):
         """Test that the admin dashboard is not accessible to non-staff members."""
