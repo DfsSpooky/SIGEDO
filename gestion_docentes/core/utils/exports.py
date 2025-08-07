@@ -158,6 +158,8 @@ def exportar_reporte_pdf(request):
                             if (asis.hora_entrada - hora_inicio_dt) > timedelta(minutes=limite_tardanza):
                                 asis.es_tardanza = True
                                 tiene_tardanza = True
+                            else:
+                                asis.es_tardanza = False
                     if tiene_tardanza:
                         estado_dia = 'Tardanza'
 
