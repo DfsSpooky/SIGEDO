@@ -6,7 +6,7 @@ from reportlab.platypus import BaseDocTemplate, Frame, PageTemplate, Table, Tabl
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib import colors
-from ..models import Docente, Asistencia, Curso, ConfiguracionInstitucion, Justificacion
+from ..models import Docente, Asistencia, Curso, ConfiguracionInstitucion, Justificacion, AsistenciaDiaria
 from io import BytesIO
 # Se quita urlopen porque ya no es necesario
 from django.utils import timezone
