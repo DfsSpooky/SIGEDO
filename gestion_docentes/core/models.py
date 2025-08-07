@@ -79,6 +79,12 @@ class Curso(models.Model):
     horario_fin = models.TimeField(null=True, blank=True)
     dia = models.CharField(max_length=20, choices=[('Lunes', 'Lunes'), ('Martes', 'Martes'), ('Miércoles', 'Miércoles'), ('Jueves', 'Jueves'), ('Viernes', 'Viernes')], null=True, blank=True)
     duracion_bloques = models.IntegerField(default=2, help_text="Número de bloques de 50 minutos que dura el curso.")
+
+    class Meta:
+        permissions = [
+            ("view_planificador", "Puede ver el planificador de horarios"),
+        ]
+
     def __str__(self): return f"{self.nombre} ({self.especialidad.nombre if self.especialidad else 'N/A'})"
 
 class Documento(models.Model):
@@ -128,6 +134,12 @@ class Asistencia(models.Model):
     hora_salida_permitida = models.DateTimeField(null=True, blank=True, help_text="Hora mínima a la que se puede marcar la salida.")
     foto_entrada = models.ImageField(upload_to='verificacion_cursos/entradas/%Y/%m/%d/', null=True, blank=True)
     foto_salida = models.ImageField(upload_to='verificacion_cursos/salidas/%Y/%m/%d/', null=True, blank=True)
+
+    class Meta:
+        permissions = [
+            ("view_reporte", "Puede ver reportes de asistencia"),
+        ]
+
     def __str__(self): return f"Asistencia {self.docente} - {self.curso} ({self.fecha})"
 
 class AsistenciaDiaria(models.Model):

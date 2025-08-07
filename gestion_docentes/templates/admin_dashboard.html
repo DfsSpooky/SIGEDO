@@ -14,8 +14,12 @@
             <p class="text-base-content/70 mt-1">Un resumen del estado actual del sistema.</p>
         </div>
         <div class="flex gap-2">
+            {% if perms.core.view_planificador %}
             <a href="{% url 'planificador_horarios' %}" class="btn btn-primary"><i class="fas fa-calendar-alt mr-2"></i>Ir al Planificador</a>
+            {% endif %}
+            {% if perms.core.view_reporte %}
             <a href="{% url 'reporte_asistencia' %}" class="btn btn-secondary"><i class="fas fa-chart-bar mr-2"></i>Ver Reportes</a>
+            {% endif %}
         </div>
     </div>
 

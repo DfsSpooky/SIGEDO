@@ -752,6 +752,7 @@ def rotate_qr_code(request, docente_id):
 # --- VISTA PARA REPORTES ---
 
 @staff_member_required
+@permission_required('core.view_reporte', raise_exception=True)
 def reporte_asistencia(request):
     # 1. MANEJO DE FILTROS Y FECHAS
     fecha_inicio_str = request.GET.get('fecha_inicio')
@@ -1010,7 +1011,10 @@ def detalle_asistencia_docente_ajax(request, docente_id):
     except Docente.DoesNotExist:
         return JsonResponse({'error': 'Docente no encontrado'}, status=404)
         
+from django.contrib.auth.decorators import permission_required
+
 @staff_member_required
+@permission_required('core.view_planificador', raise_exception=True)
 def planificador_horarios(request):
     semestre_activo = Semestre.objects.filter(estado='ACTIVO').first()
     if not semestre_activo:
