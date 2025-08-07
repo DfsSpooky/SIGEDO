@@ -1,11 +1,14 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
+from django.urls import reverse
 from django.utils.html import format_html
+from django.utils import timezone
 from .models import (
     Grupo, Carrera, Especialidad, TipoDocumento, Docente, Curso,
     Documento, Asistencia, SolicitudIntercambio,
     PersonalDocente, Administrador, AsistenciaDiaria,
-    ConfiguracionInstitucion, Semestre, FranjaHoraria, DiaEspecial, VersionDocumento
+    ConfiguracionInstitucion, Semestre, FranjaHoraria, DiaEspecial, VersionDocumento,
+    Notificacion, Anuncio, TipoJustificacion, Justificacion
 )
 
 # --- CONFIGURACIÓN DE ADMINS ---
@@ -15,14 +18,21 @@ class DocenteAdmin(UserAdmin):
     list_display = ['username', 'first_name', 'last_name', 'get_especialidades', 'disponibilidad', 'is_staff']
     
     fieldsets = UserAdmin.fieldsets + (
-        ('Información Adicional', {'fields': ('dni', 'especialidades', 'disponibilidad', 'id_qr', 'foto', 'vista_previa_foto')}),
+        ('Información Adicional', {'fields': ('dni', 'especialidades', 'disponibilidad', 'id_qr', 'foto', 'vista_previa_foto', 'rotate_qr_code_button')}),
     )
     add_fieldsets = UserAdmin.add_fieldsets + (
         ('Información Adicional', {'fields': ('dni', 'especialidades', 'disponibilidad', 'foto')}),
     )
     
-    readonly_fields = ('id_qr', 'vista_previa_foto',)
+    readonly_fields = ('id_qr', 'vista_previa_foto', 'rotate_qr_code_button',)
     filter_horizontal = ('especialidades',)
+
+    def rotate_qr_code_button(self, obj):
+        if obj.pk:
+            url = reverse('rotate_qr_code', args=[obj.pk])
+            return format_html('<a class="button" href="{}">Generar Nuevo Código QR</a>', url)
+        return "No disponible para nuevos docentes"
+    rotate_qr_code_button.short_description = "Regenerar QR"
 
     def vista_previa_foto(self, obj):
         if obj.foto and hasattr(obj.foto, 'url'):
@@ -107,6 +117,9 @@ class ConfiguracionInstitucionAdmin(admin.ModelAdmin):
         ('Información Principal', {
             'fields': ('nombre_institucion', 'logo', 'facultad')
         }),
+        ('Parámetros del Sistema', {
+            'fields': ('tiempo_limite_tardanza',)
+        }),
         ('Datos de Contacto (Opcional)', {
             'fields': ('direccion', 'telefono', 'email_contacto'),
             'classes': ('collapse',),
@@ -115,6 +128,42 @@ class ConfiguracionInstitucionAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return not ConfiguracionInstitucion.objects.exists()
+
+@admin.register(Anuncio)
+class AnuncioAdmin(admin.ModelAdmin):
+    list_display = ('titulo', 'autor', 'fecha_publicacion')
+    search_fields = ('titulo', 'contenido')
+    list_filter = ('autor', 'fecha_publicacion')
+
+    def save_model(self, request, obj, form, change):
+        if not obj.autor:
+            obj.autor = request.user
+        super().save_model(request, obj, form, change)
+
+@admin.register(TipoJustificacion)
+class TipoJustificacionAdmin(admin.ModelAdmin):
+    list_display = ('nombre',)
+    search_fields = ('nombre',)
+
+@admin.register(Justificacion)
+class JustificacionAdmin(admin.ModelAdmin):
+    list_display = ('docente', 'tipo', 'fecha_inicio', 'fecha_fin', 'estado')
+    list_filter = ('estado', 'tipo', 'fecha_inicio')
+    search_fields = ('docente__first_name', 'docente__last_name', 'motivo')
+    ordering = ('-fecha_creacion',)
+    readonly_fields = ('fecha_creacion', 'fecha_revision', 'revisado_por')
+
+    fieldsets = (
+        (None, {'fields': ('docente', 'tipo', 'fecha_inicio', 'fecha_fin', 'motivo')}),
+        ('Documentación', {'fields': ('documento_adjunto',)}),
+        ('Estado de la Solicitud', {'fields': ('estado', 'observaciones_revision', 'revisado_por', 'fecha_revision')}),
+    )
+
+    def save_model(self, request, obj, form, change):
+        if 'estado' in form.changed_data:
+            obj.revisado_por = request.user
+            obj.fecha_revision = timezone.now()
+        super().save_model(request, obj, form, change)
 
 # --- REGISTRO DEL RESTO DE MODELOS ---
 admin.site.register(Grupo)

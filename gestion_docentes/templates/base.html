@@ -1,5 +1,5 @@
 {% load static %} <!DOCTYPE html>
-<html lang="es" data-theme="dark"> <head>
+<html lang="es" data-theme="winter"> <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Gestión Docente{% endblock %} - Sistema de Gestión</title>
@@ -69,12 +69,14 @@
                     </div>
                 </div>
                 <div class="flex-none gap-4">
-                    <label class="swap swap-rotate btn btn-ghost btn-circle">
-                        <input type="checkbox" id="theme-toggle" />
-                        <i class="fas fa-sun swap-on fill-current w-5 h-5 transition-transform duration-300 ease-in-out"></i>
-                        <i class="fas fa-moon swap-off fill-current w-5 h-5 transition-transform duration-300 ease-in-out"></i>
-                    </label>
-                    
+                    <a href="{% url 'ver_notificaciones' %}" class="btn btn-ghost btn-circle">
+                        <div class="indicator">
+                            <i class="fas fa-bell text-xl"></i>
+                            {% if unread_notifications_count > 0 %}
+                                <span class="badge badge-sm badge-primary indicator-item">{{ unread_notifications_count }}</span>
+                            {% endif %}
+                        </div>
+                    </a>
                     <div class="dropdown dropdown-end">
                         <label tabindex="0" class="btn btn-ghost btn-circle avatar">
                             <div class="w-10 rounded-full ring-2 ring-offset-2 ring-offset-base-100 ring-transparent hover:ring-primary transition-shadow duration-300">
@@ -154,14 +156,17 @@
                 
                 <li class="menu-title"><span class="opacity-60">Principal</span></li>
                 <li><a href="{% url 'dashboard' %}" class="group transition-all duration-300"><i class="fas fa-tachometer-alt fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Dashboard</a></li>
+                <li><a href="{% url 'ver_anuncios' %}" class="group transition-all duration-300"><i class="fas fa-bullhorn fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Anuncios</a></li>
                 <li><a href="{% url 'perfil' %}" class="group transition-all duration-300"><i class="fas fa-user-circle fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Mi Perfil</a></li>
                 <li><a href="{% url 'lista_documentos' %}" class="group transition-all duration-300"><i class="fas fa-file-alt fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Mis Documentos</a></li>
+                <li><a href="{% url 'lista_justificaciones' %}" class="group transition-all duration-300"><i class="fas fa-calendar-check fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Mis Justificaciones</a></li>
 
                 {% if user.is_staff %}
                 <li class="menu-title"><span class="opacity-60 pt-4">Administración</span></li>
                 <li><a href="{% url 'planificador_horarios' %}" class="group transition-all duration-300"><i class="fas fa-calendar-alt fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Planificador</a></li>
                 <li><a href="{% url 'lista_credenciales' %}" class="group transition-all duration-300"><i class="fas fa-id-card fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Credenciales</a></li>
                 <li><a href="{% url 'reporte_asistencia' %}" class="group transition-all duration-300"><i class="fas fa-chart-bar fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Reportes</a></li>
+                <li><a href="{% url 'lista_justificaciones' %}" class="group transition-all duration-300"><i class="fas fa-check-double fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Gestionar Justificaciones</a></li>
                 <li><a href="/admin" target="_blank" class="group transition-all duration-300"><i class="fas fa-cogs fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Panel de Admin</a></li>
                 {% endif %}
 
@@ -172,18 +177,6 @@
         </div>
     </div>
 
-    <script>
-        const themeToggle = document.getElementById('theme-toggle');
-        const html = document.documentElement;
-        const currentTheme = localStorage.getItem('theme') || 'dark';
-        html.setAttribute('data-theme', currentTheme);
-        themeToggle.checked = currentTheme === 'light';
-        themeToggle.addEventListener('change', function() {
-            const newTheme = this.checked ? 'light' : 'dark';
-            html.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
-        });
-    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>
