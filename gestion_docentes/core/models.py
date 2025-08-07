@@ -159,6 +159,7 @@ class ConfiguracionInstitucion(models.Model):
         blank=True, 
         help_text="Seleccione la facultad o carrera principal para la cual se está configurando el sistema."
     )
+    tiempo_limite_tardanza = models.PositiveIntegerField(default=10, help_text="Minutos de tolerancia para considerar una asistencia como tardanza.")
     
     class Meta:
         verbose_name = "Configuración de la Institución"; verbose_name_plural = "Configuración de la Institución"

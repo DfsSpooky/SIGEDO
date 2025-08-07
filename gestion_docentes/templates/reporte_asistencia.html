@@ -80,37 +80,47 @@
                 <!-- Table Head -->
                 <thead class="bg-base-200">
                     <tr>
-                        <th class="w-1/4">Docente</th>
-                        <th>Asistencia General</th>
-                        <th>Asistencias por Curso</th>
-                        <th class="w-24 text-center">Acciones</th>
+                        <th>Fecha</th>
+                        <th>Docente</th>
+                        <th class="text-center">Estado</th>
+                        <th>Detalles de Asistencia</th>
                     </tr>
                 </thead>
                 <tbody class="text-base-content/80">
-                    {% for item in page_obj %}
-                    <tr class="hover" data-docente-nombre="{{ item.docente.first_name }} {{ item.docente.last_name }}" data-docente-dni="{{ item.docente.dni }}">
-                        <!-- Teacher Info -->
+                    {% for record in page_obj %}
+                    <tr class="hover" data-docente-nombre="{{ record.docente.first_name }} {{ record.docente.last_name }}" data-docente-dni="{{ record.docente.dni }}">
+                        <!-- Fecha -->
+                        <td class="font-mono text-sm">{{ record.fecha|date:"d/m/Y" }}</td>
+
+                        <!-- Docente Info -->
                         <td class="font-medium">
                             <div class="flex items-center gap-3">
-                                <div class="avatar"><div class="mask mask-squircle w-12 h-12"><img src="{{ item.docente.foto.url }}" alt="Foto"></div></div>
+                                <div class="avatar"><div class="mask mask-squircle w-12 h-12"><img src="{{ record.docente.foto.url }}" alt="Foto"></div></div>
                                 <div>
-                                    <div class="font-bold">{{ item.docente.first_name }} {{ item.docente.last_name }}</div>
-                                    <div class="text-sm opacity-50">DNI: {{ item.docente.dni }}</div>
+                                    <div class="font-bold">{{ record.docente.first_name }} {{ record.docente.last_name }}</div>
+                                    <div class="text-sm opacity-50">DNI: {{ record.docente.dni }}</div>
                                 </div>
                             </div>
                         </td>
-                        <!-- General Attendance -->
-                        <td>
-                            {% if item.asistencia_general %}
-                                <span class="badge badge-success badge-lg font-bold">Presente</span>
-                                <span class="block text-sm mt-1 text-base-content/70">{{ item.asistencia_general.hora_entrada|time:"h:i A" }}</span>
-                            {% else %}<span class="badge badge-error badge-lg font-bold">Ausente</span>{% endif %}
+
+                        <!-- Estado -->
+                        <td class="text-center">
+                            {% if record.estado == 'Presente' %}
+                                <span class="badge badge-success font-bold">{{ record.estado }}</span>
+                            {% elif record.estado == 'Tardanza' %}
+                                <span class="badge badge-warning font-bold">{{ record.estado }}</span>
+                            {% elif record.estado == 'Falta' %}
+                                <span class="badge badge-error font-bold">{{ record.estado }}</span>
+                            {% else %}
+                                <span class="badge badge-ghost">{{ record.estado }}</span>
+                            {% endif %}
                         </td>
-                        <!-- Course Attendance -->
+
+                        <!-- Detalles de Asistencia -->
                         <td>
-                            {% if item.asistencias_cursos %}
+                            {% if record.asistencias %}
                                 <ul class="space-y-2">
-                                    {% for asistencia in item.asistencias_cursos %}
+                                    {% for asistencia in record.asistencias %}
                                     <li class="flex flex-col p-2 bg-base-200 rounded-lg">
                                         <strong class="font-medium text-base-content/90 text-sm">{{ asistencia.curso.nombre }}</strong>
                                         <div class="flex justify-between items-center text-xs text-base-content/60 mt-1">
@@ -123,13 +133,11 @@
                                     </li>
                                     {% endfor %}
                                 </ul>
-                            {% else %}<span class="text-base-content/50">Sin cursos.</span>{% endif %}
-                        </td>
-                        <!-- Actions -->
-                        <td>
-                            <div class="flex justify-center">
-                                <button class="btn btn-ghost btn-sm tooltip btn-modal-trigger" data-tip="Ver detalles" data-docente-id="{{ item.docente.id }}"><i class="fas fa-eye text-lg"></i></button>
-                            </div>
+                            {% elif record.estado == 'Falta' %}
+                                <div class="text-error/70 text-sm">No se registró asistencia para los cursos programados.</div>
+                            {% else %}
+                                <span class="text-base-content/50 text-sm">N/A</span>
+                            {% endif %}
                         </td>
                     </tr>
                     {% empty %}
@@ -242,7 +250,80 @@ document.addEventListener('DOMContentLoaded', function() {
         // But for this implementation, letting the page reload is simpler and fine.
     });
 
-    // Modal logic and filterTable() function remain the same as before...
+    // --- MODAL LOGIC ---
+    const modal = document.getElementById('detalle_docente_modal');
+    document.querySelectorAll('.btn-modal-trigger').forEach(button => {
+        button.addEventListener('click', async function() {
+            const docenteId = this.dataset.docenteId;
+            const url = `/reporte-asistencia/detalle/${docenteId}/`;
+
+            // Show a loading state in the modal
+            modal.innerHTML = '<div class="modal-box"><span class="loading loading-spinner loading-lg"></span></div>';
+            modal.showModal();
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Error al cargar los datos.');
+
+                const data = await response.json();
+
+                // Build the modal content with the fetched data
+                let asistenciasCursosHtml = data.asistencias_cursos.map(asis => `
+                    <li class="p-2 bg-base-200 rounded-md">
+                        <p class="font-semibold">${asis.curso}</p>
+                        <p class="text-xs">Entrada: ${asis.hora_entrada || '-'} | Salida: ${asis.hora_salida || '-'}</p>
+                    </li>
+                `).join('');
+
+                if (!asistenciasCursosHtml) {
+                    asistenciasCursosHtml = '<p class="text-sm text-base-content/60">No hay registros de asistencia a cursos.</p>';
+                }
+
+                modal.innerHTML = `
+                    <div class="modal-box max-w-2xl">
+                        <form method="dialog"><button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button></form>
+                        <div class="flex items-center gap-4 mb-6">
+                            <div class="avatar"><div class="w-20 rounded-full ring ring-primary"><img src="${data.docente.foto_url || '/static/placeholder.png'}" /></div></div>
+                            <div>
+                                <h3 class="font-bold text-2xl">${data.docente.nombre_completo}</h3>
+                                <p class="text-base-content/70">DNI: ${data.docente.dni}</p>
+                            </div>
+                        </div>
+                        <div class="divider"></div>
+                        <h4 class="font-bold text-lg mb-2">Asistencias a Cursos</h4>
+                        <ul class="space-y-2 max-h-64 overflow-y-auto">${asistenciasCursosHtml}</ul>
+                    </div>
+                `;
+
+            } catch (error) {
+                modal.innerHTML = `
+                    <div class="modal-box">
+                        <form method="dialog"><button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button></form>
+                        <h3 class="font-bold text-lg text-error">Error</h3>
+                        <p class="py-4">${error.message}</p>
+                    </div>
+                `;
+            }
+        });
+    });
+
+    // --- TABLE SEARCH FILTER ---
+    window.filterTable = function() {
+        const input = document.getElementById('search-input');
+        const filter = input.value.toLowerCase();
+        const table = document.getElementById('attendance-table');
+        const tr = table.getElementsByTagName('tr');
+
+        for (let i = 1; i < tr.length; i++) { // Start from 1 to skip header row
+            const nombre = tr[i].dataset.docenteNombre.toLowerCase();
+            const dni = tr[i].dataset.docenteDni.toLowerCase();
+            if (nombre.includes(filter) || dni.includes(filter)) {
+                tr[i].style.display = "";
+            } else {
+                tr[i].style.display = "none";
+            }
+        }
+    }
 });
 
 </script>

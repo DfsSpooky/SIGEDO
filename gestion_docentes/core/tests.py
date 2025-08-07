@@ -1,8 +1,11 @@
 from django.test import TestCase, Client
 from django.urls import reverse
-from .models import PersonalDocente, Notificacion, TipoDocumento, Documento, Anuncio, Semestre
+from .models import PersonalDocente, Notificacion, TipoDocumento, Documento, Anuncio, Semestre, ConfiguracionInstitucion, Curso, Asistencia, Carrera
 from .utils.encryption import encrypt_id, decrypt_id
 import re
+from django.utils import timezone
+from datetime import time
+from django.utils.timezone import make_aware
 import json
 from datetime import date, timedelta
 
@@ -262,3 +265,129 @@ class NotificationTest(TestCase):
         # 4. Check the dashboard again, the count should be gone
         response = self.client.get(dashboard_url)
         self.assertNotContains(response, 'indicator-item')
+
+
+class ReporteAsistenciaTest(TestCase):
+
+    def setUp(self):
+        """Set up a staff user and a regular user for testing."""
+        self.staff_user = PersonalDocente.objects.create_superuser(
+            username='staffuser',
+            password='staffpassword123',
+            dni='87654321',
+            first_name='Staff',
+            last_name='User'
+        )
+        self.docente = PersonalDocente.objects.create_user(
+            username='testdocente',
+            password='testpassword123',
+            dni='12345678',
+            first_name='Test',
+            last_name='Docente'
+        )
+        self.client = Client()
+        self.client.login(username='staffuser', password='staffpassword123')
+        self.carrera = Carrera.objects.create(nombre="Ingeniería de Software")
+
+    def test_get_detalle_docente_api(self):
+        """
+        Test the API endpoint that retrieves detailed attendance info for the modal.
+        """
+        # URL for the detail API
+        url = reverse('detalle_asistencia_docente_ajax', args=[self.docente.id])
+
+        # Make the request
+        response = self.client.get(url)
+
+        # Check that the response is successful and is JSON
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/json')
+
+        # Parse the JSON and check the structure
+        data = response.json()
+        self.assertIn('docente', data)
+        self.assertIn('asistencias_cursos', data)
+        self.assertEqual(data['docente']['nombre_completo'], 'Test Docente')
+        self.assertEqual(data['docente']['dni'], '12345678')
+
+    def test_reporte_asistencia_logic(self):
+        """
+        Test the core logic of the attendance report for Presente, Tardanza, and Falta.
+        """
+        # 1. Setup
+        today = date.today()
+        # Ensure today is a Monday for predictability
+        today = today - timedelta(days=today.weekday())
+
+        Semestre.objects.create(nombre="Test Semestre", fecha_inicio=today-timedelta(days=30), fecha_fin=today+timedelta(days=30), estado='ACTIVO')
+        config = ConfiguracionInstitucion.load()
+        config.tiempo_limite_tardanza = 15
+        config.save()
+
+        curso_manana = Curso.objects.create(
+            docente=self.docente,
+            nombre="Curso de Mañana",
+            dia='Lunes', # Corresponds to the adjusted `today`
+            horario_inicio="09:00:00",
+            horario_fin="11:00:00",
+            semestre=Semestre.objects.first(),
+            carrera=self.carrera
+        )
+
+        # 2. Test "Falta" (Absent)
+        url = reverse('reporte_asistencia') + f'?fecha_inicio={today}&fecha_fin={today}'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        report_data = response.context['page_obj'].object_list
+        # Find the record for our specific teacher and day
+        docente_report = next((r for r in report_data if r['docente'] == self.docente and r['fecha'] == today), None)
+        self.assertIsNotNone(docente_report)
+        self.assertEqual(docente_report['estado'], 'Falta')
+
+        # 3. Test "Presente" (Present)
+        Asistencia.objects.create(
+            docente=self.docente,
+            curso=curso_manana,
+            fecha=today,
+            hora_entrada=make_aware(timezone.datetime.combine(today, time(9, 5))) # On time
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        report_data = response.context['page_obj'].object_list
+        docente_report = next((r for r in report_data if r['docente'] == self.docente and r['fecha'] == today), None)
+        self.assertIsNotNone(docente_report)
+        self.assertEqual(docente_report['estado'], 'Presente')
+
+        # 4. Test "Tardanza" (Late)
+        Asistencia.objects.all().delete() # Clear previous attendance
+        Asistencia.objects.create(
+            docente=self.docente,
+            curso=curso_manana,
+            fecha=today,
+            hora_entrada=make_aware(timezone.datetime.combine(today, time(9, 20))) # 20 mins late
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        report_data = response.context['page_obj'].object_list
+        docente_report = next((r for r in report_data if r['docente'] == self.docente and r['fecha'] == today), None)
+        self.assertIsNotNone(docente_report)
+        self.assertEqual(docente_report['estado'], 'Tardanza')
+
+        # 5. Test "No Requerido"
+        # Check for Tuesday, when there are no classes scheduled
+        tuesday = today + timedelta(days=1)
+        url = reverse('reporte_asistencia') + f'?fecha_inicio={tuesday}&fecha_fin={tuesday}'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        report_data = response.context['page_obj'].object_list
+        # The report for this day for this teacher should not be generated unless 'todos' is selected
+        docente_report = next((r for r in report_data if r['docente'] == self.docente and r['fecha'] == tuesday), None)
+        self.assertIsNone(docente_report)
+
+        # Now check with 'todos' filter
+        url_todos = url + '&estado=todos'
+        response = self.client.get(url_todos)
+        report_data = response.context['page_obj'].object_list
+        docente_report = next((r for r in report_data if r['docente'] == self.docente and r['fecha'] == tuesday), None)
+        self.assertIsNotNone(docente_report)
+        self.assertEqual(docente_report['estado'], 'No Requerido')

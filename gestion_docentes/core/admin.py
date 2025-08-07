@@ -116,6 +116,9 @@ class ConfiguracionInstitucionAdmin(admin.ModelAdmin):
         ('Información Principal', {
             'fields': ('nombre_institucion', 'logo', 'facultad')
         }),
+        ('Parámetros del Sistema', {
+            'fields': ('tiempo_limite_tardanza',)
+        }),
         ('Datos de Contacto (Opcional)', {
             'fields': ('direccion', 'telefono', 'email_contacto'),
             'classes': ('collapse',),

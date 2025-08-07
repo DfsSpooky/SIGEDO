@@ -659,94 +659,102 @@ def rotate_qr_code(request, docente_id):
 
 @staff_member_required
 def reporte_asistencia(request):
-    # Manejo de Filtros
-    fecha_inicio = request.GET.get('fecha_inicio')
-    fecha_fin = request.GET.get('fecha_fin')
-    estado = request.GET.get('estado', 'todos')
+    # 1. MANEJO DE FILTROS Y FECHAS
+    fecha_inicio_str = request.GET.get('fecha_inicio')
+    fecha_fin_str = request.GET.get('fecha_fin')
+    estado_filtro = request.GET.get('estado', 'todos')
     curso_id = request.GET.get('curso')
     especialidad_id = request.GET.get('especialidad')
 
-    # Si no se seleccionan fechas, usar la fecha actual como valor predeterminado
-    if not fecha_inicio or not fecha_fin:
-        today = date.today()
-        fecha_inicio = today.strftime('%Y-%m-%d')
-        fecha_fin = today.strftime('%Y-%m-%d')
+    try:
+        fecha_inicio = timezone.datetime.strptime(fecha_inicio_str, '%Y-%m-%d').date() if fecha_inicio_str else date.today()
+        fecha_fin = timezone.datetime.strptime(fecha_fin_str, '%Y-%m-%d').date() if fecha_fin_str else date.today()
+    except ValueError:
+        fecha_inicio = fecha_fin = date.today()
 
-    # Obtener todos los docentes
-    docentes = Docente.objects.all().order_by('last_name', 'first_name')
-
-    # Aplicar filtro por especialidad
+    # 2. OBTENER QUERYSETS BASE
+    docentes_qs = Docente.objects.all().order_by('last_name', 'first_name')
     if especialidad_id:
-        docentes = docentes.filter(especialidades__id=especialidad_id)
-    
-    # Construir el queryset para las asistencias con el filtro de fechas
+        docentes_qs = docentes_qs.filter(especialidades__id=especialidad_id)
+
+    # Pre-fetch de datos relacionados para optimizar
     asistencias_qs = Asistencia.objects.filter(
         fecha__range=[fecha_inicio, fecha_fin]
     ).select_related('docente', 'curso')
 
-    # Aplicar filtro por estado
-    if estado == 'presente':
-        docentes_presentes_ids = asistencias_qs.filter(curso__isnull=True).values_list('docente_id', flat=True).distinct()
-        docentes = docentes.filter(id__in=docentes_presentes_ids)
-    elif estado == 'ausente':
-        docentes_presentes_ids = asistencias_qs.filter(curso__isnull=True).values_list('docente_id', flat=True).distinct()
-        docentes = docentes.exclude(id__in=docentes_presentes_ids)
-    elif estado == 'retardo':
-        # Definimos tardanza como entrada 10 minutos después del inicio del curso
-        from django.db.models import F, ExpressionWrapper, DurationField
-
-        # Obtenemos las asistencias que cumplen la condición de tardanza
-        asistencias_tardias = asistencias_qs.filter(
-            curso__horario_inicio__isnull=False,
-            hora_entrada__isnull=False
-        ).annotate(
-            lateness=ExpressionWrapper(
-                F('hora_entrada') - F('curso__horario_inicio'),
-                output_field=DurationField()
-            )
-        ).filter(lateness__gt=timedelta(minutes=10))
-
-        docentes_con_tardanza_ids = asistencias_tardias.values_list('docente_id', flat=True).distinct()
-        docentes = docentes.filter(id__in=docentes_con_tardanza_ids)
-
-    # Aplicar filtro por curso
+    semestre_activo = Semestre.objects.filter(estado='ACTIVO').first()
+    cursos_programados_qs = Curso.objects.filter(semestre=semestre_activo, dia__isnull=False)
     if curso_id:
-        docentes_con_asistencia_en_curso_ids = asistencias_qs.filter(curso_id=curso_id).values_list('docente_id', flat=True).distinct()
-        docentes = docentes.filter(id__in=docentes_con_asistencia_en_curso_ids)
+        cursos_programados_qs = cursos_programados_qs.filter(id=curso_id)
+        # Si filtramos por curso, filtramos también los docentes que lo dictan
+        docente_del_curso_id = cursos_programados_qs.first().docente_id
+        docentes_qs = docentes_qs.filter(id=docente_del_curso_id)
 
-    # Generar el reporte final con los datos filtrados
-    reporte_data = []
-    for docente in docentes:
-        asistencias_docente = asistencias_qs.filter(docente=docente)
+    # 3. PROCESAMIENTO DE DATOS Y CÁLCULO DE ESTADO
+    reporte_final = []
+    configuracion = ConfiguracionInstitucion.load()
+    limite_tardanza = configuracion.tiempo_limite_tardanza or timedelta(minutes=10) # Default de 10 min
 
-        # Marcar asistencias con tardanza
-        asistencias_cursos = asistencias_docente.filter(curso__isnull=False)
-        for asis in asistencias_cursos:
-            if asis.hora_entrada and asis.curso.horario_inicio:
-                # Comparamos la hora de entrada con la hora de inicio del curso
-                hora_entrada_dt = timezone.datetime.combine(asis.fecha, asis.hora_entrada.time())
-                hora_inicio_dt = timezone.datetime.combine(asis.fecha, asis.curso.horario_inicio)
-                if (hora_entrada_dt - hora_inicio_dt) > timedelta(minutes=10):
-                    asis.es_tardanza = True
-            else:
-                asis.es_tardanza = False
+    dias_del_rango = [fecha_inicio + timedelta(days=i) for i in range((fecha_fin - fecha_inicio).days + 1)]
+    dias_semana_map = {0: 'Lunes', 1: 'Martes', 2: 'Miércoles', 3: 'Jueves', 4: 'Viernes', 5: 'Sábado', 6: 'Domingo'}
 
-        reporte_data.append({
-            'docente': docente,
-            'asistencia_general': asistencias_docente.filter(curso__isnull=True).first(),
-            'asistencias_cursos': asistencias_cursos,
-        })
+    for docente in docentes_qs:
+        for dia_actual in dias_del_rango:
+            dia_semana_str = dias_semana_map[dia_actual.weekday()]
 
-    # Contadores para las cards
-    total_docentes = Docente.objects.count()
-    presentes_count = Asistencia.objects.filter(fecha__range=[fecha_inicio, fecha_fin], curso__isnull=True).values('docente').distinct().count()
-    ausentes_count = total_docentes - presentes_count
+            # Cursos que el docente DEBÍA dictar ese día
+            cursos_del_dia = cursos_programados_qs.filter(docente=docente, dia=dia_semana_str)
 
-    # Obtener el día especial (si existe)
-    dia_especial = DiaEspecial.objects.filter(fecha__range=[fecha_inicio, fecha_fin]).first()
+            # Asistencias que el docente MARCÓ ese día
+            asistencias_del_dia = asistencias_qs.filter(docente=docente, fecha=dia_actual)
+
+            estado_dia = 'No Requerido'
+            tiene_tardanza = False
+
+            if cursos_del_dia.exists():
+                # Si tenía cursos, por defecto es "Falta" hasta que se demuestre lo contrario
+                estado_dia = 'Falta'
+
+                if asistencias_del_dia.exists():
+                    # Si marcó al menos una asistencia, ya no es "Falta"
+                    estado_dia = 'Presente'
+
+                    # Verificamos si alguna de sus asistencias fue tardía
+                    for asis in asistencias_del_dia:
+                        if asis.hora_entrada and asis.curso.horario_inicio:
+                            hora_entrada_dt = timezone.datetime.combine(dia_actual, asis.hora_entrada.time())
+                            hora_inicio_dt = timezone.datetime.combine(dia_actual, asis.curso.horario_inicio)
+                            if (hora_entrada_dt - hora_inicio_dt) > timedelta(minutes=limite_tardanza):
+                                asis.es_tardanza = True
+                                tiene_tardanza = True
+                            else:
+                                asis.es_tardanza = False
+
+                    if tiene_tardanza:
+                        estado_dia = 'Tardanza'
+
+            # Aplicar el filtro de ESTADO
+            if estado_filtro != 'todos' and estado_dia.lower() != estado_filtro:
+                continue
+
+            # Solo añadir al reporte si no es "No Requerido" o si se muestran todos
+            if estado_dia != 'No Requerido' or estado_filtro == 'todos':
+                reporte_final.append({
+                    'docente': docente,
+                    'fecha': dia_actual,
+                    'estado': estado_dia,
+                    'asistencias': asistencias_del_dia,
+                    'cursos_programados': cursos_del_dia
+                })
     
-    # Implementación de Paginación
-    paginator = Paginator(reporte_data, 20)
+    # 4. CONTADORES Y PAGINACIÓN
+    total_docentes = docentes_qs.count()
+    # Los contadores ahora se basan en los datos procesados, son más precisos
+    presentes_count = len([r for r in reporte_final if r['estado'] == 'Presente'])
+    ausentes_count = len([r for r in reporte_final if r['estado'] == 'Falta'])
+
+    # Paginación
+    paginator = Paginator(reporte_final, 20)
     page_number = request.GET.get('page')
     try:
         page_obj = paginator.get_page(page_number)
@@ -766,12 +774,11 @@ def reporte_asistencia(request):
         'total_docentes': total_docentes,
         'presentes_count': presentes_count,
         'ausentes_count': ausentes_count,
-        'dia_especial': dia_especial,
         'cursos': Curso.objects.all(),
         'especialidades': Especialidad.objects.all(),
-        'fecha_inicio': fecha_inicio,
-        'fecha_fin': fecha_fin,
-        'estado': estado,
+        'fecha_inicio': fecha_inicio.strftime('%Y-%m-%d'),
+        'fecha_fin': fecha_fin.strftime('%Y-%m-%d'),
+        'estado': estado_filtro,
         'curso_id': curso_id,
         'especialidad_id': especialidad_id,
         'filter_params': query_params.urlencode(),
@@ -821,12 +828,14 @@ def api_get_report_chart_data(request):
     total_ausentes = total_docentes - total_presentes
 
     # Lateness calculation
+    configuracion = ConfiguracionInstitucion.load()
+    limite_tardanza = configuracion.tiempo_limite_tardanza
     from django.db.models import F, ExpressionWrapper, DurationField
     asistencias_tardias_count = asistencias_qs.filter(
         curso__horario_inicio__isnull=False, hora_entrada__isnull=False
     ).annotate(
         lateness=ExpressionWrapper(F('hora_entrada') - F('curso__horario_inicio'), output_field=DurationField())
-    ).filter(lateness__gt=timedelta(minutes=10)).values('docente').distinct().count()
+    ).filter(lateness__gt=timedelta(minutes=limite_tardanza)).values('docente').distinct().count()
 
     chart_data = {
         'bar_chart': {
