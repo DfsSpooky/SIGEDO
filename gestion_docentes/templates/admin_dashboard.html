@@ -1,36 +1,207 @@
 {% extends 'base.html' %}
 {% block title %}Admin Dashboard{% endblock %}
-{% block breadcrumb %}Dashboard{% endblock %}
+{% block breadcrumb %}Dashboard de Admin{% endblock %}
 
 {% block content %}
-<div class="card bg-base-100 shadow-xl">
-    <div class="card-body">
-        <h1 class="card-title text-3xl">{{ welcome_message }}</h1>
-        <p class="text-base-content/70">Este es el panel de control principal para administradores. Desde aquí podrás gestionar todos los aspectos del sistema.</p>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-        <div class="divider"></div>
+<div class="container mx-auto p-4 lg:p-8 space-y-8">
 
-        <h2 class="text-2xl font-semibold mt-6 mb-4">Accesos Rápidos</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <a href="{% url 'admin:core_personaldocente_changelist' %}" class="btn btn-primary btn-lg">
-                <i class="fas fa-chalkboard-teacher mr-2"></i> Gestionar Docentes
-            </a>
-            <a href="{% url 'admin:core_curso_changelist' %}" class="btn btn-primary btn-lg">
-                <i class="fas fa-book mr-2"></i> Gestionar Cursos
-            </a>
-            <a href="{% url 'admin:core_documento_changelist' %}" class="btn btn-primary btn-lg">
-                <i class="fas fa-file-alt mr-2"></i> Revisar Documentos
-            </a>
-            <a href="{% url 'reporte_asistencia' %}" class="btn btn-secondary btn-lg">
-                <i class="fas fa-chart-bar mr-2"></i> Ver Reportes
-            </a>
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row justify-between md:items-center gap-4">
+        <div>
+            <h1 class="text-3xl md:text-4xl font-bold text-base-content">Panel de Control de Administración</h1>
+            <p class="text-base-content/70 mt-1">Un resumen del estado actual del sistema.</p>
+        </div>
+        <div class="flex gap-2">
+            <a href="{% url 'planificador_horarios' %}" class="btn btn-primary"><i class="fas fa-calendar-alt mr-2"></i>Ir al Planificador</a>
+            <a href="{% url 'reporte_asistencia' %}" class="btn btn-secondary"><i class="fas fa-chart-bar mr-2"></i>Ver Reportes</a>
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="card bg-base-100 shadow-lg border-l-4 border-primary">
+            <div class="card-body">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-sm font-medium text-base-content/60">Docentes Activos</p>
+                        <p class="text-3xl font-extrabold">{{ kpis.total_docentes }}</p>
+                    </div>
+                    <i class="fas fa-chalkboard-teacher text-4xl text-primary/30"></i>
+                </div>
+            </div>
+        </div>
+        <div class="card bg-base-100 shadow-lg border-l-4 border-accent">
+            <div class="card-body">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-sm font-medium text-base-content/60">Cursos Hoy</p>
+                        <p class="text-3xl font-extrabold">{{ kpis.cursos_hoy }}</p>
+                    </div>
+                    <i class="fas fa-book-open text-4xl text-accent/30"></i>
+                </div>
+            </div>
+        </div>
+        <div class="card bg-base-100 shadow-lg border-l-4 border-warning">
+            <div class="card-body">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-sm font-medium text-base-content/60">Justificaciones Pendientes</p>
+                        <p class="text-3xl font-extrabold">{{ kpis.justificaciones_pendientes }}</p>
+                    </div>
+                    <i class="fas fa-file-medical-alt text-4xl text-warning/30"></i>
+                </div>
+            </div>
+        </div>
+        <div class="card bg-base-100 shadow-lg border-l-4 border-error">
+            <div class="card-body">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-sm font-medium text-base-content/60">Documentos Observados</p>
+                        <p class="text-3xl font-extrabold">{{ kpis.documentos_observados }}</p>
+                    </div>
+                    <i class="fas fa-exclamation-circle text-4xl text-error/30"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-8">
+        <div class="lg:col-span-3 card bg-base-100 shadow-lg p-6">
+            <h2 class="card-title mb-4">Asistencia de la Última Semana</h2>
+            <canvas id="asistenciaSemanalChart"></canvas>
+        </div>
+        <div class="lg:col-span-2 card bg-base-100 shadow-lg p-6">
+            <h2 class="card-title mb-4">Estado General de Documentos</h2>
+            <canvas id="documentosStatusChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Quick Access Lists -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div class="card bg-base-100 shadow-lg">
+            <div class="card-body">
+                <h2 class="card-title">Justificaciones Pendientes</h2>
+                <div class="overflow-x-auto">
+                    <table class="table table-sm">
+                        <tbody>
+                            {% for justificacion in justificaciones_recientes %}
+                            <tr>
+                                <td>
+                                    <div class="font-bold">{{ justificacion.docente.get_full_name }}</div>
+                                    <div class="text-xs opacity-70">{{ justificacion.tipo.nombre }}</div>
+                                </td>
+                                <td class="text-xs">{{ justificacion.fecha_inicio|date:"d/m/Y" }} - {{ justificacion.fecha_fin|date:"d/m/Y" }}</td>
+                                <td><a href="{% url 'admin:core_justificacion_change' justificacion.id %}" class="btn btn-xs btn-outline btn-primary">Revisar</a></td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="3" class="text-center text-base-content/60 py-4">No hay justificaciones pendientes. ¡Buen trabajo!</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
-        <div class="divider"></div>
-
-        <p class="mt-6 text-sm text-base-content/50">
-            Próximamente se añadirán más estadísticas y métricas en este panel.
-        </p>
+        <div class="card bg-base-100 shadow-lg">
+            <div class="card-body">
+                <h2 class="card-title">Últimos Documentos en Revisión</h2>
+                <div class="overflow-x-auto">
+                    <table class="table table-sm">
+                        <tbody>
+                            {% for doc in documentos_recientes %}
+                            <tr>
+                                <td>
+                                    <div class="font-bold">{{ doc.titulo }}</div>
+                                    <div class="text-xs opacity-70">{{ doc.docente.get_full_name }}</div>
+                                </td>
+                                <td class="text-xs">{{ doc.fecha_subida|date:"d/m/Y" }}</td>
+                                <td><a href="{% url 'admin:core_documento_change' doc.id %}" class="btn btn-xs btn-outline btn-primary">Revisar</a></td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="3" class="text-center text-base-content/60 py-4">No hay documentos en revisión.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
+
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Data from Django
+    const asistenciaData = {{ charts_data.asistencia_semanal_json|safe }};
+    const documentosData = {{ charts_data.documentos_status_json|safe }};
+
+    // Chart 1: Asistencia Semanal
+    const asistenciaCtx = document.getElementById('asistenciaSemanalChart').getContext('2d');
+    new Chart(asistenciaCtx, {
+        type: 'bar',
+        data: {
+            labels: asistenciaData.labels,
+            datasets: [
+                {
+                    label: 'Presentes',
+                    data: asistenciaData.presentes,
+                    backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Faltas',
+                    data: asistenciaData.faltas,
+                    backgroundColor: 'rgba(255, 99, 132, 0.6)',
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Tardanzas',
+                    data: asistenciaData.tardanzas,
+                    backgroundColor: 'rgba(255, 206, 86, 0.6)',
+                    borderColor: 'rgba(255, 206, 86, 1)',
+                    borderWidth: 1
+                }
+            ]
+        },
+        options: {
+            scales: {
+                y: { beginAtZero: true, stacked: true },
+                x: { stacked: true }
+            },
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+
+    // Chart 2: Documentos Status
+    const documentosCtx = document.getElementById('documentosStatusChart').getContext('2d');
+    new Chart(documentosCtx, {
+        type: 'doughnut',
+        data: {
+            labels: documentosData.labels,
+            datasets: [{
+                label: 'Estado de Documentos',
+                data: documentosData.data,
+                backgroundColor: [
+                    'rgba(75, 192, 192, 0.7)',
+                    'rgba(255, 206, 86, 0.7)',
+                    'rgba(255, 99, 132, 0.7)',
+                    'rgba(54, 162, 235, 0.7)',
+                    'rgba(153, 102, 255, 0.7)'
+                ],
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+});
+</script>
 {% endblock %}
