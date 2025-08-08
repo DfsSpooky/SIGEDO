@@ -13,9 +13,9 @@ from core.models import Docente, Curso, Justificacion, Semestre
 @staff_member_required
 def dashboard(request):
     model_groups = {
-        'Gestión Académica': ['Semestre', 'Carrera', 'Especialidad', 'Curso'],
-        'Personal y Asistencia': ['Docente', 'Asistencia', 'Justificacion'],
-        'Documentos y Anuncios': ['Documento', 'Anuncio'],
+        'Gestión Académica': ['Semestre', 'Carrera', 'Especialidad', 'Curso', 'Grupo'],
+        'Personal y Asistencia': ['Docente', 'Asistencia', 'Justificacion', 'AsistenciaDiaria', 'SolicitudIntercambio'],
+        'Documentos y Anuncios': ['Documento', 'Anuncio', 'Notificacion'],
         'Configuración': ['FranjaHoraria', 'DiaEspecial', 'TipoDocumento', 'TipoJustificacion'],
     }
 
@@ -51,6 +51,10 @@ MODEL_LIST_FIELDS = {
     'semestre': ['nombre', 'fecha_inicio', 'fecha_fin', 'estado'],
     'curso': ['nombre', 'docente', 'carrera', 'semestre'],
     'justificacion': ['docente', 'tipo', 'fecha_inicio', 'fecha_fin', 'estado'],
+    'grupo': ['nombre'],
+    'asistenciadiaria': ['docente', 'fecha', 'hora_entrada'],
+    'solicitudintercambio': ['docente_solicitante', 'curso_solicitante', 'docente_destino', 'curso_destino', 'estado'],
+    'notificacion': ['destinatario', 'mensaje', 'leido', 'fecha_creacion'],
 }
 
 @login_required

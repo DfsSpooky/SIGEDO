@@ -38,15 +38,15 @@ except Exception as e:
     exit()
 
 # Test pages
-models_to_test = ['docente', 'semestre', 'curso']
+models_to_test = ['docente', 'semestre', 'curso', 'grupo', 'asistenciadiaria', 'solicitudintercambio', 'notificacion']
 for model in models_to_test:
-    url = f"{BASE_URL}/panel/core/{model}/add/"
+    url = f"{BASE_URL}/panel/core/{model}/"
     try:
         response = session.get(url)
         response.raise_for_status()
         if response.status_code == 200:
-            print(f"Successfully reached add page for {model}.")
+            print(f"Successfully reached list page for {model}.")
         else:
-            print(f"Failed to reach add page for {model}. Status: {response.status_code}")
+            print(f"Failed to reach list page for {model}. Status: {response.status_code}")
     except Exception as e:
-        print(f"Failed to reach add page for {model}: {e}")
+        print(f"Failed to reach list page for {model}: {e}")
