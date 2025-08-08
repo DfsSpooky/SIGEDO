@@ -11,11 +11,13 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="{% static 'css/custom_styles.css' %}">
 
     <style>
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Roboto', 'Inter', sans-serif;
         }
         /* Scrollbar estilizado (sin cambios, ya está bien) */
         ::-webkit-scrollbar { width: 8px; }
@@ -185,5 +187,7 @@
     </div>
 
     {% block extra_js %}{% endblock %}
+    <script src="{% static 'js/form_styles.js' %}"></script>
+    <script src="{% static 'js/ripple.js' %}"></script>
 </body>
 </html>
