@@ -34,7 +34,6 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
-    'jet',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -42,6 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'core',
+    'panel',
     'tailwind',
     
 ]
@@ -140,10 +140,3 @@ LOGIN_REDIRECT_URL = 'dashboard'
 LOGOUT_REDIRECT_URL = 'login'
 
 X_FRAME_OPTIONS = 'SAMEORIGIN'
-
-
-
-
-JET_THEME = 'light-blue'
-
-JET_INDEX_DASHBOARD = 'core.dashboard.CustomIndexDashboard'

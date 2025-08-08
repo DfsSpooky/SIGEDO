@@ -1,0 +1,84 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-gray-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Panel de Administración{% endblock %} - SIGEDO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="h-full">
+    <div class="min-h-full">
+        <!-- Off-canvas menu for mobile, show/hide based on menu state. -->
+        <div class="relative z-40 lg:hidden" role="dialog" aria-modal="true">
+            <!-- Off-canvas menu backdrop, show/hide based on off-canvas menu state. -->
+            <div class="fixed inset-0 bg-gray-600 bg-opacity-75"></div>
+            <div class="fixed inset-0 z-40 flex">
+                <div class="relative flex w-full max-w-xs flex-1 flex-col bg-gray-800 pt-5 pb-4">
+                    <!-- Close button -->
+                    <div class="absolute top-0 right-0 -mr-12 pt-2">
+                        <button type="button" class="ml-1 flex h-10 w-10 items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white">
+                            <span class="sr-only">Close sidebar</span>
+                            <i class="fas fa-times text-white"></i>
+                        </button>
+                    </div>
+                    <!-- Sidebar component -->
+                    <div class="mt-5 h-0 flex-1 overflow-y-auto">
+                        <nav class="space-y-1 px-2">
+                            <a href="{% url 'panel:dashboard' %}" class="bg-gray-900 text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+                                <i class="fas fa-tachometer-alt mr-3"></i> Dashboard
+                            </a>
+                        </nav>
+                    </div>
+                </div>
+                <div class="w-14 flex-shrink-0"></div>
+            </div>
+        </div>
+
+        <!-- Static sidebar for desktop -->
+        <div class="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
+            <div class="flex flex-grow flex-col overflow-y-auto bg-gray-800 pt-5">
+                 <div class="flex flex-shrink-0 items-center px-4 text-white">
+                    <i class="fas fa-university text-2xl text-indigo-400"></i>
+                    <span class="ml-3 text-xl font-bold">SIGEDO Panel</span>
+                </div>
+                <div class="mt-5 flex flex-1 flex-col">
+                    <nav class="flex-1 space-y-1 px-2 pb-4">
+                        <a href="{% url 'panel:dashboard' %}" class="bg-gray-900 text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+                            <i class="fas fa-tachometer-alt mr-3"></i> Dashboard
+                        </a>
+                        <!-- Add more navigation links here -->
+                    </nav>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex flex-1 flex-col lg:pl-64">
+            <div class="sticky top-0 z-10 flex h-16 flex-shrink-0 bg-white shadow">
+                <!-- Mobile menu button -->
+                <button type="button" class="border-r border-gray-200 px-4 text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 lg:hidden">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="flex flex-1 justify-end px-4">
+                    <!-- User dropdown -->
+                </div>
+            </div>
+
+            <main class="flex-1">
+                <div class="py-6">
+                    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                        {% block panel_content %}{% endblock %}
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+</body>
+</html>
