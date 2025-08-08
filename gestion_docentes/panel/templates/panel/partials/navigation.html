@@ -1,0 +1,24 @@
+<nav class="flex-1 space-y-1 bg-gray-800 px-2 py-4">
+    <a href="{% url 'panel:dashboard' %}" class="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+        <i class="fas fa-tachometer-alt mr-3 flex-shrink-0 h-6 w-6"></i>
+        Dashboard
+    </a>
+
+    {% for group_name, models_info in panel_nav_structure.items %}
+        <div x-data="{ open: false }" class="space-y-1">
+            <button @click="open = !open" class="text-gray-300 hover:bg-gray-700 hover:text-white group w-full flex items-center pl-2 pr-1 py-2 text-left text-sm font-medium rounded-md focus:outline-none">
+                <span class="flex-1">{{ group_name }}</span>
+                <svg class="ml-3 h-5 w-5 flex-shrink-0 transform transition-colors duration-150 ease-in-out" :class="{'rotate-90': open}" viewBox="0 0 20 20" aria-hidden="true">
+                    <path d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" fill="currentColor" />
+                </svg>
+            </button>
+            <div x-show="open" class="space-y-1 pl-4" x-cloak>
+                {% for model in models_info %}
+                <a href="{% url 'panel:model_list' app_label=model.app_label model_name=model.name %}" class="group flex items-center rounded-md py-2 px-2 text-sm font-medium text-gray-400 hover:bg-gray-700 hover:text-white">
+                    {{ model.verbose_name_plural|capfirst }}
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+    {% endfor %}
+</nav>

@@ -8,27 +8,21 @@
     </p>
 </div>
 
-<div class="mt-8 space-y-8">
+<div class="mt-6 grid grid-cols-1 gap-y-6 sm:grid-cols-2 sm:gap-x-6 lg:grid-cols-3">
     {% for group_name, models_info in app_structure.items %}
-        <div class="bg-white shadow-sm rounded-lg">
-            <div class="p-4 border-b border-gray-200">
-                <h2 class="text-lg font-semibold text-gray-800">{{ group_name }}</h2>
-            </div>
-            <div class="p-4">
+        <div class="group relative rounded-lg border border-gray-200 bg-white p-4 shadow-sm hover:shadow-lg transition-shadow">
+            <h3 class="text-lg font-medium text-gray-900">
+                <i class="fas fa-layer-group text-indigo-500 mr-2"></i>
+                {{ group_name }}
+            </h3>
+            <div class="mt-4 border-t border-gray-200 pt-4">
                 <ul class="space-y-2">
                     {% for model in models_info %}
-                        <li>
-                            <a href="{% url 'panel:model_list' app_label=model.app_label model_name=model.name %}" class="flex justify-between items-center p-2 rounded-md hover:bg-gray-50 transition-colors">
-                                <span class="font-medium text-indigo-600">{{ model.verbose_name_plural|capfirst }}</span>
-                                {% if request.user.is_superuser or model.has_add_perm %}
-                                <div class="flex items-center gap-2">
-                                    <span class="text-sm text-gray-500 hover:text-gray-900 hover:bg-gray-100 p-1 rounded-md">
-                                        <i class="fas fa-plus mr-1"></i> Añadir
-                                    </span>
-                                </div>
-                                {% endif %}
-                            </a>
-                        </li>
+                    <li>
+                        <a href="{% url 'panel:model_list' app_label=model.app_label model_name=model.name %}" class="block p-2 rounded-md hover:bg-gray-50">
+                           <span class="text-sm font-medium text-gray-700 hover:text-indigo-600">{{ model.verbose_name_plural|capfirst }}</span>
+                        </a>
+                    </li>
                     {% endfor %}
                 </ul>
             </div>

@@ -39,14 +39,21 @@ def model_list_view(request, app_label, model_name):
     try:
         model = apps.get_model(app_label, model_name)
     except LookupError:
-        # Handle model not found error
-        return render(request, 'panel/404.html') # O una plantilla de error personalizada
+        return render(request, 'panel/404.html')
 
+    opts = model._meta
     queryset = model.objects.all()
 
+    # Verificar permisos
+    has_add_permission = request.user.has_perm(f'{app_label}.add_{model_name}')
+    has_change_permission = request.user.has_perm(f'{app_label}.change_{model_name}')
+    has_delete_permission = request.user.has_perm(f'{app_label}.delete_{model_name}')
+
     context = {
-        'model': model,
         'queryset': queryset,
-        'opts': model._meta,
+        'opts': opts,
+        'has_add_permission': has_add_permission,
+        'has_change_permission': has_change_permission,
+        'has_delete_permission': has_delete_permission,
     }
     return render(request, 'panel/model_list.html', context)
