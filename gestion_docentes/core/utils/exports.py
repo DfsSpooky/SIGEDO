@@ -373,6 +373,10 @@ def exportar_ficha_docente_pdf(docente, semestre_activo):
 
     elements = []
 
+    frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id='normal')
+    template = PageTemplate(id='ficha_template', frames=[frame])
+    doc.addPageTemplates([template])
+
     # --- Cabecera ---
     configuracion = ConfiguracionInstitucion.load()
     logo_img = Spacer(0,0)
