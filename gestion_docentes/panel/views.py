@@ -71,10 +71,10 @@ class ModelCreateView(PermissionRequiredMixin, CreateView):
         return [f"{model._meta.app_label}.add_{model._meta.model_name}"]
 
     def get_form_class(self):
-        model = self.get_model()
+        self.model = self.get_model()
         class ModelForm(forms.ModelForm):
             class Meta:
-                model = model
+                model = self.model
                 fields = '__all__'
         return ModelForm
 
@@ -96,10 +96,10 @@ class ModelUpdateView(PermissionRequiredMixin, UpdateView):
         return [f"{model._meta.app_label}.change_{model._meta.model_name}"]
 
     def get_form_class(self):
-        model = self.get_model()
+        self.model = self.get_model()
         class ModelForm(forms.ModelForm):
             class Meta:
-                model = model
+                model = self.model
                 fields = '__all__'
         return ModelForm
 
