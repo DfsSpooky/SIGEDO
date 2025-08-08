@@ -109,18 +109,18 @@ class AdminInterfaceTest(TestCase):
     def test_admin_dashboard_accessible_by_staff(self):
         """Test that the admin dashboard is accessible to staff members."""
         self.client.login(username='staffuser', password='staffpassword123')
-        url = reverse('admin_dashboard')
+        url = reverse('panel:dashboard')
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Panel de Control de Administración")
+        self.assertContains(response, "Panel de Administración")
 
     def test_admin_dashboard_inaccessible_by_non_staff(self):
         """Test that the admin dashboard is not accessible to non-staff members."""
         self.client.login(username='normaluser', password='userpassword123')
-        url = reverse('admin_dashboard')
+        url = reverse('panel:dashboard')
         response = self.client.get(url)
-        # Should redirect to the normal user dashboard or login page
-        self.assertNotEqual(response.status_code, 200)
+        # Should redirect to the login page as they are not staff
+        self.assertEqual(response.status_code, 302)
 
     def test_rotate_qr_code_view(self):
         """Test that the rotate_qr_code view changes the id_qr."""

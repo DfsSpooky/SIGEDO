@@ -9,30 +9,26 @@
 </div>
 
 <div class="mt-8 space-y-8">
-    {% for group_name, models in app_models.items %}
+    {% for group_name, models_info in app_structure.items %}
         <div class="bg-white shadow-sm rounded-lg">
             <div class="p-4 border-b border-gray-200">
                 <h2 class="text-lg font-semibold text-gray-800">{{ group_name }}</h2>
             </div>
             <div class="p-4">
                 <ul class="space-y-2">
-                    {% for model in models %}
-                        {% with opts=model._meta %}
-                            <li>
-                                <a href="{% url 'panel:model_list' app_label=opts.app_label model_name=opts.model_name %}" class="flex justify-between items-center p-2 rounded-md hover:bg-gray-50 transition-colors">
-                                    <span class="font-medium text-indigo-600">{{ opts.verbose_name_plural|capfirst }}</span>
-                                    {% with add_perm=opts.app_label|add:'.'|add:'add_'|add:opts.model_name %}
-                                        {% if perms.core|has_perm:add_perm %}
-                                            <div class="flex items-center gap-2">
-                                                <span class="text-sm text-gray-500 hover:text-gray-900 hover:bg-gray-100 p-1 rounded-md">
-                                                    <i class="fas fa-plus mr-1"></i> Añadir
-                                                </span>
-                                            </div>
-                                        {% endif %}
-                                    {% endwith %}
-                                </a>
-                            </li>
-                        {% endwith %}
+                    {% for model in models_info %}
+                        <li>
+                            <a href="{% url 'panel:model_list' app_label=model.app_label model_name=model.name %}" class="flex justify-between items-center p-2 rounded-md hover:bg-gray-50 transition-colors">
+                                <span class="font-medium text-indigo-600">{{ model.verbose_name_plural|capfirst }}</span>
+                                {% if request.user.is_superuser or model.has_add_perm %}
+                                <div class="flex items-center gap-2">
+                                    <span class="text-sm text-gray-500 hover:text-gray-900 hover:bg-gray-100 p-1 rounded-md">
+                                        <i class="fas fa-plus mr-1"></i> Añadir
+                                    </span>
+                                </div>
+                                {% endif %}
+                            </a>
+                        </li>
                     {% endfor %}
                 </ul>
             </div>

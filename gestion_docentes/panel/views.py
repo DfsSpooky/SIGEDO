@@ -1,37 +1,35 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
+from django.contrib.admin.views.decorators import staff_member_required
 from django.apps import apps
 
 @login_required
+@staff_member_required
 def dashboard(request):
     # Agrupamos los modelos de la app 'core' por categoría para mostrarlos en el panel.
-    # En el futuro, esto puede ser más dinámico.
-    app_models = {
-        'Gestión Académica': [
-            apps.get_model('core', 'Semestre'),
-            apps.get_model('core', 'Carrera'),
-            apps.get_model('core', 'Especialidad'),
-            apps.get_model('core', 'Curso'),
-        ],
-        'Personal y Asistencia': [
-            apps.get_model('core', 'Docente'),
-            apps.get_model('core', 'Asistencia'),
-            apps.get_model('core', 'Justificacion'),
-        ],
-        'Documentos y Anuncios': [
-            apps.get_model('core', 'Documento'),
-            apps.get_model('core', 'Anuncio'),
-        ],
-        'Configuración': [
-            apps.get_model('core', 'FranjaHoraria'),
-            apps.get_model('core', 'DiaEspecial'),
-            apps.get_model('core', 'TipoDocumento'),
-            apps.get_model('core', 'TipoJustificacion'),
-        ]
+    model_groups = {
+        'Gestión Académica': ['Semestre', 'Carrera', 'Especialidad', 'Curso'],
+        'Personal y Asistencia': ['Docente', 'Asistencia', 'Justificacion'],
+        'Documentos y Anuncios': ['Documento', 'Anuncio'],
+        'Configuración': ['FranjaHoraria', 'DiaEspecial', 'TipoDocumento', 'TipoJustificacion'],
     }
 
+    app_structure = {}
+    for group, model_names in model_groups.items():
+        models_info = []
+        for model_name in model_names:
+            model = apps.get_model('core', model_name)
+            opts = model._meta
+            models_info.append({
+                'name': opts.model_name,
+                'verbose_name_plural': opts.verbose_name_plural,
+                'app_label': opts.app_label,
+                'has_add_perm': request.user.has_perm(f'{opts.app_label}.add_{opts.model_name}'),
+            })
+        app_structure[group] = models_info
+
     context = {
-        'app_models': app_models
+        'app_structure': app_structure
     }
 
     return render(request, 'panel/dashboard.html', context)
