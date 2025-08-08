@@ -1,0 +1,113 @@
+{% extends 'panel/panel_base.html' %}
+
+{% block panel_content %}
+<div>
+    <h1 class="text-3xl font-bold text-gray-900">Panel de Administración</h1>
+    <p class="mt-2 text-lg text-gray-600">
+        Bienvenido al panel de control. Desde aquí podrá gestionar las aplicaciones del sistema.
+    </p>
+</div>
+
+<!-- KPIs -->
+<div class="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-users fa-2x text-indigo-500"></i>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">
+                            Total Docentes
+                        </dt>
+                        <dd class="text-3xl font-semibold text-gray-900">
+                            {{ kpis.total_docentes }}
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-book-open fa-2x text-green-500"></i>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">
+                            Cursos Activos
+                        </dt>
+                        <dd class="text-3xl font-semibold text-gray-900">
+                            {{ kpis.cursos_activos }}
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-file-alt fa-2x text-yellow-500"></i>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">
+                            Justificaciones Pendientes
+                        </dt>
+                        <dd class="text-3xl font-semibold text-gray-900">
+                            {{ kpis.justificaciones_pendientes }}
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-calendar-alt fa-2x text-red-500"></i>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">
+                            Semestres Activos
+                        </dt>
+                        <dd class="text-3xl font-semibold text-gray-900">
+                            {{ kpis.semestres_activos }}
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div class="mt-8">
+    {% for group_name, models_info in app_structure.items %}
+        <div class="mb-8">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4">{{ group_name }}</h2>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {% for model in models_info %}
+                <a href="{% url 'panel:model_list' app_label=model.app_label model_name=model.name %}" class="group block p-6 bg-white rounded-lg shadow hover:shadow-xl transition-shadow">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-folder text-gray-400 group-hover:text-indigo-500"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-lg font-medium text-gray-900">{{ model.verbose_name_plural|capfirst }}</p>
+                        </div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}

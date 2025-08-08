@@ -5,6 +5,7 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('panel/', include('panel.urls', namespace='panel')),
     path('', include('core.urls')),
     path('accounts/', include('django.contrib.auth.urls')), # Para login, logout, etc.
 ]

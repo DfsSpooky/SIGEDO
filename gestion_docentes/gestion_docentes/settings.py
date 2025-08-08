@@ -22,6 +22,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-=w1huy-2d3)$32m)$+8+*kkuz(+#hx)eio37q8(+94@o-+av&s'
 
+# Key for encrypting IDs
+ID_ENCRYPTION_KEY = b'J5YSFVZTupEKrBGPkvBODOR_B_uHBx2GZeKcO32JeUI='
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
@@ -31,7 +34,6 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
-    'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -39,6 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'core',
+    'panel',
     'tailwind',
     
 ]
@@ -66,6 +69,9 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'core.context_processors.unread_notifications_context',
+                'core.context_processors.site_configuration_context',
+                'core.context_processors.panel_navigation_context',
             ],
         },
     },
@@ -131,73 +137,7 @@ AUTH_USER_MODEL = 'core.Docente'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-LOGIN_REDIRECT_URL = 'dashboard'
+LOGIN_REDIRECT_URL = '/panel/'
+LOGOUT_REDIRECT_URL = 'login'
 
-
-
-
-JAZZMIN_SETTINGS = {
-    # Título de la ventana (se verá en la pestaña del navegador)
-    "site_title": "Gestión Docente Admin",
-
-    # Título en la pantalla de login (puede ser corto)
-    "site_header": "Gestión Docente",
-
-    # Título en el logo (puede ser más corto)
-    "site_brand": "GD-Admin",
-
-    # Logo para la pantalla de login
-    "login_logo": "/static/placeholder.png", # Puedes cambiar esto a la ruta de tu logo
-
-    # Logo para la barra lateral en modo oscuro
-    "site_logo_dark": "/static/placeholder.png", # Puedes cambiar esto
-
-    # Temas de Bootswatch https://bootswatch.com/
-    "theme": "darkly",
-
-    # Opciones de la interfaz de usuario
-    "ui_tweaks": {
-        "navbar_small_text": False,
-        "footer_small_text": False,
-        "body_small_text": False,
-        "brand_small_text": False,
-        "brand_colour": "navbar-dark",
-        "accent": "accent-primary",
-        "navbar": "navbar-dark",
-        "no_navbar_border": False,
-        "sidebar": "sidebar-dark-primary",
-        "sidebar_nav_small_text": False,
-        "sidebar_disable_expand": False,
-        "sidebar_nav_child_indent": False,
-        "sidebar_nav_compact_style": False,
-        "sidebar_nav_legacy_style": False,
-        "sidebar_nav_flat_style": False,
-        "theme": "darkly",
-        "dark_mode_theme": "darkly",
-        "button_classes": {
-            "primary": "btn-primary",
-            "secondary": "btn-secondary",
-            "info": "btn-info",
-            "warning": "btn-warning",
-            "danger": "btn-danger",
-            "success": "btn-success"
-        }
-    },
-
-    # --- ORGANIZACIÓN DEL MENÚ LATERAL ---
-    "show_sidebar": True,
-    "navigation_expanded": True,
-    "order_with_respect_to": [
-        # Autenticación y Usuarios
-        "auth", "core.docente", "core.personal", "core.administrador",
-
-        # Organización Académica
-        "core.semestre", "core.carrera", "core.especialidad", "core.grupo", "core.curso",
-
-        # Asistencia y Horarios
-        "core.asistenciadiaria", "core.asistencia", "core.franjahoraria", "core.diaespecial",
-
-        # Otros
-        "core.documento", "core.tipodocumento", "core.solicitudintercambio"
-    ],
-}
+X_FRAME_OPTIONS = 'SAMEORIGIN'
