@@ -36,6 +36,8 @@ import uuid
 
 def custom_login_view(request):
     if request.user.is_authenticated:
+        if request.user.is_staff:
+            return redirect('panel:dashboard')
         return redirect('dashboard')
 
     configuracion = ConfiguracionInstitucion.load()
@@ -48,6 +50,8 @@ def custom_login_view(request):
             user = authenticate(username=username, password=password)
             if user is not None:
                 login(request, user)
+                if user.is_staff:
+                    return redirect('panel:dashboard')
                 return redirect('dashboard')
         # Si el form no es válido, se renderiza de nuevo la página con los errores
     else:

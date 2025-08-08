@@ -58,7 +58,7 @@ class DiaEspecial(models.Model):
 
 class Docente(AbstractUser):
     DISPONIBILIDAD_CHOICES = [('COMPLETO', 'Tiempo Completo (Mañana y Tarde)'), ('MANANA', 'Solo Mañana'), ('TARDE', 'Solo Tarde')]
-    dni = models.CharField(max_length=8, unique=True, db_index=True)
+    dni = models.CharField(max_length=8, unique=True, db_index=True, null=True, blank=True)
     especialidades = models.ManyToManyField(Especialidad, related_name="docentes")
     disponibilidad = models.CharField(max_length=20, choices=DISPONIBILIDAD_CHOICES, default='COMPLETO')
     id_qr = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)

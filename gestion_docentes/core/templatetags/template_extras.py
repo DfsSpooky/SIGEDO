@@ -42,3 +42,7 @@ def encrypt(value):
     Encrypts a value using the encrypt_id utility.
     """
     return encrypt_id(value)
+
+@register.filter(name='widget_type')
+def widget_type(field):
+    return field.field.widget.__class__.__name__
