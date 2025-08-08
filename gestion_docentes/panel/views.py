@@ -2,6 +2,7 @@ from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.contrib.admin.views.decorators import staff_member_required
 from django.apps import apps
+from django import forms
 
 @login_required
 @staff_member_required
@@ -49,6 +50,10 @@ def model_list_view(request, app_label, model_name):
     has_change_permission = request.user.has_perm(f'{app_label}.change_{model_name}')
     has_delete_permission = request.user.has_perm(f'{app_label}.delete_{model_name}')
 
+from django.views.generic import CreateView, UpdateView, DeleteView
+from django.urls import reverse_lazy
+from django.contrib.auth.mixins import PermissionRequiredMixin
+
     context = {
         'queryset': queryset,
         'opts': opts,
@@ -57,3 +62,66 @@ def model_list_view(request, app_label, model_name):
         'has_delete_permission': has_delete_permission,
     }
     return render(request, 'panel/model_list.html', context)
+
+class ModelCreateView(PermissionRequiredMixin, CreateView):
+    template_name = 'panel/model_form.html'
+
+    def get_model(self):
+        return apps.get_model(self.kwargs['app_label'], self.kwargs['model_name'])
+
+    def get_permission_required(self):
+        model = self.get_model()
+        return [f"{model._meta.app_label}.add_{model._meta.model_name}"]
+
+    def get_form_class(self):
+        model = self.get_model()
+        class ModelForm(forms.ModelForm):
+            class Meta:
+                model = model
+                fields = '__all__'
+        return ModelForm
+
+    def get_success_url(self):
+        return reverse_lazy('panel:model_list', kwargs={'app_label': self.kwargs['app_label'], 'model_name': self.kwargs['model_name']})
+
+class ModelUpdateView(PermissionRequiredMixin, UpdateView):
+    template_name = 'panel/model_form.html'
+
+    def get_model(self):
+        return apps.get_model(self.kwargs['app_label'], self.kwargs['model_name'])
+
+    def get_queryset(self):
+        model = self.get_model()
+        return model.objects.all()
+
+    def get_permission_required(self):
+        model = self.get_model()
+        return [f"{model._meta.app_label}.change_{model._meta.model_name}"]
+
+    def get_form_class(self):
+        model = self.get_model()
+        class ModelForm(forms.ModelForm):
+            class Meta:
+                model = model
+                fields = '__all__'
+        return ModelForm
+
+    def get_success_url(self):
+        return reverse_lazy('panel:model_list', kwargs={'app_label': self.kwargs['app_label'], 'model_name': self.kwargs['model_name']})
+
+class ModelDeleteView(PermissionRequiredMixin, DeleteView):
+    template_name = 'panel/model_confirm_delete.html'
+
+    def get_model(self):
+        return apps.get_model(self.kwargs['app_label'], self.kwargs['model_name'])
+
+    def get_queryset(self):
+        model = self.get_model()
+        return model.objects.all()
+
+    def get_permission_required(self):
+        model = self.get_model()
+        return [f"{model._meta.app_label}.delete_{model._meta.model_name}"]
+
+    def get_success_url(self):
+        return reverse_lazy('panel:model_list', kwargs={'app_label': self.kwargs['app_label'], 'model_name': self.kwargs['model_name']})
