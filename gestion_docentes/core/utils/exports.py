@@ -366,10 +366,10 @@ def exportar_ficha_docente_pdf(docente, semestre_activo):
 
     # Estilos
     styles = getSampleStyleSheet()
-    styles.add(ParagraphStyle(name='Title', fontName='Helvetica-Bold', fontSize=18, spaceAfter=12, alignment=1))
-    styles.add(ParagraphStyle(name='Subtitle', fontName='Helvetica-Bold', fontSize=14, spaceAfter=8, textColor=colors.darkslategray))
-    styles.add(ParagraphStyle(name='Body', fontName='Helvetica', fontSize=10, leading=14))
-    styles.add(ParagraphStyle(name='BodyBold', fontName='Helvetica-Bold', fontSize=10))
+    styles.add(ParagraphStyle(name='FichaTitle', fontName='Helvetica-Bold', fontSize=18, spaceAfter=12, alignment=1))
+    styles.add(ParagraphStyle(name='FichaSubtitle', fontName='Helvetica-Bold', fontSize=14, spaceAfter=8, textColor=colors.darkslategray))
+    styles.add(ParagraphStyle(name='FichaBody', fontName='Helvetica', fontSize=10, leading=14))
+    styles.add(ParagraphStyle(name='FichaBodyBold', parent=styles['FichaBody'], fontName='Helvetica-Bold'))
 
     elements = []
 
@@ -382,62 +382,62 @@ def exportar_ficha_docente_pdf(docente, semestre_activo):
         logo_file.close()
 
     header_data = [
-        [logo_img, Paragraph(f"<b>{configuracion.nombre_institucion}</b><br/>{configuracion.facultad.nombre if configuracion.facultad else ''}", styles['Body'])]
+        [logo_img, Paragraph(f"<b>{configuracion.nombre_institucion}</b><br/>{configuracion.facultad.nombre if configuracion.facultad else ''}", styles['FichaBody'])]
     ]
     header_table = Table(header_data, colWidths=[1*inch, 6*inch])
     header_table.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'TOP')]))
     elements.append(header_table)
     elements.append(Spacer(1, 0.25*inch))
-    elements.append(Paragraph("Ficha Integral del Docente", styles['Title']))
+    elements.append(Paragraph("Ficha Integral del Docente", styles['FichaTitle']))
 
     # --- Datos Personales ---
-    elements.append(Paragraph("1. Datos Personales", styles['Subtitle']))
+    elements.append(Paragraph("1. Datos Personales", styles['FichaSubtitle']))
     personal_data = [
-        [Paragraph("<b>Nombre Completo:</b>", styles['Body']), Paragraph(docente.get_full_name(), styles['Body'])],
-        [Paragraph("<b>DNI:</b>", styles['Body']), Paragraph(docente.dni, styles['Body'])],
-        [Paragraph("<b>Email:</b>", styles['Body']), Paragraph(docente.email, styles['Body'])],
+        [Paragraph("<b>Nombre Completo:</b>", styles['FichaBody']), Paragraph(docente.get_full_name(), styles['FichaBody'])],
+        [Paragraph("<b>DNI:</b>", styles['FichaBody']), Paragraph(docente.dni, styles['FichaBody'])],
+        [Paragraph("<b>Email:</b>", styles['FichaBody']), Paragraph(docente.email, styles['FichaBody'])],
     ]
     personal_table = Table(personal_data, colWidths=[1.5*inch, 5.5*inch])
     elements.append(personal_table)
     elements.append(Spacer(1, 0.25*inch))
 
     # --- Carga Académica ---
-    elements.append(Paragraph(f"2. Carga Académica ({semestre_activo.nombre})", styles['Subtitle']))
+    elements.append(Paragraph(f"2. Carga Académica ({semestre_activo.nombre})", styles['FichaSubtitle']))
     cursos = Curso.objects.filter(docente=docente, semestre=semestre_activo)
     if cursos.exists():
-        cursos_data = [[Paragraph(f"<b>{c.nombre}</b> ({c.especialidad.nombre if c.especialidad else 'N/A'})", styles['Body'])] for c in cursos]
+        cursos_data = [[Paragraph(f"<b>{c.nombre}</b> ({c.especialidad.nombre if c.especialidad else 'N/A'})", styles['FichaBody'])] for c in cursos]
         cursos_table = Table(cursos_data, colWidths=[7*inch])
         cursos_table.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.whitesmoke), ('INNERGRID', (0,0), (-1,-1), 0.25, colors.grey)]))
         elements.append(cursos_table)
     else:
-        elements.append(Paragraph("No tiene cursos asignados en este semestre.", styles['Body']))
+        elements.append(Paragraph("No tiene cursos asignados en este semestre.", styles['FichaBody']))
     elements.append(Spacer(1, 0.25*inch))
 
     # --- Desempeño de Asistencia ---
-    elements.append(Paragraph("3. Desempeño de Asistencia", styles['Subtitle']))
+    elements.append(Paragraph("3. Desempeño de Asistencia", styles['FichaSubtitle']))
     # (Lógica de cálculo de asistencia simplificada para la ficha)
     total_clases_programadas = Asistencia.objects.filter(docente=docente, curso__in=cursos).count()
     asistencias_contadas = Asistencia.objects.filter(docente=docente, curso__in=cursos, hora_entrada__isnull=False).count()
     porcentaje_asistencia = (asistencias_contadas / total_clases_programadas * 100) if total_clases_programadas > 0 else 100
 
     desempeno_data = [
-        [Paragraph("<b>Clases Programadas en el Semestre:</b>", styles['Body']), Paragraph(str(total_clases_programadas), styles['Body'])],
-        [Paragraph("<b>Asistencias Registradas:</b>", styles['Body']), Paragraph(str(asistencias_contadas), styles['Body'])],
-        [Paragraph("<b>Porcentaje de Asistencia:</b>", styles['Body']), Paragraph(f"{porcentaje_asistencia:.2f}%", styles['BodyBold'])],
+        [Paragraph("<b>Clases Programadas en el Semestre:</b>", styles['FichaBody']), Paragraph(str(total_clases_programadas), styles['FichaBody'])],
+        [Paragraph("<b>Asistencias Registradas:</b>", styles['FichaBody']), Paragraph(str(asistencias_contadas), styles['FichaBody'])],
+        [Paragraph("<b>Porcentaje de Asistencia:</b>", styles['FichaBody']), Paragraph(f"{porcentaje_asistencia:.2f}%", styles['FichaBodyBold'])],
     ]
     desempeno_table = Table(desempeno_data, colWidths=[3*inch, 4*inch])
     elements.append(desempeno_table)
     elements.append(Spacer(1, 0.25*inch))
 
     # --- Gestión Documental ---
-    elements.append(Paragraph("4. Gestión Documental", styles['Subtitle']))
+    elements.append(Paragraph("4. Gestión Documental", styles['FichaSubtitle']))
     documentos = Documento.objects.filter(docente=docente)
-    doc_data = [[Paragraph(f"<b>{d.get_estado_display()}</b>", styles['Body']), Paragraph(d.titulo, styles['Body'])] for d in documentos]
+    doc_data = [[Paragraph(f"<b>{d.get_estado_display()}</b>", styles['FichaBody']), Paragraph(d.titulo, styles['FichaBody'])] for d in documentos]
     if doc_data:
         doc_table = Table(doc_data, colWidths=[1.5*inch, 5.5*inch])
         elements.append(doc_table)
     else:
-        elements.append(Paragraph("No hay documentos registrados.", styles['Body']))
+        elements.append(Paragraph("No hay documentos registrados.", styles['FichaBody']))
 
     doc.build(elements)
     pdf = buffer.getvalue()
