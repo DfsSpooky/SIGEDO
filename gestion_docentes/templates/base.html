@@ -163,6 +163,7 @@
 
                 {% if user.is_staff %}
                 <li class="menu-title"><span class="opacity-60 pt-4">Administración</span></li>
+                <li><a href="{% url 'panel:dashboard' %}" class="group transition-all duration-300 font-bold text-base"><i class="fas fa-shield-alt fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Panel de Control</a></li>
                 {% if perms.core.view_planificador %}
                 <li><a href="{% url 'planificador_horarios' %}" class="group transition-all duration-300"><i class="fas fa-calendar-alt fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Planificador</a></li>
                 {% endif %}
