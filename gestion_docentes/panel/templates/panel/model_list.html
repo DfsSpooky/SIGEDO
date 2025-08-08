@@ -45,7 +45,7 @@
                     {% endfor %}
                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         {% if has_change_permission %}
-                        <a href="{% url 'panel:model_change' app_label=opts.app_label model_name=opts.model_name pk=object.pk %}" class="text-indigo-600 hover:text-indigo-900" title="Editar">
+                        <a href="{% url 'panel:model_change' app_label=opts.app_label model_name=opts.model_name pk=object.pk %}" class="text-indigo-600 hover:text-indigo-900 modal-link" title="Editar" data-modal-title="Editar {{ opts.verbose_name }}">
                             <i class="fas fa-pencil-alt"></i>
                         </a>
                         {% endif %}
@@ -68,10 +68,36 @@
     </div>
 </div>
 
-{% if has_add_permission %}
-<a href="{% url 'panel:model_add' app_label=opts.app_label model_name=opts.model_name %}" class="fixed bottom-10 right-10 bg-primary text-white w-16 h-16 rounded-full flex items-center justify-center shadow-lg hover:bg-primary-focus transition-transform duration-300 transform hover:scale-110" title="Añadir {{ opts.verbose_name }}">
+{% if has_add_permission or request.user.is_superuser %}
+<a href="{% url 'panel:model_add' app_label=opts.app_label model_name=opts.model_name %}" class="fixed bottom-10 right-10 bg-primary text-white w-16 h-16 rounded-full flex items-center justify-center shadow-lg hover:bg-primary-focus transition-transform duration-300 transform hover:scale-110 modal-link" title="Añadir {{ opts.verbose_name }}" data-modal-title="Añadir {{ opts.verbose_name }}">
     <i class="fas fa-plus text-2xl"></i>
 </a>
 {% endif %}
 
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.modal-link').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const url = this.href;
+            const title = this.dataset.modalTitle;
+
+            fetch(url)
+                .then(response => response.text())
+                .then(html => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const form = doc.querySelector('form');
+                    if (form) {
+                        const event = new CustomEvent('open-modal', { detail: { title: title, content: form.outerHTML } });
+                        window.dispatchEvent(event);
+                    }
+                });
+        });
+    });
+});
+</script>
 {% endblock %}

@@ -97,11 +97,13 @@
                 {% for model in models_info %}
                 <a href="{% url 'panel:model_list' app_label=model.app_label model_name=model.name %}"
                    class="group block p-5 bg-surface rounded-lg shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-                    <div class="flex items-center justify-between">
-                        <p class="text-lg font-semibold text-on-surface">{{ model.verbose_name_plural|capfirst }}</p>
-                        <span class="text-primary opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                            <i class="fas fa-arrow-right"></i>
-                        </span>
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0 bg-primary/10 p-3 rounded-full">
+                            <i class="fas {{ model.icon }} fa-lg text-primary"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-lg font-semibold text-on-surface">{{ model.verbose_name_plural|capfirst }}</p>
+                        </div>
                     </div>
                 </a>
                 {% endfor %}

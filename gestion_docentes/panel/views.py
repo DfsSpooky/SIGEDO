@@ -6,8 +6,30 @@ from django import forms
 from django.views.generic import CreateView, UpdateView, DeleteView
 from django.urls import reverse_lazy
 from django.contrib.auth.mixins import PermissionRequiredMixin
+from django.http import JsonResponse
+from django.template.loader import render_to_string
 from .forms import DocenteCreationForm, DocenteChangeForm, SemestreForm, CursoForm
 from core.models import Docente, Curso, Justificacion, Semestre
+
+MODEL_ICONS = {
+    'semestre': 'fa-calendar-alt',
+    'carrera': 'fa-graduation-cap',
+    'especialidad': 'fa-star',
+    'curso': 'fa-book',
+    'grupo': 'fa-users',
+    'docente': 'fa-user-tie',
+    'asistencia': 'fa-clock',
+    'justificacion': 'fa-file-medical-alt',
+    'asistenciadiaria': 'fa-calendar-day',
+    'solicitudintercambio': 'fa-exchange-alt',
+    'documento': 'fa-file-alt',
+    'anuncio': 'fa-bullhorn',
+    'notificacion': 'fa-bell',
+    'franjahoraria': 'fa-hourglass-half',
+    'diaespecial': 'fa-calendar-star',
+    'tipodocumento': 'fa-file-invoice',
+    'tipojustificacion': 'fa-file-signature',
+}
 
 @login_required
 @staff_member_required
@@ -30,6 +52,7 @@ def dashboard(request):
                 'verbose_name_plural': opts.verbose_name_plural,
                 'app_label': opts.app_label,
                 'has_add_perm': request.user.has_perm(f'{opts.app_label}.add_{opts.model_name}'),
+                'icon': MODEL_ICONS.get(opts.model_name, 'fa-folder'),
             })
         app_structure[group] = models_info
 
@@ -112,7 +135,18 @@ MODEL_ADD_FORMS = {
     'docente': DocenteCreationForm,
 }
 
-class ModelCreateView(PermissionRequiredMixin, CreateView):
+class AjaxFormMixin:
+    def form_valid(self, form):
+        self.object = form.save()
+        return JsonResponse({'status': 'success'})
+
+    def form_invalid(self, form):
+        # We need to get the context data to render the form correctly
+        context = self.get_context_data(form=form)
+        form_html = render_to_string(self.template_name, context, request=self.request)
+        return JsonResponse({'status': 'error', 'form_html': form_html})
+
+class ModelCreateView(PermissionRequiredMixin, AjaxFormMixin, CreateView):
     template_name = 'panel/model_form.html'
 
     def get_model(self):
@@ -147,7 +181,7 @@ class ModelCreateView(PermissionRequiredMixin, CreateView):
     def get_success_url(self):
         return reverse_lazy('panel:model_list', kwargs={'app_label': self.kwargs['app_label'], 'model_name': self.kwargs['model_name']})
 
-class ModelUpdateView(PermissionRequiredMixin, UpdateView):
+class ModelUpdateView(PermissionRequiredMixin, AjaxFormMixin, UpdateView):
     template_name = 'panel/model_form.html'
 
     def get_model(self):
