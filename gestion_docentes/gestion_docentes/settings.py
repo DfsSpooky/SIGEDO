@@ -34,7 +34,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
-    'jazzmin',
+    'jet',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -144,93 +144,6 @@ X_FRAME_OPTIONS = 'SAMEORIGIN'
 
 
 
-JAZZMIN_SETTINGS = {
-    # General settings
-    "site_title": "Panel de Control",
-    "site_header": "Gestión Docente",
-    "site_brand": "SIGEDO",
-    "welcome_sign": "Bienvenido al Panel de Control de SIGEDO",
-    "copyright": "SIGEDO",
-    "dashboard_url": "admin_dashboard",
+JET_THEME = 'light-blue'
 
-    # Theme settings
-    "theme": "litera",
-    "dark_mode_theme": "darkly",
-
-    # UI Tweaks
-    "ui_tweaks": {
-        "navbar_small_text": False,
-        "footer_small_text": False,
-        "body_small_text": False,
-        "brand_small_text": False,
-        "brand_colour": "navbar-primary",
-        "accent": "accent-primary",
-        "navbar": "navbar-dark",
-        "no_navbar_border": False,
-        "sidebar": "sidebar-dark-primary",
-        "sidebar_nav_flat_style": True,
-        "sidebar_nav_child_indent": False,
-        "sidebar_nav_compact_style": True,
-    },
-
-    # Menu settings
-    "show_sidebar": True,
-    "navigation_expanded": True,
-    "order_with_respect_to": ["core"], # App order
-
-    "icons": {
-        "auth": "fas fa-users-cog",
-        "auth.user": "fas fa-user",
-        "auth.Group": "fas fa-users",
-        "core.personaldocente": "fas fa-chalkboard-teacher",
-        "core.administrador": "fas fa-user-shield",
-        "core.carrera": "fas fa-university",
-        "core.especialidad": "fas fa-atom",
-        "core.semestre": "fas fa-calendar-alt",
-        "core.curso": "fas fa-book-reader",
-        "core.grupo": "fas fa-layer-group",
-        "core.franjahoraria": "fas fa-clock",
-        "core.asistencia": "fas fa-check-circle",
-        "core.asistenciadiaria": "fas fa-calendar-check",
-        "core.justificacion": "fas fa-file-medical-alt",
-        "core.tipojustificacion": "fas fa-tags",
-        "core.documento": "fas fa-file-alt",
-        "core.versiondocumento": "fas fa-file-upload",
-        "core.tipodocumento": "fas fa-tag",
-        "core.anuncio": "fas fa-bullhorn",
-        "core.notificacion": "fas fa-bell",
-        "core.solicitudintercambio": "fas fa-exchange-alt",
-        "core.diaespecial": "fas fa-calendar-star",
-        "core.configuracioninstitucion": "fas fa-cogs",
-    },
-
-    "custom_links": {
-        "core": [
-            {
-                "name": "Planificador de Horarios",
-                "url": "planificador_horarios",
-                "icon": "fas fa-calendar-alt",
-                "permissions": ["core.view_curso"]
-            },
-            {
-                "name": "Reporte de Asistencia",
-                "url": "reporte_asistencia",
-                "icon": "fas fa-chart-bar",
-                "permissions": ["core.view_asistencia"]
-            },
-            {
-                "name": "Generador de Credenciales",
-                "url": "lista_credenciales",
-                "icon": "fas fa-id-card",
-                "permissions": ["core.view_docente"]
-            }
-        ]
-    },
-
-    "related_modal_active": True,
-}
-
-JAZZMIN_UI_TWEAKS = {
-    "theme": "litera",
-    "dark_mode_theme": "darkly",
-}
+JET_INDEX_DASHBOARD = 'core.dashboard.CustomIndexDashboard'
