@@ -6,9 +6,8 @@ from reportlab.platypus import BaseDocTemplate, Frame, PageTemplate, Table, Tabl
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib import colors
-from ..models import Docente, Asistencia, Curso, ConfiguracionInstitucion, Justificacion, AsistenciaDiaria
+from ..models import Docente, Asistencia, Curso, ConfiguracionInstitucion, Justificacion, AsistenciaDiaria, Documento
 from io import BytesIO
-# Se quita urlopen porque ya no es necesario
 from django.utils import timezone
 
 # ... (El resto de los estilos no cambia) ...
@@ -360,3 +359,87 @@ def exportar_reporte_excel(request):
 
     workbook.save(response)
     return response
+
+def exportar_ficha_docente_pdf(docente, semestre_activo):
+    buffer = BytesIO()
+    doc = BaseDocTemplate(buffer, pagesize=letter, leftMargin=0.75*inch, rightMargin=0.75*inch, topMargin=0.75*inch, bottomMargin=0.75*inch)
+
+    # Estilos
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(name='Title', fontName='Helvetica-Bold', fontSize=18, spaceAfter=12, alignment=1))
+    styles.add(ParagraphStyle(name='Subtitle', fontName='Helvetica-Bold', fontSize=14, spaceAfter=8, textColor=colors.darkslategray))
+    styles.add(ParagraphStyle(name='Body', fontName='Helvetica', fontSize=10, leading=14))
+    styles.add(ParagraphStyle(name='BodyBold', fontName='Helvetica-Bold', fontSize=10))
+
+    elements = []
+
+    # --- Cabecera ---
+    configuracion = ConfiguracionInstitucion.load()
+    logo_img = Spacer(0,0)
+    if configuracion.logo and configuracion.logo.storage.exists(configuracion.logo.name):
+        logo_file = configuracion.logo.open('rb')
+        logo_img = Image(logo_file, width=0.8*inch, height=0.8*inch)
+        logo_file.close()
+
+    header_data = [
+        [logo_img, Paragraph(f"<b>{configuracion.nombre_institucion}</b><br/>{configuracion.facultad.nombre if configuracion.facultad else ''}", styles['Body'])]
+    ]
+    header_table = Table(header_data, colWidths=[1*inch, 6*inch])
+    header_table.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'TOP')]))
+    elements.append(header_table)
+    elements.append(Spacer(1, 0.25*inch))
+    elements.append(Paragraph("Ficha Integral del Docente", styles['Title']))
+
+    # --- Datos Personales ---
+    elements.append(Paragraph("1. Datos Personales", styles['Subtitle']))
+    personal_data = [
+        [Paragraph("<b>Nombre Completo:</b>", styles['Body']), Paragraph(docente.get_full_name(), styles['Body'])],
+        [Paragraph("<b>DNI:</b>", styles['Body']), Paragraph(docente.dni, styles['Body'])],
+        [Paragraph("<b>Email:</b>", styles['Body']), Paragraph(docente.email, styles['Body'])],
+    ]
+    personal_table = Table(personal_data, colWidths=[1.5*inch, 5.5*inch])
+    elements.append(personal_table)
+    elements.append(Spacer(1, 0.25*inch))
+
+    # --- Carga Académica ---
+    elements.append(Paragraph(f"2. Carga Académica ({semestre_activo.nombre})", styles['Subtitle']))
+    cursos = Curso.objects.filter(docente=docente, semestre=semestre_activo)
+    if cursos.exists():
+        cursos_data = [[Paragraph(f"<b>{c.nombre}</b> ({c.especialidad.nombre if c.especialidad else 'N/A'})", styles['Body'])] for c in cursos]
+        cursos_table = Table(cursos_data, colWidths=[7*inch])
+        cursos_table.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.whitesmoke), ('INNERGRID', (0,0), (-1,-1), 0.25, colors.grey)]))
+        elements.append(cursos_table)
+    else:
+        elements.append(Paragraph("No tiene cursos asignados en este semestre.", styles['Body']))
+    elements.append(Spacer(1, 0.25*inch))
+
+    # --- Desempeño de Asistencia ---
+    elements.append(Paragraph("3. Desempeño de Asistencia", styles['Subtitle']))
+    # (Lógica de cálculo de asistencia simplificada para la ficha)
+    total_clases_programadas = Asistencia.objects.filter(docente=docente, curso__in=cursos).count()
+    asistencias_contadas = Asistencia.objects.filter(docente=docente, curso__in=cursos, hora_entrada__isnull=False).count()
+    porcentaje_asistencia = (asistencias_contadas / total_clases_programadas * 100) if total_clases_programadas > 0 else 100
+
+    desempeno_data = [
+        [Paragraph("<b>Clases Programadas en el Semestre:</b>", styles['Body']), Paragraph(str(total_clases_programadas), styles['Body'])],
+        [Paragraph("<b>Asistencias Registradas:</b>", styles['Body']), Paragraph(str(asistencias_contadas), styles['Body'])],
+        [Paragraph("<b>Porcentaje de Asistencia:</b>", styles['Body']), Paragraph(f"{porcentaje_asistencia:.2f}%", styles['BodyBold'])],
+    ]
+    desempeno_table = Table(desempeno_data, colWidths=[3*inch, 4*inch])
+    elements.append(desempeno_table)
+    elements.append(Spacer(1, 0.25*inch))
+
+    # --- Gestión Documental ---
+    elements.append(Paragraph("4. Gestión Documental", styles['Subtitle']))
+    documentos = Documento.objects.filter(docente=docente)
+    doc_data = [[Paragraph(f"<b>{d.get_estado_display()}</b>", styles['Body']), Paragraph(d.titulo, styles['Body'])] for d in documentos]
+    if doc_data:
+        doc_table = Table(doc_data, colWidths=[1.5*inch, 5.5*inch])
+        elements.append(doc_table)
+    else:
+        elements.append(Paragraph("No hay documentos registrados.", styles['Body']))
+
+    doc.build(elements)
+    pdf = buffer.getvalue()
+    buffer.close()
+    return pdf

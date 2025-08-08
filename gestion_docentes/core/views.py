@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.admin.views.decorators import staff_member_required
-from django.http import JsonResponse, Http404
+from django.http import JsonResponse, Http404, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 from datetime import time, timedelta, date
@@ -1452,3 +1452,17 @@ def ver_anuncios(request):
         'anuncios': anuncios
     }
     return render(request, 'ver_anuncios.html', context)
+
+@staff_member_required
+def generar_ficha_docente(request, docente_id):
+    docente = get_object_or_404(Docente, id=docente_id)
+    semestre_activo = Semestre.objects.filter(estado='ACTIVO').first()
+    if not semestre_activo:
+        messages.error(request, "No hay un semestre activo para generar la ficha.")
+        return redirect('perfil')
+
+    pdf = exportar_ficha_docente_pdf(docente, semestre_activo)
+
+    response = HttpResponse(pdf, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="ficha_integral_{docente.username}.pdf"'
+    return response

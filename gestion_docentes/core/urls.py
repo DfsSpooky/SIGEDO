@@ -58,4 +58,5 @@ urlpatterns = [
     path('api/reporte/chart-data/', views.api_get_report_chart_data, name='api_report_chart_data'),
     path('notificaciones/', views.ver_notificaciones, name='ver_notificaciones'),
     path('anuncios/', views.ver_anuncios, name='ver_anuncios'),
+    path('docente/<int:docente_id>/ficha/', views.generar_ficha_docente, name='generar_ficha_docente'),
 ]
