@@ -25,7 +25,7 @@ from .models import (
     Notificacion, Justificacion, TipoJustificacion
 )
 from .forms import DocumentoForm, SolicitudIntercambioForm, VersionDocumentoForm, JustificacionForm
-from .utils.exports import exportar_reporte_excel, exportar_reporte_pdf
+from .utils.exports import exportar_reporte_excel, exportar_reporte_pdf, exportar_ficha_docente_pdf
 from .utils.encryption import decrypt_id
 import qrcode
 from django.contrib.auth import login, authenticate

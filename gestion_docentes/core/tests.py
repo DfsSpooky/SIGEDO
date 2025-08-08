@@ -435,7 +435,7 @@ class JustificacionTest(TestCase):
         # Test GET request
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Solicitar Justificación de Ausencia")
+        self.assertContains(response, "Nueva Solicitud de Justificación")
 
         # Test POST request
         today = date.today()
