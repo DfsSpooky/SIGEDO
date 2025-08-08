@@ -3,18 +3,18 @@
 
 {% block title %}
     {% if object %}
-        Editar {{ view.get_model._meta.verbose_name }}
+        Editar {{ opts.verbose_name }}
     {% else %}
-        Añadir {{ view.get_model._meta.verbose_name }}
+        Añadir {{ opts.verbose_name }}
     {% endif %}
 {% endblock %}
 
 {% block panel_content %}
 <h1 class="text-3xl font-bold text-gray-900">
     {% if object %}
-        Editar {{ view.get_model._meta.verbose_name|capfirst }}
+        Editar {{ opts.verbose_name|capfirst }}
     {% else %}
-        Añadir {{ view.get_model._meta.verbose_name|capfirst }}
+        Añadir {{ opts.verbose_name|capfirst }}
     {% endif %}
 </h1>
 

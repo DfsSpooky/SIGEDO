@@ -121,13 +121,11 @@ class ModelCreateView(PermissionRequiredMixin, CreateView):
     def get_form_class(self):
         self.model = self.get_model()
         model_name = self.model._meta.model_name
-        print(f"Model name: {model_name}")
 
         form_class = MODEL_ADD_FORMS.get(model_name)
         if not form_class:
             form_class = MODEL_FORMS.get(model_name)
 
-        print(f"Form class: {form_class}")
         if form_class:
             return form_class
 
@@ -136,6 +134,11 @@ class ModelCreateView(PermissionRequiredMixin, CreateView):
                 model = self.model
                 fields = '__all__'
         return ModelForm
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['opts'] = self.get_model()._meta
+        return context
 
     def get_success_url(self):
         return reverse_lazy('panel:model_list', kwargs={'app_label': self.kwargs['app_label'], 'model_name': self.kwargs['model_name']})
@@ -165,6 +168,11 @@ class ModelUpdateView(PermissionRequiredMixin, UpdateView):
                 model = self.model
                 fields = '__all__'
         return ModelForm
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['opts'] = self.get_model()._meta
+        return context
 
     def get_success_url(self):
         return reverse_lazy('panel:model_list', kwargs={'app_label': self.kwargs['app_label'], 'model_name': self.kwargs['model_name']})
