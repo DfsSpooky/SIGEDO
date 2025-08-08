@@ -195,5 +195,10 @@ class ModelDeleteView(PermissionRequiredMixin, DeleteView):
         model = self.get_model()
         return [f"{model._meta.app_label}.delete_{model._meta.model_name}"]
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['opts'] = self.get_model()._meta
+        return context
+
     def get_success_url(self):
         return reverse_lazy('panel:model_list', kwargs={'app_label': self.kwargs['app_label'], 'model_name': self.kwargs['model_name']})

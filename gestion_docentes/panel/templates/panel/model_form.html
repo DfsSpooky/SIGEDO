@@ -35,7 +35,7 @@
                         <div class="space-y-2 bg-gray-50 p-4 rounded-md border">
                         {% for choice in field %}
                             <label class="flex items-center space-x-3">
-                                {{ choice.tag }}
+                                {{ choice.tag|add_class:'form-checkbox h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500' }}
                                 <span>{{ choice.choice_label }}</span>
                             </label>
                         {% endfor %}
@@ -45,17 +45,19 @@
                             {% if field.value %}
                                 <img src="{{ field.value.url }}" alt="Vista previa" class="h-20 w-20 object-cover rounded-md">
                             {% endif %}
-                            {{ field }}
+                            {{ field|add_class:'block w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 cursor-pointer dark:text-gray-400 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400' }}
                         </div>
                     {% else %}
-                        {{ field }}
+                        {{ field|add_class:'block w-full px-4 py-2 mt-1 text-sm text-gray-900 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm' }}
                     {% endif %}
 
                     {% if field.help_text %}
                         <p class="mt-2 text-sm text-gray-500">{{ field.help_text }}</p>
                     {% endif %}
                     {% for error in field.errors %}
-                        <p class="mt-2 text-sm text-red-600">{{ error }}</p>
+                        <div class="mt-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
+                            <i class="fas fa-exclamation-circle mr-2"></i> {{ error }}
+                        </div>
                     {% endfor %}
                 </div>
             </div>
@@ -67,7 +69,7 @@
                     Cancelar
                 </a>
                 <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                    Guardar
+                    <i class="fas fa-save mr-2"></i> Guardar
                 </button>
             </div>
         </div>

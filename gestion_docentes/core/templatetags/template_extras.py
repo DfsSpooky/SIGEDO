@@ -46,3 +46,11 @@ def encrypt(value):
 @register.filter(name='widget_type')
 def widget_type(field):
     return field.field.widget.__class__.__name__
+
+@register.filter(name='is_boolean')
+def is_boolean(value):
+    return isinstance(value, bool)
+
+@register.filter(name='add_class')
+def add_class(field, css_class):
+    return field.as_widget(attrs={'class': css_class})
