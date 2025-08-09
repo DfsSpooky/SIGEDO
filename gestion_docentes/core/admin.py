@@ -151,7 +151,7 @@ class ConfiguracionInstitucionAdmin(ModelAdmin):
     """
     fieldsets = (
         ('Información Principal', {
-            'fields': ('nombre_institucion', 'logo', 'facultad')
+            'fields': ('nombre_institucion', 'logo', 'facultad', 'nombre_dashboard')
         }),
         ('Parámetros del Sistema', {
             'fields': ('tiempo_limite_tardanza',)

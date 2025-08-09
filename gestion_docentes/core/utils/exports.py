@@ -40,17 +40,13 @@ class ReportePDFTemplate(BaseDocTemplate):
     def _draw_header_footer(self, canvas, doc):
         canvas.saveState()
         
-        logo_img = Paragraph("AQUI VA EL LOGO", STYLES['Normal'])
+        logo_img = Paragraph("LOGO", STYLES['Normal'])
         
-        # --- CAMBIO: Se lee la imagen desde la ruta del archivo, no desde una URL ---
-        if self.configuracion and self.configuracion.logo and self.configuracion.logo.storage.exists(self.configuracion.logo.name):
+        if self.configuracion and self.configuracion.logo and hasattr(self.configuracion.logo, 'path'):
             try:
-                logo_file = self.configuracion.logo.open('rb')
-                logo_img = Image(logo_file, width=1.2*inch, height=1.2*inch, hAlign='CENTER')
-                logo_file.close()
+                logo_img = Image(self.configuracion.logo.path, width=1.2*inch, height=1.2*inch, hAlign='CENTER')
             except Exception as e:
-                print(f"Error cargando logo para PDF: {e}")
-        # --- FIN DEL CAMBIO ---
+                print(f"Error loading logo for PDF: {e}")
 
         nombre_institucion = Paragraph(self.configuracion.nombre_institucion if self.configuracion else "Nombre de Institución", STYLES['InstitutionTitle'])
         if self.configuracion and self.configuracion.facultad:

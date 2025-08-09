@@ -3,9 +3,14 @@
 {% block breadcrumb %}Dashboard{% endblock %}
 
 {% block content %}
-<div class="mb-8">
-    <h1 class="text-3xl md:text-4xl font-bold text-base-content">Bienvenido, {{ user.first_name }}</h1>
-    <p class="text-base-content/70 mt-1">Aquí tienes un resumen de tu actividad y próximos eventos.</p>
+<div class="mb-8 flex items-center justify-between">
+    <div>
+        <h1 class="text-3xl md:text-4xl font-bold text-base-content">Bienvenido, {{ user.first_name }}</h1>
+        <p class="text-base-content/70 mt-1">Aquí tienes un resumen de tu actividad y próximos eventos.</p>
+    </div>
+    {% if configuracion.logo %}
+        <img src="{{ configuracion.logo.url }}" alt="Logo" class="h-16 w-16 object-contain">
+    {% endif %}
 </div>
 
 <!-- Stat Cards -->

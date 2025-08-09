@@ -104,12 +104,15 @@ def dashboard(request):
     # Ordenamos la actividad combinada por fecha y tomamos los 3 más recientes
     actividad_reciente.sort(key=lambda item: item['fecha'], reverse=True)
     
+    configuracion = ConfiguracionInstitucion.load()
+
     context = {
         'asistencias_count': asistencias_count,
         'documentos_observados_count': documentos_observados_count,
         'cursos_hoy_count': cursos_hoy_count,
         'proximo_curso': proximo_curso,
         'actividad_reciente': actividad_reciente[:3], # Pasamos solo los 3 últimos eventos
+        'configuracion': configuracion,
     }
     return render(request, 'dashboard.html', context)
 
