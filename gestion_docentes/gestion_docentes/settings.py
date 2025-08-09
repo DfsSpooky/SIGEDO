@@ -214,7 +214,7 @@ UNFOLD = {
                     },
                     {
                         "title": "Tipos de Justificación",
-                        "link": reverse_lazy("admin:core_tiposjustificacion_changelist"),
+                        "link": reverse_lazy("admin:core_tipojustificacion_changelist"),
                     },
                 ],
             },
