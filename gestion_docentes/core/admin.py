@@ -15,19 +15,47 @@ from .models import (
 
 # --- CONFIGURACIÓN DE ADMINS ---
 
+@admin.register(Docente)
 class DocenteAdmin(UserAdmin, ModelAdmin):
     model = Docente
     list_display = ['username', 'first_name', 'last_name', 'get_especialidades', 'disponibilidad', 'is_staff']
     
-    fieldsets = UserAdmin.fieldsets + (
-        ('Información Adicional', {'fields': ('dni', 'especialidades', 'disponibilidad', 'id_qr', 'foto', 'vista_previa_foto', 'rotate_qr_code_button')}),
+    # Reemplazamos los fieldsets para usar tabs
+    fieldsets = (
+        (None, {
+            'fields': ('username', 'password')
+        }),
+        ('Información Personal', {
+            'classes': ('tab',),
+            'fields': ('first_name', 'last_name', 'email', 'dni')
+        }),
+        ('Perfil Docente', {
+            'classes': ('tab',),
+            'fields': ('especialidades', 'disponibilidad', 'foto', 'vista_previa_foto')
+        }),
+        ('Permisos', {
+            'classes': ('tab',),
+            'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')
+        }),
+        ('Credencial QR', {
+            'classes': ('tab',),
+            'fields': ('id_qr', 'rotate_qr_code_button')
+        }),
+        ('Fechas Importantes', {
+            'classes': ('tab',),
+            'fields': ('date_joined', 'last_login')
+        }),
     )
+
     add_fieldsets = UserAdmin.add_fieldsets + (
         ('Información Adicional', {'fields': ('dni', 'especialidades', 'disponibilidad', 'foto')}),
     )
     
-    readonly_fields = ('id_qr', 'vista_previa_foto', 'rotate_qr_code_button',)
-    filter_horizontal = ('especialidades',)
+    readonly_fields = ('id_qr', 'vista_previa_foto', 'rotate_qr_code_button', 'date_joined', 'last_login')
+    filter_horizontal = ('especialidades', 'groups', 'user_permissions')
+    list_filter = ('is_staff', 'is_superuser', 'is_active', 'groups')
+    search_fields = ('username', 'first_name', 'last_name', 'email')
+    ordering = ('username',)
 
     def rotate_qr_code_button(self, obj):
         if obj.pk:
@@ -77,8 +105,14 @@ class CursoAdmin(ModelAdmin):
     
     fieldsets = (
         (None, {'fields': ('nombre', 'tipo_curso', 'docente')}),
-        ('Organización Académica', {'fields': ('carrera', 'especialidad', 'semestre', 'semestre_cursado')}),
-        ('Horario', {'fields': ('dia', 'horario_inicio', 'horario_fin', 'duracion_bloques')}),
+        ('Organización Académica', {
+            'classes': ('tab',),
+            'fields': ('carrera', 'especialidad', 'semestre', 'semestre_cursado')
+        }),
+        ('Horario', {
+            'classes': ('tab',),
+            'fields': ('dia', 'horario_inicio', 'horario_fin', 'duracion_bloques')
+        }),
     )
 
 @admin.register(DiaEspecial)

@@ -154,26 +154,32 @@ UNFOLD = {
                 "items": [
                     {
                         "title": "Semestres",
+                        "icon": "date_range",
                         "link": reverse_lazy("admin:core_semestre_changelist"),
                     },
                     {
                         "title": "Carreras",
+                        "icon": "account_balance",
                         "link": reverse_lazy("admin:core_carrera_changelist"),
                     },
                     {
                         "title": "Especialidades",
+                        "icon": "category",
                         "link": reverse_lazy("admin:core_especialidad_changelist"),
                     },
                     {
                         "title": "Cursos",
+                        "icon": "book",
                         "link": reverse_lazy("admin:core_curso_changelist"),
                     },
                     {
                         "title": "Franjas Horarias",
+                        "icon": "schedule",
                         "link": reverse_lazy("admin:core_franjahoraria_changelist"),
                     },
                     {
                         "title": "Días Especiales",
+                        "icon": "event",
                         "link": reverse_lazy("admin:core_diaespecial_changelist"),
                     },
                 ],
@@ -184,14 +190,17 @@ UNFOLD = {
                 "items": [
                     {
                         "title": "Docentes",
+                        "icon": "person",
                         "link": reverse_lazy("admin:core_personaldocente_changelist"),
                     },
                     {
                         "title": "Administradores",
+                        "icon": "shield_person",
                         "link": reverse_lazy("admin:core_administrador_changelist"),
                     },
                     {
                         "title": "Grupos",
+                        "icon": "groups",
                         "link": reverse_lazy("admin:core_grupo_changelist"),
                     },
                 ],
@@ -202,18 +211,22 @@ UNFOLD = {
                 "items": [
                     {
                         "title": "Documentos",
+                        "icon": "folder",
                         "link": reverse_lazy("admin:core_documento_changelist"),
                     },
                     {
                         "title": "Tipos de Documento",
+                        "icon": "description",
                         "link": reverse_lazy("admin:core_tipodocumento_changelist"),
                     },
                     {
                         "title": "Justificaciones",
+                        "icon": "assignment_turned_in",
                         "link": reverse_lazy("admin:core_justificacion_changelist"),
                     },
                     {
                         "title": "Tipos de Justificación",
+                        "icon": "rule",
                         "link": reverse_lazy("admin:core_tipojustificacion_changelist"),
                     },
                 ],
@@ -224,14 +237,17 @@ UNFOLD = {
                 "items": [
                     {
                         "title": "Registros de Asistencia",
+                        "icon": "person_check",
                         "link": reverse_lazy("admin:core_asistencia_changelist"),
                     },
                     {
                         "title": "Asistencia Diaria",
+                        "icon": "today",
                         "link": reverse_lazy("admin:core_asistenciadiaria_changelist"),
                     },
                     {
                         "title": "Solicitudes de Intercambio",
+                        "icon": "swap_horiz",
                         "link": reverse_lazy("admin:core_solicitudintercambio_changelist"),
                     },
                 ],
@@ -242,10 +258,12 @@ UNFOLD = {
                 "items": [
                     {
                         "title": "Anuncios",
+                        "icon": "campaign",
                         "link": reverse_lazy("admin:core_anuncio_changelist"),
                     },
                     {
                         "title": "Notificaciones",
+                        "icon": "notifications",
                         "link": reverse_lazy("admin:core_notificacion_changelist"),
                     },
                 ],
@@ -256,6 +274,7 @@ UNFOLD = {
                 "items": [
                     {
                         "title": "Configuración de la Institución",
+                        "icon": "settings_applications",
                         "link": reverse_lazy("admin:core_configuracioninstitucion_changelist"),
                     },
                 ],
