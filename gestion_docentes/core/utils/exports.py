@@ -48,6 +48,11 @@ class ReportePDFTemplate(BaseDocTemplate):
             except Exception as e:
                 print(f"Error loading logo for PDF: {e}")
 
+        # DEBUGGING
+        debug_info = f"DEBUG: PDF - {self.configuracion.nombre_institucion} / {self.configuracion.nombre_dashboard}"
+        debug_paragraph = Paragraph(debug_info, STYLES['TableCellSmall'])
+        # END DEBUGGING
+
         nombre_institucion = Paragraph(self.configuracion.nombre_institucion if self.configuracion else "Nombre de Institución", STYLES['InstitutionTitle'])
         if self.configuracion and self.configuracion.facultad:
             nombre_facultad = Paragraph(self.configuracion.facultad.nombre.upper(), STYLES['FacultyTitle'])
@@ -55,7 +60,7 @@ class ReportePDFTemplate(BaseDocTemplate):
             nombre_facultad = Spacer(0, 0)
         titulo_reporte = Paragraph("REPORTE DE ASISTENCIA DOCENTE", STYLES['ReportTitle'])
         periodo_reporte = Paragraph(f"Periodo del {self.fecha_inicio} al {self.fecha_fin}", STYLES['ReportSubtitle'])
-        header_text_content = [nombre_institucion, nombre_facultad, titulo_reporte, periodo_reporte]
+        header_text_content = [debug_paragraph, nombre_institucion, nombre_facultad, titulo_reporte, periodo_reporte]
         
         header_table = Table([[logo_img, header_text_content]], colWidths=[1.5*inch, 8.0*inch])
         header_table.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'MIDDLE'), ('ALIGN', (0, 0), (-1, -1), 'CENTER')]))

@@ -3,6 +3,13 @@
 {% block breadcrumb %}Dashboard{% endblock %}
 
 {% block content %}
+<!-- DEBUGGING -->
+<div class="alert alert-info mb-4">
+    <p>DEBUG: Nombre Institucion: {{ configuracion.nombre_institucion }}</p>
+    <p>DEBUG: Logo URL: {{ configuracion.logo.url }}</p>
+    <p>DEBUG: Nombre Dashboard: {{ configuracion.nombre_dashboard }}</p>
+</div>
+<!-- END DEBUGGING -->
 <div class="mb-8 flex items-center justify-between">
     <div>
         <h1 class="text-3xl md:text-4xl font-bold text-base-content">Bienvenido, {{ user.first_name }}</h1>
