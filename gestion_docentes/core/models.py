@@ -181,7 +181,9 @@ class ConfiguracionInstitucion(models.Model):
     
     @classmethod
     def load(cls):
-        obj, created = cls.objects.get_or_create(pk=1)
+        obj = cls.objects.first()
+        if obj is None:
+            obj = cls.objects.create()
         return obj
 
 class PersonalDocente(Docente):
