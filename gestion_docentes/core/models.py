@@ -79,6 +79,12 @@ class Curso(models.Model):
     horario_fin = models.TimeField(null=True, blank=True)
     dia = models.CharField(max_length=20, choices=[('Lunes', 'Lunes'), ('Martes', 'Martes'), ('Miércoles', 'Miércoles'), ('Jueves', 'Jueves'), ('Viernes', 'Viernes')], null=True, blank=True)
     duracion_bloques = models.IntegerField(default=2, help_text="Número de bloques de 50 minutos que dura el curso.")
+
+    class Meta:
+        permissions = [
+            ("view_planificador", "Puede ver el planificador de horarios"),
+        ]
+
     def __str__(self): return f"{self.nombre} ({self.especialidad.nombre if self.especialidad else 'N/A'})"
 
 class Documento(models.Model):
@@ -128,6 +134,12 @@ class Asistencia(models.Model):
     hora_salida_permitida = models.DateTimeField(null=True, blank=True, help_text="Hora mínima a la que se puede marcar la salida.")
     foto_entrada = models.ImageField(upload_to='verificacion_cursos/entradas/%Y/%m/%d/', null=True, blank=True)
     foto_salida = models.ImageField(upload_to='verificacion_cursos/salidas/%Y/%m/%d/', null=True, blank=True)
+
+    class Meta:
+        permissions = [
+            ("view_reporte", "Puede ver reportes de asistencia"),
+        ]
+
     def __str__(self): return f"Asistencia {self.docente} - {self.curso} ({self.fecha})"
 
 class AsistenciaDiaria(models.Model):
@@ -159,6 +171,8 @@ class ConfiguracionInstitucion(models.Model):
         blank=True, 
         help_text="Seleccione la facultad o carrera principal para la cual se está configurando el sistema."
     )
+    tiempo_limite_tardanza = models.PositiveIntegerField(default=10, help_text="Minutos de tolerancia para considerar una asistencia como tardanza.")
+    nombre_dashboard = models.CharField(max_length=100, default="Gestión Docente", help_text="El nombre que se mostrará en el dashboard.")
     
     class Meta:
         verbose_name = "Configuración de la Institución"; verbose_name_plural = "Configuración de la Institución"
@@ -177,3 +191,67 @@ class PersonalDocente(Docente):
 class Administrador(Docente):
     class Meta:
         proxy = True; verbose_name = 'Administrador'; verbose_name_plural = 'Administradores'
+
+class Notificacion(models.Model):
+    destinatario = models.ForeignKey(Docente, on_delete=models.CASCADE, related_name='notificaciones')
+    mensaje = models.CharField(max_length=255)
+    leido = models.BooleanField(default=False)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    url = models.CharField(max_length=255, blank=True, help_text="URL a la que la notificación debe dirigir.")
+
+    class Meta:
+        ordering = ['-fecha_creacion']
+        verbose_name = "Notificación"
+        verbose_name_plural = "Notificaciones"
+
+    def __str__(self):
+        return f"Notificación para {self.destinatario.username}: {self.mensaje[:30]}..."
+
+class Anuncio(models.Model):
+    titulo = models.CharField(max_length=200)
+    contenido = models.TextField()
+    fecha_publicacion = models.DateTimeField(auto_now_add=True)
+    autor = models.ForeignKey(Docente, on_delete=models.SET_NULL, null=True, limit_choices_to={'is_staff': True})
+
+    class Meta:
+        ordering = ['-fecha_publicacion']
+        verbose_name = "Anuncio"
+        verbose_name_plural = "Anuncios"
+
+    def __str__(self):
+        return self.titulo
+
+class TipoJustificacion(models.Model):
+    nombre = models.CharField(max_length=100, unique=True, help_text="Ej: Licencia Médica, Comisión de Servicio, Permiso Personal")
+
+    def __str__(self):
+        return self.nombre
+
+class Justificacion(models.Model):
+    ESTADOS_APROBACION = [
+        ('PENDIENTE', 'Pendiente'),
+        ('APROBADO', 'Aprobado'),
+        ('RECHAZADO', 'Rechazado'),
+    ]
+
+    docente = models.ForeignKey(Docente, on_delete=models.CASCADE, related_name='justificaciones')
+    tipo = models.ForeignKey(TipoJustificacion, on_delete=models.PROTECT, related_name='justificaciones')
+    fecha_inicio = models.DateField()
+    fecha_fin = models.DateField()
+    motivo = models.TextField(help_text="Explique brevemente el motivo de su ausencia.")
+    documento_adjunto = models.FileField(upload_to='justificaciones/', blank=True, null=True, help_text="Opcional: Adjunte un documento que respalde su solicitud (PDF, imagen, etc.)")
+    estado = models.CharField(max_length=20, choices=ESTADOS_APROBACION, default='PENDIENTE')
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_revision = models.DateTimeField(null=True, blank=True)
+    revisado_por = models.ForeignKey(Docente, on_delete=models.SET_NULL, null=True, blank=True, related_name='justificaciones_revisadas', limit_choices_to={'is_staff': True})
+    observaciones_revision = models.TextField(blank=True, help_text="Notas internas del administrador que revisa la solicitud.")
+
+    def __str__(self):
+        return f"Justificación de {self.docente} ({self.fecha_inicio} al {self.fecha_fin}) - {self.get_estado_display()}"
+
+    def clean(self):
+        if self.fecha_inicio > self.fecha_fin:
+            raise ValidationError("La fecha de inicio no puede ser posterior a la fecha de fin.")
+
+    class Meta:
+        ordering = ['-fecha_creacion']
