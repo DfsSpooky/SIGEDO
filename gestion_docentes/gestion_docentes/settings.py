@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+from django.urls import reverse_lazy
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -131,6 +132,138 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+UNFOLD = {
+    "SITE_HEADER": "Gestión de Docentes",
+    "DASHBOARD_CALLBACK": "core.dashboard.dashboard_callback",
+    "SIDEBAR": {
+        "navigation": [
+            {
+                "title": "Principal",
+                "items": [
+                    {
+                        "title": "Dashboard",
+                        "icon": "dashboard",
+                        "link": reverse_lazy("admin:index"),
+                    },
+                ],
+            },
+            {
+                "title": "Gestión Académica",
+                "icon": "school",
+                "items": [
+                    {
+                        "title": "Semestres",
+                        "link": reverse_lazy("admin:core_semestre_changelist"),
+                    },
+                    {
+                        "title": "Carreras",
+                        "link": reverse_lazy("admin:core_carrera_changelist"),
+                    },
+                    {
+                        "title": "Especialidades",
+                        "link": reverse_lazy("admin:core_especialidad_changelist"),
+                    },
+                    {
+                        "title": "Cursos",
+                        "link": reverse_lazy("admin:core_curso_changelist"),
+                    },
+                    {
+                        "title": "Franjas Horarias",
+                        "link": reverse_lazy("admin:core_franjahoraria_changelist"),
+                    },
+                    {
+                        "title": "Días Especiales",
+                        "link": reverse_lazy("admin:core_diaespecial_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Personal",
+                "icon": "group",
+                "items": [
+                    {
+                        "title": "Docentes",
+                        "link": reverse_lazy("admin:core_personaldocente_changelist"),
+                    },
+                    {
+                        "title": "Administradores",
+                        "link": reverse_lazy("admin:core_administrador_changelist"),
+                    },
+                    {
+                        "title": "Grupos",
+                        "link": reverse_lazy("admin:core_grupo_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Documentos y Justificaciones",
+                "icon": "folder_managed",
+                "items": [
+                    {
+                        "title": "Documentos",
+                        "link": reverse_lazy("admin:core_documento_changelist"),
+                    },
+                    {
+                        "title": "Tipos de Documento",
+                        "link": reverse_lazy("admin:core_tipodocumento_changelist"),
+                    },
+                    {
+                        "title": "Justificaciones",
+                        "link": reverse_lazy("admin:core_justificacion_changelist"),
+                    },
+                    {
+                        "title": "Tipos de Justificación",
+                        "link": reverse_lazy("admin:core_tiposjustificacion_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Asistencia",
+                "icon": "event_available",
+                "items": [
+                    {
+                        "title": "Registros de Asistencia",
+                        "link": reverse_lazy("admin:core_asistencia_changelist"),
+                    },
+                    {
+                        "title": "Asistencia Diaria",
+                        "link": reverse_lazy("admin:core_asistenciadiaria_changelist"),
+                    },
+                    {
+                        "title": "Solicitudes de Intercambio",
+                        "link": reverse_lazy("admin:core_solicitudintercambio_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Comunicación",
+                "icon": "campaign",
+                "items": [
+                    {
+                        "title": "Anuncios",
+                        "link": reverse_lazy("admin:core_anuncio_changelist"),
+                    },
+                    {
+                        "title": "Notificaciones",
+                        "link": reverse_lazy("admin:core_notificacion_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Configuración",
+                "icon": "settings",
+                "items": [
+                    {
+                        "title": "Configuración de la Institución",
+                        "link": reverse_lazy("admin:core_configuracioninstitucion_changelist"),
+                    },
+                ],
+            },
+        ],
+    },
+}
+
 
 AUTH_USER_MODEL = 'core.Docente'
 MEDIA_URL = '/media/'
