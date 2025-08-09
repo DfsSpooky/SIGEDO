@@ -131,6 +131,12 @@ class ConfiguracionInstitucionAdmin(ModelAdmin):
     def has_add_permission(self, request):
         return not ConfiguracionInstitucion.objects.exists()
 
+@admin.register(Notificacion)
+class NotificacionAdmin(ModelAdmin):
+    list_display = ('destinatario', 'mensaje', 'leido', 'fecha_creacion')
+    list_filter = ('leido', 'fecha_creacion')
+    search_fields = ('destinatario__username', 'mensaje')
+
 @admin.register(Anuncio)
 class AnuncioAdmin(ModelAdmin):
     list_display = ('titulo', 'autor', 'fecha_publicacion')
