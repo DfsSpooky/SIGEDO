@@ -41,7 +41,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'core',
-    'panel',
     'tailwind',
     
 ]
@@ -71,7 +70,6 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'core.context_processors.unread_notifications_context',
                 'core.context_processors.site_configuration_context',
-                'core.context_processors.panel_navigation_context',
             ],
         },
     },
