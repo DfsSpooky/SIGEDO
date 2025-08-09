@@ -1,6 +1,6 @@
 from django.test import TestCase, Client
 from django.urls import reverse
-from .models import PersonalDocente, Notificacion, TipoDocumento, Documento, Anuncio, Semestre, ConfiguracionInstitucion, Curso, Asistencia, Carrera, Justificacion, TipoJustificacion
+from .models import PersonalDocente, Notificacion, TipoDocumento, Documento, Anuncio, Semestre, ConfiguracionInstitucion, Curso, Asistencia, AsistenciaDiaria, Carrera, Justificacion, TipoJustificacion
 from .utils.encryption import encrypt_id, decrypt_id
 import re
 from django.utils import timezone
@@ -467,3 +467,74 @@ class JustificacionTest(TestCase):
         docente_report = next((r for r in report_data if r['docente'] == self.teacher and r['fecha'] == today), None)
         self.assertIsNotNone(docente_report)
         self.assertEqual(docente_report['estado'], 'Justificado')
+
+
+class RfidAsistenciaTest(TestCase):
+
+    def setUp(self):
+        """Set up a test user with an RFID UID and a client."""
+        self.rfid_uid = "0A:1B:2C:3D"
+        self.docente = PersonalDocente.objects.create_user(
+            username='rfiduser',
+            password='rfidpassword',
+            dni='87654321',
+            rfid_uid=self.rfid_uid
+        )
+        self.client = Client()
+        self.url = reverse('api_asistencia_rfid')
+
+    def test_registrar_asistencia_rfid_success(self):
+        """Test successful attendance registration via RFID."""
+        self.assertEqual(AsistenciaDiaria.objects.count(), 0)
+
+        payload = json.dumps({'uid': self.rfid_uid})
+        response = self.client.post(self.url, data=payload, content_type='application/json')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['status'], 'success')
+        self.assertEqual(AsistenciaDiaria.objects.count(), 1)
+
+        asistencia = AsistenciaDiaria.objects.first()
+        self.assertEqual(asistencia.docente, self.docente)
+        self.assertEqual(asistencia.fecha, timezone.localtime(timezone.now()).date())
+
+    def test_registrar_asistencia_rfid_duplicate(self):
+        """Test that duplicate attendance registration is prevented."""
+        # First registration
+        self.client.post(self.url, data=json.dumps({'uid': self.rfid_uid}), content_type='application/json')
+        self.assertEqual(AsistenciaDiaria.objects.count(), 1)
+
+        # Second (duplicate) registration
+        response = self.client.post(self.url, data=json.dumps({'uid': self.rfid_uid}), content_type='application/json')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['status'], 'warning')
+        self.assertEqual(AsistenciaDiaria.objects.count(), 1) # Count should not increase
+
+    def test_registrar_asistencia_rfid_not_found(self):
+        """Test registration with an unregistered RFID UID."""
+        payload = json.dumps({'uid': 'XX:XX:XX:XX'})
+        response = self.client.post(self.url, data=payload, content_type='application/json')
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()['status'], 'error')
+        self.assertIn('no asignado', response.json()['message'])
+        self.assertEqual(AsistenciaDiaria.objects.count(), 0)
+
+    def test_registrar_asistencia_rfid_bad_request_no_uid(self):
+        """Test registration with missing UID in payload."""
+        payload = json.dumps({'other_key': 'some_value'})
+        response = self.client.post(self.url, data=payload, content_type='application/json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()['status'], 'error')
+        self.assertIn('no proporcionado', response.json()['message'])
+
+    def test_registrar_asistencia_rfid_bad_request_invalid_json(self):
+        """Test registration with an invalid JSON payload."""
+        payload = 'this is not json'
+        response = self.client.post(self.url, data=payload, content_type='application/json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()['status'], 'error')
+        self.assertIn('inválido', response.json()['message'])

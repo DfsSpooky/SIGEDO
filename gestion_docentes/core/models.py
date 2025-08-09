@@ -62,6 +62,7 @@ class Docente(AbstractUser):
     especialidades = models.ManyToManyField(Especialidad, related_name="docentes")
     disponibilidad = models.CharField(max_length=20, choices=DISPONIBILIDAD_CHOICES, default='COMPLETO')
     id_qr = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    rfid_uid = models.CharField(max_length=100, unique=True, null=True, blank=True, help_text="UID de la tarjeta RFID asignada al docente")
     foto = models.ImageField(upload_to='fotos_docentes/', null=True, blank=True, default='fotos_docentes/placeholder.png')
     def __str__(self): return f"{self.first_name} {self.last_name}"
 

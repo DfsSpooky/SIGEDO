@@ -644,6 +644,38 @@ def mark_attendance_kiosk(request):
     return JsonResponse({'status': 'error', 'message': 'Método no permitido'}, status=405)
 
 
+@csrf_exempt
+def registrar_asistencia_rfid(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            rfid_uid = data.get('uid')
+
+            if not rfid_uid:
+                return JsonResponse({'status': 'error', 'message': 'UID de RFID no proporcionado.'}, status=400)
+
+            docente = Docente.objects.get(rfid_uid=rfid_uid)
+            today = timezone.localtime(timezone.now()).date()
+
+            # Verificar si ya se marcó la asistencia diaria para evitar duplicados
+            if AsistenciaDiaria.objects.filter(docente=docente, fecha=today).exists():
+                return JsonResponse({'status': 'warning', 'message': f'La asistencia de hoy para {docente.first_name} {docente.last_name} ya fue registrada.'})
+
+            # Registrar la asistencia diaria (sin foto por ahora)
+            AsistenciaDiaria.objects.create(docente=docente, fecha=today)
+
+            return JsonResponse({'status': 'success', 'message': f'Asistencia registrada para {docente.first_name} {docente.last_name}.'})
+
+        except Docente.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'UID de RFID no asignado a ningún docente.'}, status=404)
+        except json.JSONDecodeError:
+            return JsonResponse({'status': 'error', 'message': 'JSON inválido.'}, status=400)
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+    return JsonResponse({'status': 'error', 'message': 'Método no permitido'}, status=405)
+
+
 # --- VISTAS PARA CREDENCIALES ---
 
 @staff_member_required

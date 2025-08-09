@@ -32,6 +32,7 @@ urlpatterns = [
     # APIs que usará el JavaScript del kiosco
     path('api/get-teacher-info/', views.get_teacher_info, name='api_get_teacher_info'),
     path('api/mark-attendance/', views.mark_attendance_kiosk, name='api_mark_attendance'),
+    path('api/asistencia_rfid/', views.registrar_asistencia_rfid, name='api_asistencia_rfid'),
 
         # --- INICIO DE URLS PARA CREDENCIALES ---
     path('credenciales/', views.lista_docentes_credenciales, name='lista_credenciales'),
