@@ -469,37 +469,49 @@ class JustificacionTest(TestCase):
         self.assertEqual(docente_report['estado'], 'Justificado')
 
 
+from unittest.mock import patch
+
 class RfidAsistenciaTest(TestCase):
 
     def setUp(self):
         """Set up a test user with an RFID UID and a client."""
         self.rfid_uid = "0A:1B:2C:3D"
-        self.docente = PersonalDocente.objects.create_user(
+        self.docente = PersonalDocente.objects.create(
             username='rfiduser',
             password='rfidpassword',
             dni='87654321',
+            first_name='RFID',
+            last_name='User',
             rfid_uid=self.rfid_uid
         )
         self.client = Client()
         self.url = reverse('api_asistencia_rfid')
 
-    def test_registrar_asistencia_rfid_success(self):
-        """Test successful attendance registration via RFID."""
-        self.assertEqual(AsistenciaDiaria.objects.count(), 0)
+    @patch('django.utils.timezone.now')
+    def test_registrar_asistencia_rfid_success(self, mock_now):
+        """Test successful attendance registration via RFID on a weekday."""
+        # Mock 'now' to be a weekday
+        mock_now.return_value = make_aware(timezone.datetime(2023, 10, 26, 10, 0, 0)) # A Thursday
 
+        self.assertEqual(AsistenciaDiaria.objects.count(), 0)
         payload = json.dumps({'uid': self.rfid_uid})
         response = self.client.post(self.url, data=payload, content_type='application/json')
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()['status'], 'success')
+        response_data = response.json()
+        self.assertEqual(response_data['status'], 'success')
+        self.assertIn('teacher', response_data)
+        self.assertEqual(response_data['teacher']['name'], 'RFID User')
         self.assertEqual(AsistenciaDiaria.objects.count(), 1)
 
         asistencia = AsistenciaDiaria.objects.first()
         self.assertEqual(asistencia.docente, self.docente)
-        self.assertEqual(asistencia.fecha, timezone.localtime(timezone.now()).date())
+        self.assertEqual(asistencia.fecha, date(2023, 10, 26))
 
-    def test_registrar_asistencia_rfid_duplicate(self):
+    @patch('django.utils.timezone.now')
+    def test_registrar_asistencia_rfid_duplicate(self, mock_now):
         """Test that duplicate attendance registration is prevented."""
+        mock_now.return_value = make_aware(timezone.datetime(2023, 10, 26, 10, 0, 0))
         # First registration
         self.client.post(self.url, data=json.dumps({'uid': self.rfid_uid}), content_type='application/json')
         self.assertEqual(AsistenciaDiaria.objects.count(), 1)
@@ -508,17 +520,23 @@ class RfidAsistenciaTest(TestCase):
         response = self.client.post(self.url, data=json.dumps({'uid': self.rfid_uid}), content_type='application/json')
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()['status'], 'warning')
-        self.assertEqual(AsistenciaDiaria.objects.count(), 1) # Count should not increase
+        response_data = response.json()
+        self.assertEqual(response_data['status'], 'warning')
+        self.assertIn('teacher', response_data)
+        self.assertEqual(AsistenciaDiaria.objects.count(), 1)
 
-    def test_registrar_asistencia_rfid_not_found(self):
+    @patch('django.utils.timezone.now')
+    def test_registrar_asistencia_rfid_not_found(self, mock_now):
         """Test registration with an unregistered RFID UID."""
+        # Mock 'now' to be a weekday to bypass the weekend check
+        mock_now.return_value = make_aware(timezone.datetime(2023, 10, 26, 10, 0, 0)) # A Thursday
+
         payload = json.dumps({'uid': 'XX:XX:XX:XX'})
         response = self.client.post(self.url, data=payload, content_type='application/json')
 
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()['status'], 'error')
-        self.assertIn('no asignado', response.json()['message'])
+        self.assertIn('no reconocida', response.json()['message'])
         self.assertEqual(AsistenciaDiaria.objects.count(), 0)
 
     def test_registrar_asistencia_rfid_bad_request_no_uid(self):
@@ -530,11 +548,15 @@ class RfidAsistenciaTest(TestCase):
         self.assertEqual(response.json()['status'], 'error')
         self.assertIn('no proporcionado', response.json()['message'])
 
-    def test_registrar_asistencia_rfid_bad_request_invalid_json(self):
-        """Test registration with an invalid JSON payload."""
-        payload = 'this is not json'
+    @patch('django.utils.timezone.now')
+    def test_registrar_asistencia_rfid_weekend(self, mock_now):
+        """Test that attendance registration is blocked on weekends."""
+        # Mock 'now' to be a Saturday
+        mock_now.return_value = make_aware(timezone.datetime(2023, 10, 28, 10, 0, 0)) # A Saturday
+
+        payload = json.dumps({'uid': self.rfid_uid})
         response = self.client.post(self.url, data=payload, content_type='application/json')
 
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()['status'], 'error')
-        self.assertIn('inválido', response.json()['message'])
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['status'], 'weekend_off')
+        self.assertEqual(AsistenciaDiaria.objects.count(), 0)

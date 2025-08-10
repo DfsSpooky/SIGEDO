@@ -650,28 +650,51 @@ def registrar_asistencia_rfid(request):
         try:
             data = json.loads(request.body)
             rfid_uid = data.get('uid')
+            today = timezone.localtime(timezone.now()).date()
 
             if not rfid_uid:
                 return JsonResponse({'status': 'error', 'message': 'UID de RFID no proporcionado.'}, status=400)
 
+            # 1. Comprobar si es fin de semana (Sábado=5, Domingo=6)
+            if today.weekday() in [5, 6]:
+                return JsonResponse({'status': 'weekend_off', 'message': 'El registro de asistencia no está disponible los fines de semana.'})
+
+            # 2. Buscar al docente
             docente = Docente.objects.get(rfid_uid=rfid_uid)
-            today = timezone.localtime(timezone.now()).date()
 
-            # Verificar si ya se marcó la asistencia diaria para evitar duplicados
+            # 3. Preparar la información del docente para devolverla siempre
+            photo_url = request.build_absolute_uri(docente.foto.url) if docente.foto and hasattr(docente.foto, 'url') else request.build_absolute_uri(static('placeholder.png'))
+            teacher_data = {
+                'name': f'{docente.first_name} {docente.last_name}',
+                'dni': docente.dni,
+                'photoUrl': photo_url,
+            }
+
+            # 4. Comprobar si ya se marcó la asistencia
             if AsistenciaDiaria.objects.filter(docente=docente, fecha=today).exists():
-                return JsonResponse({'status': 'warning', 'message': f'La asistencia de hoy para {docente.first_name} {docente.last_name} ya fue registrada.'})
+                return JsonResponse({
+                    'status': 'warning',
+                    'message': f'La asistencia de hoy ya fue registrada a las {AsistenciaDiaria.objects.get(docente=docente, fecha=today).hora_entrada.strftime("%H:%M:%S")}.',
+                    'teacher': teacher_data
+                })
 
-            # Registrar la asistencia diaria (sin foto por ahora)
+            # 5. Registrar la asistencia diaria (sin foto)
             AsistenciaDiaria.objects.create(docente=docente, fecha=today)
 
-            return JsonResponse({'status': 'success', 'message': f'Asistencia registrada para {docente.first_name} {docente.last_name}.'})
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Asistencia registrada correctamente.',
+                'teacher': teacher_data
+            })
 
         except Docente.DoesNotExist:
-            return JsonResponse({'status': 'error', 'message': 'UID de RFID no asignado a ningún docente.'}, status=404)
+            return JsonResponse({'status': 'error', 'message': 'Tarjeta RFID no reconocida o no asignada.'}, status=404)
         except json.JSONDecodeError:
-            return JsonResponse({'status': 'error', 'message': 'JSON inválido.'}, status=400)
+            return JsonResponse({'status': 'error', 'message': 'Datos de la petición en formato incorrecto.'}, status=400)
         except Exception as e:
-            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+            # Log del error para depuración en el servidor
+            print(f"Error inesperado en registrar_asistencia_rfid: {e}")
+            return JsonResponse({'status': 'error', 'message': 'Ocurrió un error interno en el servidor.'}, status=500)
 
     return JsonResponse({'status': 'error', 'message': 'Método no permitido'}, status=405)
 

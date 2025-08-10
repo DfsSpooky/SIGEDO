@@ -3,6 +3,7 @@ from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 import uuid
+from datetime import date
 
 class Grupo(models.Model):
     nombre = models.CharField(max_length=100, help_text="Ej: Grupo A, Grupo B, Grupo C")
@@ -145,9 +146,9 @@ class Asistencia(models.Model):
 
 class AsistenciaDiaria(models.Model):
     docente = models.ForeignKey(Docente, on_delete=models.CASCADE)
-    fecha = models.DateField(auto_now_add=True)
+    fecha = models.DateField(default=date.today)
     hora_entrada = models.DateTimeField(auto_now_add=True)
-    foto_verificacion = models.ImageField(upload_to='verificacion_diaria/%Y/%m/%d/')
+    foto_verificacion = models.ImageField(upload_to='verificacion_diaria/%Y/%m/%d/', null=True, blank=True)
     def __str__(self): return f"Asistencia Diaria de {self.docente} - {self.fecha}"
 
 class SolicitudIntercambio(models.Model):
