@@ -37,9 +37,9 @@ class DocenteAdmin(UserAdmin, ModelAdmin):
             'classes': ('tab',),
             'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')
         }),
-        ('Credencial QR', {
+        ('Credenciales', {
             'classes': ('tab',),
-            'fields': ('id_qr', 'rotate_qr_code_button')
+            'fields': ('id_qr', 'rotate_qr_code_button', 'rfid_uid')
         }),
         ('Fechas Importantes', {
             'classes': ('tab',),
