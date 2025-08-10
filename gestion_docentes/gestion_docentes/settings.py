@@ -29,7 +29,7 @@ ID_ENCRYPTION_KEY = b'J5YSFVZTupEKrBGPkvBODOR_B_uHBx2GZeKcO32JeUI='
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
