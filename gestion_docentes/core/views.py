@@ -24,6 +24,8 @@ from .models import (
     Semestre, DiaEspecial, Especialidad, FranjaHoraria, VersionDocumento, Anuncio,
     Notificacion, Justificacion, TipoJustificacion
 )
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from .forms import DocumentoForm, SolicitudIntercambioForm, VersionDocumentoForm, JustificacionForm
 from .utils.exports import exportar_reporte_excel, exportar_reporte_pdf, exportar_ficha_docente_pdf
 from .utils.encryption import decrypt_id
@@ -672,20 +674,31 @@ def registrar_asistencia_rfid(request):
 
             # 4. Comprobar si ya se marcó la asistencia
             if AsistenciaDiaria.objects.filter(docente=docente, fecha=today).exists():
-                return JsonResponse({
+                response_data = {
                     'status': 'warning',
                     'message': f'La asistencia de hoy ya fue registrada a las {AsistenciaDiaria.objects.get(docente=docente, fecha=today).hora_entrada.strftime("%H:%M:%S")}.',
                     'teacher': teacher_data
-                })
+                }
+            else:
+                # 5. Registrar la asistencia diaria (sin foto)
+                AsistenciaDiaria.objects.create(docente=docente, fecha=today)
+                response_data = {
+                    'status': 'success',
+                    'message': 'Asistencia registrada correctamente.',
+                    'teacher': teacher_data
+                }
 
-            # 5. Registrar la asistencia diaria (sin foto)
-            AsistenciaDiaria.objects.create(docente=docente, fecha=today)
+            # 6. Enviar actualización a través de Channels
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                'kiosk_group',
+                {
+                    'type': 'kiosk.update',
+                    'data': response_data
+                }
+            )
 
-            return JsonResponse({
-                'status': 'success',
-                'message': 'Asistencia registrada correctamente.',
-                'teacher': teacher_data
-            })
+            return JsonResponse(response_data)
 
         except Docente.DoesNotExist:
             return JsonResponse({'status': 'error', 'message': 'Tarjeta RFID no reconocida o no asignada.'}, status=404)

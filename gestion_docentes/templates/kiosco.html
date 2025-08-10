@@ -229,6 +229,37 @@
             }, 500);
         }
 
+        // --- LÓGICA PARA WEBSOCKETS ---
+        const kioskSocket = new WebSocket(
+            'ws://'
+            + window.location.host
+            + '/ws/kiosk/'
+        );
+
+        kioskSocket.onopen = function(e) {
+            console.log('Kiosk WebSocket connection established.');
+        };
+
+        kioskSocket.onmessage = function(e) {
+            const eventData = JSON.parse(e.data);
+            console.log('Data received from WebSocket:', eventData);
+
+            if (eventData.type === 'kiosk.update') {
+                // Detener el escaneo de la cámara si está activo
+                qrScanned = true;
+                // Usar la función existente para mostrar la información
+                displayInfoAndActions(eventData.data);
+            }
+        };
+
+        kioskSocket.onclose = function(e) {
+            console.error('Kiosk WebSocket connection closed unexpectedly. Trying to reconnect...');
+            // Opcional: intentar reconectar después de un breve retraso
+            setTimeout(function() {
+                // Lógica de reconexión podría ir aquí
+            }, 2000);
+        };
+
     </script>
 </body>
 </html>

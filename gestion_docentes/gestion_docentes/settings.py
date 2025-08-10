@@ -35,6 +35,8 @@ ALLOWED_HOSTS = ['*']
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
+    'channels',
     'unfold',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -79,6 +81,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'gestion_docentes.wsgi.application'
+ASGI_APPLICATION = 'gestion_docentes.asgi.application'
 
 
 # Database
