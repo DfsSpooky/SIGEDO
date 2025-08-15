@@ -10,7 +10,8 @@ from .models import (
     Documento, Asistencia, SolicitudIntercambio,
     PersonalDocente, Administrador, AsistenciaDiaria,
     ConfiguracionInstitucion, Semestre, FranjaHoraria, DiaEspecial, VersionDocumento,
-    Notificacion, Anuncio, TipoJustificacion, Justificacion
+    Notificacion, Anuncio, TipoJustificacion, Justificacion,
+    Activo, TipoActivo, Reserva
 )
 
 # --- CONFIGURACIÓN DE ADMINS ---
@@ -123,9 +124,10 @@ class DiaEspecialAdmin(ModelAdmin):
     
 @admin.register(FranjaHoraria)
 class FranjaHorariaAdmin(ModelAdmin):
-    list_display = ('turno', 'hora_inicio', 'hora_fin')
+    list_display = ('__str__', 'turno', 'hora_inicio', 'hora_fin')
     list_filter = ('turno',)
     ordering = ('hora_inicio',)
+    search_fields = ('turno', 'hora_inicio')
 
 class VersionDocumentoInline(TabularInline):
     model = VersionDocumento
@@ -206,6 +208,27 @@ class JustificacionAdmin(ModelAdmin):
             obj.revisado_por = request.user
             obj.fecha_revision = timezone.now()
         super().save_model(request, obj, form, change)
+
+@admin.register(TipoActivo)
+class TipoActivoAdmin(ModelAdmin):
+    search_fields = ('nombre',)
+    list_display = ('nombre',)
+
+@admin.register(Activo)
+class ActivoAdmin(ModelAdmin):
+    list_display = ('nombre', 'codigo_patrimonial', 'tipo', 'estado', 'asignado_a')
+    list_filter = ('estado', 'tipo')
+    search_fields = ('nombre', 'codigo_patrimonial', 'asignado_a__first_name', 'asignado_a__last_name', 'asignado_a__username')
+    autocomplete_fields = ('asignado_a', 'tipo')
+
+@admin.register(Reserva)
+class ReservaAdmin(ModelAdmin):
+    list_display = ('id', 'activo', 'docente', 'fecha_reserva', 'franja_horaria', 'estado')
+    list_filter = ('estado', 'fecha_reserva')
+    search_fields = ('activo__nombre', 'docente__username', 'docente__first_name')
+    autocomplete_fields = ('activo', 'docente', 'franja_horaria')
+    readonly_fields = ('fecha_creacion', 'fecha_confirmacion', 'fecha_finalizacion')
+    list_per_page = 20
 
 # --- REGISTRO DEL RESTO DE MODELOS ---
 admin.site.register(Grupo)

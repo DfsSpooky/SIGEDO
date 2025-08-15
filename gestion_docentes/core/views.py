@@ -16,13 +16,16 @@ from django.db import models
 from django.db.models import Q, Count
 from django.templatetags.static import static
 from django.core.serializers.json import DjangoJSONEncoder
+from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, TemplateView
+from django.urls import reverse_lazy
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 
 # Importamos todos los modelos, incluyendo los nuevos
 from .models import (
     Docente, Curso, Documento, Asistencia, Carrera, SolicitudIntercambio,
     TipoDocumento, AsistenciaDiaria, PersonalDocente, ConfiguracionInstitucion,
     Semestre, DiaEspecial, Especialidad, FranjaHoraria, VersionDocumento, Anuncio,
-    Notificacion, Justificacion, TipoJustificacion
+    Notificacion, Justificacion, TipoJustificacion, Activo, TipoActivo, Reserva
 )
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
@@ -1484,3 +1487,155 @@ def generar_ficha_docente(request, docente_id):
     response = HttpResponse(pdf, content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="ficha_integral_{docente.username}.pdf"'
     return response
+
+
+# ========= VISTAS PARA RESERVA DE EQUIPOS =========
+
+class DisponibilidadEquiposView(LoginRequiredMixin, TemplateView):
+    template_name = 'reservas/disponibilidad.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        fecha_str = self.request.GET.get('fecha', timezone.now().strftime('%Y-%m-%d'))
+        try:
+            fecha_seleccionada = timezone.datetime.strptime(fecha_str, '%Y-%m-%d').date()
+        except ValueError:
+            fecha_seleccionada = timezone.now().date()
+
+        franjas = FranjaHoraria.objects.all().order_by('hora_inicio')
+        activos = Activo.objects.filter(estado__in=['DISPONIBLE', 'ASIGNADO'])
+
+        # Obtenemos todas las reservas activas para la fecha seleccionada para optimizar
+        reservas_activas = set(
+            Reserva.objects.filter(
+                fecha_reserva=fecha_seleccionada,
+                estado__in=['RESERVADO', 'EN_USO']
+            ).values_list('activo_id', 'franja_horaria_id')
+        )
+
+        grid = []
+        for activo in activos:
+            row = {'activo': activo, 'franjas': []}
+            for franja in franjas:
+                esta_reservado = (activo.id, franja.id) in reservas_activas
+                row['franjas'].append({'franja': franja, 'reservado': esta_reservado})
+            grid.append(row)
+
+        context['grid'] = grid
+        context['franjas'] = franjas
+        context['fecha_seleccionada'] = fecha_seleccionada
+        context['fecha_seleccionada_str'] = fecha_seleccionada.strftime('%Y-%m-%d')
+
+        return context
+
+    def post(self, request, *args, **kwargs):
+        try:
+            activo_id = request.POST.get('activo_id')
+            franja_id = request.POST.get('franja_id')
+            fecha_str = request.POST.get('fecha')
+
+            activo = get_object_or_404(Activo, pk=activo_id)
+            franja = get_object_or_404(FranjaHoraria, pk=franja_id)
+            fecha = timezone.datetime.strptime(fecha_str, '%Y-%m-%d').date()
+            docente = request.user
+
+            # Doble chequeo de disponibilidad y fecha
+            if fecha < timezone.now().date():
+                messages.error(request, 'No se pueden hacer reservas para fechas pasadas.')
+            elif Reserva.objects.filter(activo=activo, franja_horaria=franja, fecha_reserva=fecha, estado__in=['RESERVADO', 'EN_USO']).exists():
+                messages.error(request, 'Este equipo ya no está disponible en la franja seleccionada. Alguien más lo reservó.')
+            else:
+                Reserva.objects.create(
+                    activo=activo,
+                    franja_horaria=franja,
+                    fecha_reserva=fecha,
+                    docente=docente
+                )
+                messages.success(request, f'Equipo "{activo.nombre}" reservado con éxito para el {fecha} a las {franja.hora_inicio.strftime("%H:%M")}.')
+
+        except (ValueError, Activo.DoesNotExist, FranjaHoraria.DoesNotExist) as e:
+            messages.error(request, f'Ocurrió un error al procesar la reserva: {e}')
+
+        return redirect('reservas:disponibilidad' + f'?fecha={fecha_str}')
+
+class MisReservasView(LoginRequiredMixin, ListView):
+    model = Reserva
+    template_name = 'reservas/mis_reservas.html'
+    context_object_name = 'reservas'
+    paginate_by = 10
+
+    def get_queryset(self):
+        return Reserva.objects.filter(docente=self.request.user).order_by('-fecha_reserva', '-franja_horaria__hora_inicio')
+
+@login_required
+def cancelar_reserva(request, pk):
+    reserva = get_object_or_404(Reserva, pk=pk, docente=request.user)
+
+    hora_inicio_reserva = timezone.make_aware(
+        timezone.datetime.combine(reserva.fecha_reserva, reserva.franja_horaria.hora_inicio)
+    )
+    if reserva.estado == 'RESERVADO' and hora_inicio_reserva > timezone.now():
+        reserva.estado = 'CANCELADO'
+        reserva.save()
+        messages.success(request, 'La reserva ha sido cancelada.')
+    else:
+        messages.error(request, 'No es posible cancelar esta reserva (ya está en curso, finalizada o fue cancelada).')
+
+    return redirect('reservas:mis_reservas')
+
+
+# ========= VISTAS PARA INVENTARIO (ACTIVOS) =========
+
+class ActivoListView(LoginRequiredMixin, ListView):
+    model = Activo
+    template_name = 'inventario/lista_activos.html'
+    context_object_name = 'activos'
+    paginate_by = 15
+
+    def get_queryset(self):
+        queryset = super().get_queryset().select_related('tipo', 'asignado_a')
+        query = self.request.GET.get('q')
+        if query:
+            queryset = queryset.filter(
+                Q(nombre__icontains=query) |
+                Q(codigo_patrimonial__icontains=query) |
+                Q(asignado_a__first_name__icontains=query) |
+                Q(asignado_a__last_name__icontains=query)
+            )
+        return queryset
+
+class ActivoDetailView(LoginRequiredMixin, DetailView):
+    model = Activo
+    template_name = 'inventario/detalle_activo.html'
+    context_object_name = 'activo'
+
+class ActivoCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+    model = Activo
+    template_name = 'inventario/form_activo.html'
+    fields = ['nombre', 'descripcion', 'codigo_patrimonial', 'tipo', 'estado', 'asignado_a', 'fecha_adquisicion', 'observaciones']
+    success_url = reverse_lazy('inventario:lista')
+    permission_required = 'core.add_activo'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['titulo'] = 'Crear Nuevo Activo'
+        return context
+
+class ActivoUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+    model = Activo
+    template_name = 'inventario/form_activo.html'
+    fields = ['nombre', 'descripcion', 'codigo_patrimonial', 'tipo', 'estado', 'asignado_a', 'fecha_adquisicion', 'observaciones']
+    success_url = reverse_lazy('inventario:lista')
+    permission_required = 'core.change_activo'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['titulo'] = 'Editar Activo'
+        return context
+
+class ActivoDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
+    model = Activo
+    template_name = 'inventario/confirmar_eliminacion_activo.html'
+    success_url = reverse_lazy('inventario:lista')
+    permission_required = 'core.delete_activo'

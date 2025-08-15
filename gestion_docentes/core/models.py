@@ -259,3 +259,6 @@ class Justificacion(models.Model):
 
     class Meta:
         ordering = ['-fecha_creacion']
+
+# Importar modelos de módulos separados para mantener el código organizado
+from .models_inventario import *
