@@ -195,6 +195,27 @@ UNFOLD = {
                 ],
             },
             {
+                "title": "Gestión de Inventario",
+                "icon": "inventory_2",
+                "items": [
+                    {
+                        "title": "Tipos de Activo",
+                        "icon": "category",
+                        "link": reverse_lazy("admin:core_tipoactivo_changelist"),
+                    },
+                    {
+                        "title": "Activos",
+                        "icon": "inventory",
+                        "link": reverse_lazy("admin:core_activo_changelist"),
+                    },
+                    {
+                        "title": "Reservas y Préstamos",
+                        "icon": "event_available",
+                        "link": reverse_lazy("admin:core_reserva_changelist"),
+                    },
+                ],
+            },
+            {
                 "title": "Personal",
                 "icon": "group",
                 "items": [
