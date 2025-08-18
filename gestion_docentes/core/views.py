@@ -1371,6 +1371,115 @@ def api_auto_asignar(request):
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 @staff_member_required
+@csrf_exempt
+def generar_horario_automatico(request):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Método no permitido'}, status=405)
+
+    try:
+        semestre_activo = Semestre.objects.filter(estado='ACTIVO').first()
+        if not semestre_activo:
+            return JsonResponse({'status': 'error', 'message': 'No hay un semestre activo configurado para la planificación.'}, status=400)
+
+        # Paso 1: Limpiar todos los horarios existentes para el semestre activo
+        Curso.objects.filter(semestre=semestre_activo).update(dia=None, horario_inicio=None, horario_fin=None)
+
+        # Paso 2: Obtener todos los cursos, priorizando los más largos y los que tienen docente asignado
+        cursos_por_asignar = list(Curso.objects.filter(semestre=semestre_activo, docente__isnull=False)
+                                  .select_related('docente', 'especialidad__grupo')
+                                  .order_by('-duracion_bloques'))
+
+        total_cursos_a_asignar = len(cursos_por_asignar)
+        cursos_sin_docente = Curso.objects.filter(semestre=semestre_activo, docente__isnull=True).count()
+
+        # Paso 3: Obtener franjas horarias y días
+        franjas_horarias = list(FranjaHoraria.objects.order_by('hora_inicio'))
+        dias_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
+        random.shuffle(dias_semana)
+
+        # Paso 4: Estructura para seguir los horarios ocupados
+        horarios_ocupados = {
+            'docente': {},  # (docente_id, dia, franja_id) -> True
+            'grupo': {}     # (grupo_id, semestre_cursado, dia, franja_id) -> True
+        }
+
+        cursos_asignados_count = 0
+        cursos_no_asignados = []
+
+        # Paso 5: Algoritmo de asignación
+        for curso in cursos_por_asignar:
+            docente = curso.docente
+            grupo = curso.especialidad.grupo if curso.especialidad and curso.especialidad.grupo else None
+            semestre_cursado = curso.semestre_cursado
+
+            asignado = False
+            # Iterar aleatoriamente sobre los días para evitar sesgos
+            random.shuffle(dias_semana)
+            for dia in dias_semana:
+                # Iterar sobre las franjas de inicio posibles
+                for i in range(len(franjas_horarias) - curso.duracion_bloques + 1):
+                    franja_inicio = franjas_horarias[i]
+                    franjas_del_curso = franjas_horarias[i : i + curso.duracion_bloques]
+
+                    bloque_valido = True
+                    for franja in franjas_del_curso:
+                        # 1. Conflicto de Disponibilidad del Docente
+                        if (docente.disponibilidad == 'MANANA' and franja.turno != 'MANANA') or \
+                           (docente.disponibilidad == 'TARDE' and franja.turno != 'TARDE'):
+                            bloque_valido = False
+                            break
+                        # 2. Conflicto de Horario del Docente
+                        if horarios_ocupados['docente'].get((docente.id, dia, franja.id)):
+                            bloque_valido = False
+                            break
+                        # 3. Conflicto de Horario del Grupo/Semestre
+                        if grupo and semestre_cursado:
+                            if horarios_ocupados['grupo'].get((grupo.id, semestre_cursado, dia, franja.id)):
+                                bloque_valido = False
+                                break
+
+                    if bloque_valido:
+                        # Asignar y actualizar horarios ocupados
+                        curso.dia = dia
+                        curso.horario_inicio = franja_inicio.hora_inicio
+                        curso.horario_fin = franjas_del_curso[-1].hora_fin
+
+                        for franja in franjas_del_curso:
+                            horarios_ocupados['docente'][(docente.id, dia, franja.id)] = True
+                            if grupo and semestre_cursado:
+                                horarios_ocupados['grupo'][(grupo.id, semestre_cursado, dia, franja.id)] = True
+
+                        asignado = True
+                        break
+                if asignado:
+                    break
+
+            if asignado:
+                cursos_asignados_count += 1
+            else:
+                cursos_no_asignados.append(curso.nombre)
+
+        # Guardar todos los cambios a la vez al final si se prefiere, pero guardar uno por uno es más seguro
+        # si el proceso es largo. Dado que ya estamos guardando, lo dejamos así.
+        for curso in cursos_por_asignar:
+            if curso.dia: # Solo guardar los que fueron asignados
+                curso.save()
+
+        # Paso 6: Preparar el mensaje de respuesta
+        message = f"Proceso completado. Se asignaron exitosamente {cursos_asignados_count} de {total_cursos_a_asignar} cursos."
+        if cursos_no_asignados:
+            message += f" No se pudieron asignar {len(cursos_no_asignados)} cursos por falta de espacio o conflictos."
+        if cursos_sin_docente > 0:
+            message += f" Además, hay {cursos_sin_docente} cursos sin docente que no se pueden planificar."
+
+        return JsonResponse({'status': 'success', 'message': message})
+
+    except Exception as e:
+        # Log del error para depuración
+        print(f"Error en generar_horario_automatico: {e}")
+        return JsonResponse({'status': 'error', 'message': f'Ocurrió un error inesperado: {e}'}, status=500)
+
+@staff_member_required
 def api_get_cursos_no_asignados(request):
     try:
         especialidad_id = request.GET.get('especialidad_id')
