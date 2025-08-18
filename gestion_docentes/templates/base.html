@@ -1,5 +1,5 @@
 {% load static %} <!DOCTYPE html>
-<html lang="es" data-theme="dark"> <head>
+<html lang="es" data-theme="winter"> <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Gestión Docente{% endblock %} - Sistema de Gestión</title>
@@ -55,7 +55,7 @@
                     </label>
                 </div>
                 <div class="flex-1">
-                    <a class="btn btn-ghost text-xl">Gestión Docente</a>
+                    <a class="btn btn-ghost text-xl">{{ configuracion.nombre_dashboard|default:"Gestión Docente" }}</a>
                 </div>
             </div>
 
@@ -69,12 +69,14 @@
                     </div>
                 </div>
                 <div class="flex-none gap-4">
-                    <label class="swap swap-rotate btn btn-ghost btn-circle">
-                        <input type="checkbox" id="theme-toggle" />
-                        <i class="fas fa-sun swap-on fill-current w-5 h-5 transition-transform duration-300 ease-in-out"></i>
-                        <i class="fas fa-moon swap-off fill-current w-5 h-5 transition-transform duration-300 ease-in-out"></i>
-                    </label>
-                    
+                    <a href="{% url 'ver_notificaciones' %}" class="btn btn-ghost btn-circle">
+                        <div class="indicator">
+                            <i class="fas fa-bell text-xl"></i>
+                            {% if unread_notifications_count > 0 %}
+                                <span class="badge badge-sm badge-primary indicator-item">{{ unread_notifications_count }}</span>
+                            {% endif %}
+                        </div>
+                    </a>
                     <div class="dropdown dropdown-end">
                         <label tabindex="0" class="btn btn-ghost btn-circle avatar">
                             <div class="w-10 rounded-full ring-2 ring-offset-2 ring-offset-base-100 ring-transparent hover:ring-primary transition-shadow duration-300">
@@ -147,21 +149,35 @@
             <ul class="menu p-4 w-72 min-h-full bg-base-100 text-base-content">
                 <li class="text-2xl font-bold p-4 mb-4">
                     <a href="{% url 'dashboard' %}" class="hover:text-primary transition-colors duration-300">
-                        <i class="fas fa-university text-primary"></i>
-                        Gestión Docente
+                        {% if configuracion.logo %}
+                            <img src="{{ configuracion.logo.url }}" alt="Logo" class="h-8 w-8 mr-2 object-contain">
+                        {% else %}
+                            <i class="fas fa-university text-primary"></i>
+                        {% endif %}
+                        {{ configuracion.nombre_dashboard|default:"Gestión Docente" }}
                     </a>
                 </li>
                 
                 <li class="menu-title"><span class="opacity-60">Principal</span></li>
                 <li><a href="{% url 'dashboard' %}" class="group transition-all duration-300"><i class="fas fa-tachometer-alt fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Dashboard</a></li>
+                <li><a href="{% url 'ver_anuncios' %}" class="group transition-all duration-300"><i class="fas fa-bullhorn fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Anuncios</a></li>
                 <li><a href="{% url 'perfil' %}" class="group transition-all duration-300"><i class="fas fa-user-circle fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Mi Perfil</a></li>
                 <li><a href="{% url 'lista_documentos' %}" class="group transition-all duration-300"><i class="fas fa-file-alt fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Mis Documentos</a></li>
+                <li><a href="{% url 'lista_justificaciones' %}" class="group transition-all duration-300"><i class="fas fa-calendar-check fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Mis Justificaciones</a></li>
+                <li><a href="{% url 'reservas:disponibilidad' %}" class="group transition-all duration-300"><i class="fas fa-bookmark fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Reserva de Equipos</a></li>
 
                 {% if user.is_staff %}
                 <li class="menu-title"><span class="opacity-60 pt-4">Administración</span></li>
+                {% if perms.core.view_planificador %}
                 <li><a href="{% url 'planificador_horarios' %}" class="group transition-all duration-300"><i class="fas fa-calendar-alt fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Planificador</a></li>
+                {% endif %}
                 <li><a href="{% url 'lista_credenciales' %}" class="group transition-all duration-300"><i class="fas fa-id-card fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Credenciales</a></li>
+                {% if perms.core.view_reporte %}
                 <li><a href="{% url 'reporte_asistencia' %}" class="group transition-all duration-300"><i class="fas fa-chart-bar fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Reportes</a></li>
+                {% endif %}
+                {% if perms.core.change_justificacion %}
+                <li><a href="{% url 'lista_justificaciones' %}" class="group transition-all duration-300"><i class="fas fa-check-double fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Gestionar Justificaciones</a></li>
+                {% endif %}
                 <li><a href="/admin" target="_blank" class="group transition-all duration-300"><i class="fas fa-cogs fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Panel de Admin</a></li>
                 {% endif %}
 
@@ -172,18 +188,6 @@
         </div>
     </div>
 
-    <script>
-        const themeToggle = document.getElementById('theme-toggle');
-        const html = document.documentElement;
-        const currentTheme = localStorage.getItem('theme') || 'dark';
-        html.setAttribute('data-theme', currentTheme);
-        themeToggle.checked = currentTheme === 'light';
-        themeToggle.addEventListener('change', function() {
-            const newTheme = this.checked ? 'light' : 'dark';
-            html.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
-        });
-    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>
