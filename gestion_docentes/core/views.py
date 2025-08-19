@@ -1064,7 +1064,9 @@ def planificador_horarios(request):
     franjas = FranjaHoraria.objects.order_by('hora_inicio')
     franjas_manana_json = json.dumps(list(franjas.filter(turno='MANANA').values('id', 'hora_inicio', 'hora_fin')), cls=DjangoJSONEncoder)
     franjas_tarde_json = json.dumps(list(franjas.filter(turno='TARDE').values('id', 'hora_inicio', 'hora_fin')), cls=DjangoJSONEncoder)
-    dias_semana_json = json.dumps(['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'])
+
+    dias_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
+    dias_semana_json = json.dumps(dias_semana)
 
     context = {
         'semestre_activo': semestre_activo,
@@ -1072,6 +1074,7 @@ def planificador_horarios(request):
         'franjas_manana_json': franjas_manana_json,
         'franjas_tarde_json': franjas_tarde_json,
         'dias_semana_json': dias_semana_json,
+        'dias_semana': dias_semana,  # <-- Añadido para el template
         'semestres_validos': semestres_validos,
         # Pasamos los filtros seleccionados para que la plantilla los recuerde
         'especialidad_seleccionada_id': request.GET.get('especialidad'),
