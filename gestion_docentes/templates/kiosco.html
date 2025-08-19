@@ -75,7 +75,31 @@
             setTimeout(() => { alertElement.classList.remove('show'); }, 4000);
         }
 
-        function resetKiosk() { actionsState.classList.add('fade-out'); setTimeout(() => { location.reload(); }, 500); }
+        function resetKiosk() {
+            // Anima la salida del panel de acciones
+            actionsState.classList.add('fade-out');
+
+            // Después de la animación, resetea el estado de la UI sin recargar la página
+            setTimeout(() => {
+                actionsState.classList.add('hidden');
+                actionsState.classList.remove('fade-out');
+                scanningState.classList.remove('hidden', 'fade-out');
+
+                // Limpia la información mostrada
+                teacherName.textContent = '';
+                teacherDni.textContent = '';
+                teacherPhoto.src = '';
+                attendanceActions.innerHTML = '';
+                scanFeedback.textContent = '';
+
+                // Reanuda el escaneo de la cámara
+                qrScanned = false;
+                requestAnimationFrame(tick);
+
+                // Devuelve el foco al input de RFID
+                rfidInput.focus();
+            }, 500); // 500ms para que coincida con la transición de opacidad
+        }
         
         navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } }).then(stream => { video.srcObject = stream; video.setAttribute("playsinline", true); video.play(); requestAnimationFrame(tick); }).catch(err => { console.error("Error al acceder a la cámara: ", err); scanFeedback.textContent = "Error: No se pudo acceder a la cámara."; });
 
