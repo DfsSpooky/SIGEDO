@@ -235,12 +235,16 @@ class ReporteAsistenciaTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/json')
 
-        # Parse the JSON and check the structure
+        # Parse the JSON and check the new standardized structure
         data = response.json()
-        self.assertIn('docente', data)
-        self.assertIn('asistencias_cursos', data)
-        self.assertEqual(data['docente']['nombre_completo'], 'Test Docente')
-        self.assertEqual(data['docente']['dni'], '12345678')
+        self.assertEqual(data['status'], 'success')
+        self.assertIn('data', data)
+
+        response_data = data['data']
+        self.assertIn('docente', response_data)
+        self.assertIn('asistencias_cursos', response_data)
+        self.assertEqual(response_data['docente']['nombre_completo'], 'Test Docente')
+        self.assertEqual(response_data['docente']['dni'], '12345678')
 
     def test_reporte_asistencia_logic(self):
         """

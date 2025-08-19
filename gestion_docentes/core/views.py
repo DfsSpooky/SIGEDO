@@ -32,6 +32,8 @@ from channels.layers import get_channel_layer
 from .forms import DocumentoForm, SolicitudIntercambioForm, VersionDocumentoForm, JustificacionForm
 from .utils.exports import exportar_reporte_excel, exportar_reporte_pdf, exportar_ficha_docente_pdf
 from .utils.encryption import decrypt_id
+from .utils.responses import success_response, error_response, not_found_response, server_error_response
+from .utils.reports import _generar_datos_reporte_asistencia
 import qrcode
 from django.contrib.auth import login, authenticate
 from django.contrib.auth.forms import AuthenticationForm
@@ -109,6 +111,15 @@ def dashboard(request):
     # Ordenamos la actividad combinada por fecha y tomamos los 3 más recientes
     actividad_reciente.sort(key=lambda item: item['fecha'], reverse=True)
     
+    # 4. Encontrar las carreras asociadas al docente en el semestre activo
+    semestre_activo = Semestre.objects.filter(estado='ACTIVO').first()
+    carreras = []
+    if semestre_activo:
+        carreras = Carrera.objects.filter(
+            curso__docente=docente,
+            curso__semestre=semestre_activo
+        ).distinct()
+
     configuracion = ConfiguracionInstitucion.load()
 
     context = {
@@ -118,6 +129,7 @@ def dashboard(request):
         'proximo_curso': proximo_curso,
         'actividad_reciente': actividad_reciente[:3], # Pasamos solo los 3 últimos eventos
         'configuracion': configuracion,
+        'carreras': carreras,
     }
     return render(request, 'dashboard.html', context)
 
@@ -593,10 +605,10 @@ def get_teacher_info(request):
             return JsonResponse(response_data)
 
         except Docente.DoesNotExist:
-            return JsonResponse({'status': 'error', 'message': 'QR no válido o docente no encontrado.'}, status=404)
+            return not_found_response('QR no válido o docente no encontrado.')
         except Exception as e:
-            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
-    return JsonResponse({'status': 'error', 'message': 'Método no permitido'}, status=405)
+            return server_error_response(str(e))
+    return error_response('Método no permitido', status_code=405)
 
 
 @csrf_exempt
@@ -648,12 +660,12 @@ def mark_attendance_kiosk(request):
                         asistencia.foto_salida = photo_file
                         asistencia.save()
             
-            return JsonResponse({'status': 'success', 'message': 'Asistencia registrada correctamente.'})
+            return success_response(message='Asistencia registrada correctamente.')
 
         except Exception as e:
             print(f"Error en mark_attendance_kiosk: {e}")
-            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
-    return JsonResponse({'status': 'error', 'message': 'Método no permitido'}, status=405)
+            return server_error_response(str(e))
+    return error_response('Método no permitido', status_code=405)
 
 
 @csrf_exempt
@@ -665,7 +677,7 @@ def registrar_asistencia_rfid(request):
             today = timezone.localtime(timezone.now()).date()
 
             if not rfid_uid:
-                return JsonResponse({'status': 'error', 'message': 'UID de RFID no proporcionado.'}, status=400)
+                return error_response('UID de RFID no proporcionado.')
 
             # 1. Comprobar si es fin de semana (Sábado=5, Domingo=6)
             if today.weekday() in [5, 6]:
@@ -711,15 +723,15 @@ def registrar_asistencia_rfid(request):
             return JsonResponse(response_data)
 
         except Docente.DoesNotExist:
-            return JsonResponse({'status': 'error', 'message': 'Tarjeta RFID no reconocida o no asignada.'}, status=404)
+            return not_found_response('Tarjeta RFID no reconocida o no asignada.')
         except json.JSONDecodeError:
-            return JsonResponse({'status': 'error', 'message': 'Datos de la petición en formato incorrecto.'}, status=400)
+            return error_response('Datos de la petición en formato incorrecto.')
         except Exception as e:
             # Log del error para depuración en el servidor
             print(f"Error inesperado en registrar_asistencia_rfid: {e}")
-            return JsonResponse({'status': 'error', 'message': 'Ocurrió un error interno en el servidor.'}, status=500)
+            return server_error_response('Ocurrió un error interno en el servidor.')
 
-    return JsonResponse({'status': 'error', 'message': 'Método no permitido'}, status=405)
+    return error_response('Método no permitido', status_code=405)
 
 
 # --- VISTAS PARA CREDENCIALES ---
@@ -793,135 +805,15 @@ def rotate_qr_code(request, docente_id):
 @staff_member_required
 @permission_required('core.view_reporte', raise_exception=True)
 def reporte_asistencia(request):
-    # 1. MANEJO DE FILTROS Y FECHAS
-    fecha_inicio_str = request.GET.get('fecha_inicio')
-    fecha_fin_str = request.GET.get('fecha_fin')
-    estado_filtro = request.GET.get('estado', 'todos')
-    curso_id = request.GET.get('curso')
-    especialidad_id = request.GET.get('especialidad')
-
-    try:
-        fecha_inicio = timezone.datetime.strptime(fecha_inicio_str, '%Y-%m-%d').date() if fecha_inicio_str else date.today()
-        fecha_fin = timezone.datetime.strptime(fecha_fin_str, '%Y-%m-%d').date() if fecha_fin_str else date.today()
-    except ValueError:
-        fecha_inicio = fecha_fin = date.today()
-
-    # 2. OBTENER QUERYSETS BASE
-    docentes_qs = Docente.objects.all().order_by('last_name', 'first_name')
-    if especialidad_id:
-        docentes_qs = docentes_qs.filter(especialidades__id=especialidad_id)
-
-    # Pre-fetch de datos relacionados para optimizar
-    asistencias_qs = Asistencia.objects.filter(
-        fecha__range=[fecha_inicio, fecha_fin]
-    ).select_related('docente', 'curso')
-
-    asistencias_diarias_qs = AsistenciaDiaria.objects.filter(fecha__range=[fecha_inicio, fecha_fin]).select_related('docente')
-    asistencias_diarias_map = {(ad.docente_id, ad.fecha): ad for ad in asistencias_diarias_qs}
-
-    semestre_activo = Semestre.objects.filter(estado='ACTIVO').first()
-    cursos_programados_qs = Curso.objects.filter(semestre=semestre_activo, dia__isnull=False)
-    if curso_id:
-        cursos_programados_qs = cursos_programados_qs.filter(id=curso_id)
-        # Si filtramos por curso, filtramos también los docentes que lo dictan
-        docente_del_curso_id = cursos_programados_qs.first().docente_id
-        docentes_qs = docentes_qs.filter(id=docente_del_curso_id)
-
-    # 3. PROCESAMIENTO DE DATOS Y CÁLCULO DE ESTADO
-    reporte_final = []
-    configuracion = ConfiguracionInstitucion.load()
-    limite_tardanza = configuracion.tiempo_limite_tardanza or timedelta(minutes=10) # Default de 10 min
-
-    justificaciones_aprobadas = Justificacion.objects.filter(
-        estado='APROBADO',
-        fecha_inicio__lte=fecha_fin,
-        fecha_fin__gte=fecha_inicio
-    )
-
-    # Crear un set para búsquedas rápidas de justificaciones por (docente_id, fecha)
-    justificaciones_set = set()
-    for just in justificaciones_aprobadas:
-        d = just.fecha_inicio
-        while d <= just.fecha_fin:
-            justificaciones_set.add((just.docente_id, d))
-            d += timedelta(days=1)
-
-    dias_del_rango = [fecha_inicio + timedelta(days=i) for i in range((fecha_fin - fecha_inicio).days + 1)]
-    dias_semana_map = {0: 'Lunes', 1: 'Martes', 2: 'Miércoles', 3: 'Jueves', 4: 'Viernes', 5: 'Sábado', 6: 'Domingo'}
-
-    for docente in docentes_qs:
-        for dia_actual in dias_del_rango:
-            dia_semana_str = dias_semana_map[dia_actual.weekday()]
-
-            # Cursos que el docente DEBÍA dictar ese día
-            cursos_del_dia = cursos_programados_qs.filter(docente=docente, dia=dia_semana_str)
-
-            # Asistencias que el docente MARCÓ ese día
-            asistencias_del_dia = asistencias_qs.filter(docente=docente, fecha=dia_actual)
-
-            estado_dia = 'No Requerido'
-            tiene_tardanza = False
-
-            if cursos_del_dia.exists():
-                # Si tenía cursos, por defecto es "Falta" hasta que se demuestre lo contrario
-                estado_dia = 'Falta'
-
-                if asistencias_del_dia.exists():
-                    # Si marcó al menos una asistencia, ya no es "Falta"
-                    estado_dia = 'Presente'
-
-                    # Verificamos si alguna de sus asistencias fue tardía
-                    for asis in asistencias_del_dia:
-                        if asis.hora_entrada and asis.curso.horario_inicio:
-                            hora_inicio_dt = timezone.make_aware(timezone.datetime.combine(dia_actual, asis.curso.horario_inicio))
-                            if (asis.hora_entrada - hora_inicio_dt) > timedelta(minutes=limite_tardanza):
-                                asis.es_tardanza = True
-                                tiene_tardanza = True
-                            else:
-                                asis.es_tardanza = False
-
-                    if tiene_tardanza:
-                        estado_dia = 'Tardanza'
-
-                # Si después de todo, el estado es "Falta", comprobamos si hay justificación
-                if estado_dia == 'Falta':
-                    if (docente.id, dia_actual) in justificaciones_set:
-                        estado_dia = 'Justificado'
-
-
-            # Aplicar el filtro de ESTADO
-            if estado_filtro != 'todos' and estado_dia.lower() != estado_filtro:
-                continue
-
-            # Solo añadir al reporte si no es "No Requerido" o si se muestran todos
-            if estado_dia != 'No Requerido' or estado_filtro == 'todos':
-                asistencia_diaria = asistencias_diarias_map.get((docente.id, dia_actual))
-                reporte_final.append({
-                    'docente': docente,
-                    'fecha': dia_actual,
-                    'estado': estado_dia,
-                    'asistencias': asistencias_del_dia,
-                    'cursos_programados': cursos_del_dia,
-                    'asistencia_diaria': asistencia_diaria
-                })
+    reporte_final, total_docentes = _generar_datos_reporte_asistencia(request.GET)
     
-    # 4. CONTADORES Y PAGINACIÓN
-    total_docentes = docentes_qs.count()
-    # Los contadores ahora se basan en los datos procesados, son más precisos
     presentes_count = len([r for r in reporte_final if r['estado'] == 'Presente'])
     ausentes_count = len([r for r in reporte_final if r['estado'] == 'Falta'])
 
-    # Paginación
     paginator = Paginator(reporte_final, 20)
     page_number = request.GET.get('page')
-    try:
-        page_obj = paginator.get_page(page_number)
-    except PageNotAnInteger:
-        page_obj = paginator.get_page(1)
-    except EmptyPage:
-        page_obj = paginator.get_page(paginator.num_pages)
+    page_obj = paginator.get_page(page_number)
 
-    # Preparamos los parámetros de la URL para la paginación, excluyendo 'page'
     query_params = request.GET.copy()
     if 'page' in query_params:
         del query_params['page']
@@ -932,83 +824,129 @@ def reporte_asistencia(request):
         'total_docentes': total_docentes,
         'presentes_count': presentes_count,
         'ausentes_count': ausentes_count,
+        'docentes': Docente.objects.all().order_by('last_name'), # Para el nuevo filtro
         'cursos': Curso.objects.all(),
         'especialidades': Especialidad.objects.all(),
-        'fecha_inicio': fecha_inicio.strftime('%Y-%m-%d'),
-        'fecha_fin': fecha_fin.strftime('%Y-%m-%d'),
-        'estado': estado_filtro,
-        'curso_id': curso_id,
-        'especialidad_id': especialidad_id,
+        'fecha_inicio': request.GET.get('fecha_inicio', date.today().strftime('%Y-%m-%d')),
+        'fecha_fin': request.GET.get('fecha_fin', date.today().strftime('%Y-%m-%d')),
+        'estado': request.GET.get('estado', 'todos'),
+        'curso_id': request.GET.get('curso'),
+        'especialidad_id': request.GET.get('especialidad'),
+        'docente_id': request.GET.get('docente'), # Para el nuevo filtro
         'filter_params': query_params.urlencode(),
     }
-
     return render(request, 'reporte_asistencia.html', context)
+
+
+@staff_member_required
+@permission_required('core.view_reporte', raise_exception=True)
+def analytics_dashboard(request):
+    """
+    Displays the analytics dashboard with charts and stats for administrators.
+    """
+    # The data is fetched asynchronously by the frontend.
+    # This view can pass filter options like date ranges or semester lists if needed.
+    context = {
+        'semestres': Semestre.objects.all().order_by('-fecha_inicio'),
+        'especialidades': Especialidad.objects.all(),
+    }
+    return render(request, 'analytics_dashboard.html', context)
+
 
 @staff_member_required
 def api_get_report_chart_data(request):
+    # 1. GET FILTERS
     fecha_inicio_str = request.GET.get('fecha_inicio')
     fecha_fin_str = request.GET.get('fecha_fin')
     especialidad_id = request.GET.get('especialidad')
-    curso_id = request.GET.get('curso')
 
     try:
-        fecha_inicio = timezone.datetime.strptime(fecha_inicio_str, '%Y-%m-%d').date()
-        fecha_fin = timezone.datetime.strptime(fecha_fin_str, '%Y-%m-%d').date()
+        fecha_inicio = timezone.datetime.strptime(fecha_inicio_str, '%Y-%m-%d').date() if fecha_inicio_str else date.today() - timedelta(days=7)
+        fecha_fin = timezone.datetime.strptime(fecha_fin_str, '%Y-%m-%d').date() if fecha_fin_str else date.today()
     except (ValueError, TypeError):
-        today = date.today()
-        fecha_inicio = today
-        fecha_fin = today
+        fecha_fin = date.today()
+        fecha_inicio = fecha_fin - timedelta(days=7)
 
-    # Base queryset
-    asistencias_qs = Asistencia.objects.filter(fecha__range=[fecha_inicio, fecha_fin])
+    # 2. PROCESS DATA (similar to reporte_asistencia view)
     docentes_qs = Docente.objects.all()
-
     if especialidad_id:
         docentes_qs = docentes_qs.filter(especialidades__id=especialidad_id)
-        asistencias_qs = asistencias_qs.filter(docente__in=docentes_qs)
 
-    if curso_id:
-        asistencias_qs = asistencias_qs.filter(curso_id=curso_id)
+    semestre_activo = Semestre.objects.filter(estado='ACTIVO').first()
+    if not semestre_activo:
+        return error_response("No hay semestre activo.", status_code=400)
 
-    # Data for Bar Chart (daily breakdown)
-    from django.db.models.functions import TruncDate
-    from django.db.models import Count
+    cursos_programados_qs = Curso.objects.filter(semestre=semestre_activo, dia__isnull=False)
+    asistencias_qs = Asistencia.objects.filter(fecha__range=[fecha_inicio, fecha_fin]).select_related('curso')
 
-    daily_data = asistencias_qs.filter(curso__isnull=True).annotate(
-        dia=TruncDate('fecha')
-    ).values('dia').annotate(
-        present_count=Count('id')
-    ).order_by('dia')
+    justificaciones_aprobadas = Justificacion.objects.filter(
+        estado='APROBADO',
+        fecha_inicio__lte=fecha_fin,
+        fecha_fin__gte=fecha_inicio
+    )
+    justificaciones_set = set()
+    for just in justificaciones_aprobadas:
+        d = just.fecha_inicio
+        while d <= just.fecha_fin:
+            justificaciones_set.add((just.docente_id, d))
+            d += timedelta(days=1)
 
-    # Data for Pie Chart (total breakdown)
-    total_docentes = docentes_qs.count()
-    total_presentes = asistencias_qs.filter(curso__isnull=True).values('docente').distinct().count()
-    total_ausentes = total_docentes - total_presentes
+    dias_del_rango = [fecha_inicio + timedelta(days=i) for i in range((fecha_fin - fecha_inicio).days + 1)]
+    dias_semana_map = {0: 'Lunes', 1: 'Martes', 2: 'Miércoles', 3: 'Jueves', 4: 'Viernes', 5: 'Sábado', 6: 'Domingo'}
 
-    # Lateness calculation
+    daily_stats = {d.strftime('%d/%m'): {'presente': 0, 'falta': 0, 'tardanza': 0} for d in dias_del_rango}
+
     configuracion = ConfiguracionInstitucion.load()
-    limite_tardanza = configuracion.tiempo_limite_tardanza
-    from django.db.models import F, ExpressionWrapper, DurationField
-    asistencias_tardias_count = asistencias_qs.filter(
-        curso__horario_inicio__isnull=False, hora_entrada__isnull=False
-    ).annotate(
-        lateness=ExpressionWrapper(F('hora_entrada') - F('curso__horario_inicio'), output_field=DurationField())
-    ).filter(lateness__gt=timedelta(minutes=limite_tardanza)).values('docente').distinct().count()
+    limite_tardanza = configuracion.tiempo_limite_tardanza or 10
 
-    chart_data = {
-        'bar_chart': {
-            'labels': [d['dia'].strftime('%d/%m') for d in daily_data],
-            'presentes': [d['present_count'] for d in daily_data],
-            'ausentes': [total_docentes - d['present_count'] for d in daily_data]
-        },
-        'pie_chart': {
-            'presentes': total_presentes,
-            'ausentes': total_ausentes,
-            'tardanzas': asistencias_tardias_count
-        }
+    for dia_actual in dias_del_rango:
+        dia_semana_str = dias_semana_map[dia_actual.weekday()]
+
+        docentes_requeridos_ids = cursos_programados_qs.filter(
+            dia=dia_semana_str, docente__in=docentes_qs
+        ).values_list('docente_id', flat=True).distinct()
+
+        for docente_id in docentes_requeridos_ids:
+            if (docente_id, dia_actual) in justificaciones_set:
+                continue
+
+            asistencias_del_docente_dia = asistencias_qs.filter(docente_id=docente_id, fecha=dia_actual)
+
+            if not asistencias_del_docente_dia.exists():
+                daily_stats[dia_actual.strftime('%d/%m')]['falta'] += 1
+            else:
+                es_tardio = False
+                for asis in asistencias_del_docente_dia:
+                    if asis.hora_entrada and asis.curso.horario_inicio:
+                        hora_inicio_dt = timezone.make_aware(timezone.datetime.combine(dia_actual, asis.curso.horario_inicio))
+                        if (asis.hora_entrada - hora_inicio_dt) > timedelta(minutes=limite_tardanza):
+                            es_tardio = True
+                            break
+
+                if es_tardio:
+                    daily_stats[dia_actual.strftime('%d/%m')]['tardanza'] += 1
+                else:
+                    daily_stats[dia_actual.strftime('%d/%m')]['presente'] += 1
+
+    # 3. FORMAT FOR CHART.JS
+    bar_chart_data = {
+        'labels': list(daily_stats.keys()),
+        'presentes': [d['presente'] for d in daily_stats.values()],
+        'faltas': [d['falta'] for d in daily_stats.values()],
+        'tardanzas': [d['tardanza'] for d in daily_stats.values()],
     }
 
-    return JsonResponse(chart_data)
+    total_presentes = sum(bar_chart_data['presentes'])
+    total_faltas = sum(bar_chart_data['faltas'])
+    total_tardanzas = sum(bar_chart_data['tardanzas'])
+
+    pie_chart_data = {
+        'presentes': total_presentes,
+        'faltas': total_faltas,
+        'tardanzas': total_tardanzas,
+    }
+
+    return success_response(data={'bar_chart': bar_chart_data, 'pie_chart': pie_chart_data})
 
 
 @staff_member_required
@@ -1046,9 +984,9 @@ def detalle_asistencia_docente_ajax(request, docente_id):
                 for asis in asistencias_cursos
             ]
         }
-        return JsonResponse(data)
+        return success_response(data=data)
     except Docente.DoesNotExist:
-        return JsonResponse({'error': 'Docente no encontrado'}, status=404)
+        return not_found_response('Docente no encontrado')
         
 from django.contrib.auth.decorators import permission_required
 
@@ -1106,10 +1044,10 @@ def api_asignar_horario(request):
             # 1. Validar Disponibilidad y Cruce de DOCENTE
             for franja in franjas_a_ocupar:
                 if (docente.disponibilidad == 'MANANA' and franja.turno != 'MANANA') or (docente.disponibilidad == 'TARDE' and franja.turno != 'TARDE'):
-                    return JsonResponse({'status': 'error', 'message': f'Conflicto de Disponibilidad del docente.'}, status=400)
+                    return error_response('Conflicto de Disponibilidad del docente.')
                 conflicto_docente = Curso.objects.filter(docente=docente, semestre=semestre, dia=dia, horario_inicio=franja.hora_inicio).exclude(pk=curso.id).first()
                 if conflicto_docente:
-                    return JsonResponse({'status': 'error', 'message': f'Conflicto: El docente ya dicta "{conflicto_docente.nombre}" en este horario.'}, status=400)
+                    return error_response(f'Conflicto: El docente ya dicta "{conflicto_docente.nombre}" en este horario.')
 
             # 2. Validar Cruce de GRUPO
             grupo = curso.especialidad.grupo if curso.especialidad else None
@@ -1117,16 +1055,16 @@ def api_asignar_horario(request):
                 q_conflicto = models.Q(especialidad__grupo=grupo, semestre_cursado=curso.semestre_cursado, dia=dia, horario_inicio__in=[f.hora_inicio for f in franjas_a_ocupar])
                 if curso.tipo_curso == 'ESPECIALIDAD':
                     conflicto_grupo = Curso.objects.filter(q_conflicto, tipo_curso='GENERAL').first()
-                    if conflicto_grupo: return JsonResponse({'status': 'error', 'message': f'Conflicto de Grupo: El curso general "{conflicto_grupo.nombre}" ya está programado.'}, status=400)
+                    if conflicto_grupo: return error_response(f'Conflicto de Grupo: El curso general "{conflicto_grupo.nombre}" ya está programado.')
                 else: # GENERAL
                     conflicto_grupo = Curso.objects.filter(q_conflicto, tipo_curso='ESPECIALIDAD').first()
-                    if conflicto_grupo: return JsonResponse({'status': 'error', 'message': f'Conflicto de Grupo: El curso "{conflicto_grupo.nombre}" ({conflicto_grupo.especialidad.nombre}) ya está programado.'}, status=400)
+                    if conflicto_grupo: return error_response(f'Conflicto de Grupo: El curso "{conflicto_grupo.nombre}" ({conflicto_grupo.especialidad.nombre}) ya está programado.')
 
             # Si pasa todo, asignamos
             curso.dia = dia; curso.horario_inicio = franja_inicio.hora_inicio; curso.horario_fin = franjas_a_ocupar[-1].hora_fin; curso.save()
-            return JsonResponse({'status': 'success', 'message': 'Curso asignado con éxito.'})
+            return success_response(message='Curso asignado con éxito.')
         except Exception as e:
-            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+            return error_response(str(e))
 
 @staff_member_required
 @csrf_exempt
@@ -1143,18 +1081,18 @@ def api_desasignar_horario(request):
             curso.horario_fin = None
             curso.save()
 
-            return JsonResponse({'status': 'success', 'message': 'Curso devuelto a la lista de pendientes.'})
+            return success_response(message='Curso devuelto a la lista de pendientes.')
         except Exception as e:
-            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+            return error_response(str(e))
     
-    return JsonResponse({'status': 'error', 'message': 'Método no permitido'}, status=405)
+    return error_response('Método no permitido', status_code=405)
 
 
 @staff_member_required
 def api_get_teacher_conflicts(request):
     curso_id = request.GET.get('curso_id')
     if not curso_id:
-        return JsonResponse({'status': 'error', 'message': 'Falta el ID del curso.'}, status=400)
+        return error_response('Falta el ID del curso.')
 
     try:
         curso_a_asignar = Curso.objects.get(pk=curso_id)
@@ -1209,10 +1147,10 @@ def api_get_teacher_conflicts(request):
                 for dia in dias_semana:
                     conflictos.append({'dia': dia, 'franja_id': franja.id})
 
-        return JsonResponse({'status': 'success', 'conflicts': conflictos})
+        return success_response(data={'conflicts': conflictos})
 
     except Curso.DoesNotExist:
-        return JsonResponse({'status': 'error', 'message': 'Curso no encontrado.'}, status=404)
+        return not_found_response('Curso no encontrado.')
     
 
 def _get_planner_data(especialidad_id, semestre_cursado):
@@ -1371,14 +1309,13 @@ def api_auto_asignar(request):
         # Usamos la función auxiliar para devolver el estado actualizado
         planner_data = _get_planner_data(especialidad_id, semestre_cursado)
 
-        return JsonResponse({
-            'status': 'success',
-            'message': message,
-            'plannerData': planner_data
-        })
+        return success_response(
+            data={'plannerData': planner_data},
+            message=message
+        )
 
     except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+        return error_response(str(e), status_code=500)
 
 @staff_member_required
 @csrf_exempt
@@ -1482,12 +1419,12 @@ def generar_horario_automatico(request):
         if cursos_sin_docente > 0:
             message += f" Además, hay {cursos_sin_docente} cursos sin docente que no se pueden planificar."
 
-        return JsonResponse({'status': 'success', 'message': message})
+        return success_response(message=message)
 
     except Exception as e:
         # Log del error para depuración
         print(f"Error en generar_horario_automatico: {e}")
-        return JsonResponse({'status': 'error', 'message': f'Ocurrió un error inesperado: {e}'}, status=500)
+        return server_error_response(f'Ocurrió un error inesperado: {e}')
 
 @staff_member_required
 def api_get_cursos_no_asignados(request):
@@ -1495,9 +1432,9 @@ def api_get_cursos_no_asignados(request):
         especialidad_id = request.GET.get('especialidad_id')
         semestre_cursado = request.GET.get('semestre_cursado')
         planner_data = _get_planner_data(especialidad_id, semestre_cursado)
-        return JsonResponse(planner_data)
+        return success_response(data=planner_data)
     except ValueError as e:
-        return JsonResponse({'error': str(e)}, status=404)
+        return not_found_response(str(e))
 
 
 @login_required

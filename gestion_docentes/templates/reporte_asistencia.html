@@ -49,6 +49,13 @@
                         {% for esp in especialidades %}<option value="{{ esp.id }}" {% if especialidad_id|slugify == esp.id|slugify %}selected{% endif %}>{{ esp.nombre }}</option>{% endfor %}
                     </select>
                 </div>
+                <div class="form-control">
+                    <label for="docente" class="label pb-1"><span class="label-text">Docente:</span></label>
+                    <select id="docente" name="docente" class="select select-bordered">
+                        <option value="">Todos los docentes</option>
+                        {% for d in docentes %}<option value="{{ d.id }}" {% if docente_id|slugify == d.id|slugify %}selected{% endif %}>{{ d.last_name }}, {{ d.first_name }}</option>{% endfor %}
+                    </select>
+                </div>
                 <div class="flex items-end gap-2">
                     <button type="submit" class="btn btn-primary"><i class="fas fa-search mr-2"></i>Filtrar</button>
                     <a href="{% url 'exportar_excel' %}?{{ request.GET.urlencode }}" class="btn btn-success"><i class="fas fa-file-excel mr-2"></i>Excel</a>

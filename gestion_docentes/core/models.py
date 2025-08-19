@@ -4,6 +4,7 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 import uuid
 from datetime import date
+from PIL import Image
 
 class Grupo(models.Model):
     nombre = models.CharField(max_length=100, help_text="Ej: Grupo A, Grupo B, Grupo C")
@@ -65,7 +66,21 @@ class Docente(AbstractUser):
     id_qr = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     rfid_uid = models.CharField(max_length=100, unique=True, null=True, blank=True, help_text="UID de la tarjeta RFID asignada al docente")
     foto = models.ImageField(upload_to='fotos_docentes/', null=True, blank=True, default='fotos_docentes/placeholder.png')
+
     def __str__(self): return f"{self.first_name} {self.last_name}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.foto:
+            try:
+                img = Image.open(self.foto.path)
+                if img.height > 300 or img.width > 300:
+                    output_size = (300, 300)
+                    img.thumbnail(output_size)
+                    img.save(self.foto.path, format='PNG', quality=85)
+            except Exception as e:
+                # Log the error, but don't prevent the model from saving
+                print(f"Error al redimensionar la imagen para {self.username}: {e}")
 
 class Curso(models.Model):
     TIPO_CURSO_CHOICES = [('ESPECIALIDAD', 'Especialidad'), ('GENERAL', 'General')]

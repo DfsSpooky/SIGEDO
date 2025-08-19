@@ -58,6 +58,7 @@ urlpatterns = [
     path('horarios/ver/', views.vista_publica_horarios, name='vista_publica_horarios'),
 
     path('reporte-asistencia/', views.reporte_asistencia, name='reporte_asistencia'),
+    path('reportes/analiticas/', views.analytics_dashboard, name='analytics_dashboard'),
     # Las URLs de exportación ahora apuntan al nuevo módulo
     path('reporte-asistencia/excel/', exports.exportar_reporte_excel, name='exportar_excel'),
     path('reporte-asistencia/pdf/', exports.exportar_reporte_pdf, name='exportar_pdf'),

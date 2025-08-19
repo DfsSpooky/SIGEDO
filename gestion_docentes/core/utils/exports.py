@@ -9,6 +9,8 @@ from reportlab.lib import colors
 from ..models import Docente, Asistencia, Curso, ConfiguracionInstitucion, Justificacion, AsistenciaDiaria, Documento
 from io import BytesIO
 from django.utils import timezone
+from .reports import _generar_datos_reporte_asistencia
+import pytz
 
 # ... (El resto de los estilos no cambia) ...
 STYLES = getSampleStyleSheet()
@@ -85,88 +87,14 @@ class ReportePDFTemplate(BaseDocTemplate):
 
 from ..models import Semestre
 from datetime import date, timedelta, time
-import pytz
 
 def exportar_reporte_pdf(request):
-    # 1. OBTENER Y PROCESAR FILTROS (Lógica idéntica a la vista)
-    fecha_inicio_str = request.GET.get('fecha_inicio')
-    fecha_fin_str = request.GET.get('fecha_fin')
-    estado_filtro = request.GET.get('estado', 'todos')
-    curso_id = request.GET.get('curso')
-    especialidad_id = request.GET.get('especialidad')
+    fecha_inicio_str = request.GET.get('fecha_inicio', date.today().strftime('%Y-%m-%d'))
+    fecha_fin_str = request.GET.get('fecha_fin', date.today().strftime('%Y-%m-%d'))
 
-    try:
-        fecha_inicio = timezone.datetime.strptime(fecha_inicio_str, '%Y-%m-%d').date() if fecha_inicio_str else date.today()
-        fecha_fin = timezone.datetime.strptime(fecha_fin_str, '%Y-%m-%d').date() if fecha_fin_str else date.today()
-    except ValueError:
-        fecha_inicio = fecha_fin = date.today()
-
-    # 2. OBTENER Y FILTRAR DATOS (Lógica idéntica a la vista)
-    docentes_qs = Docente.objects.all().order_by('last_name', 'first_name')
-    if especialidad_id:
-        docentes_qs = docentes_qs.filter(especialidades__id=especialidad_id)
-
-    asistencias_qs = Asistencia.objects.filter(fecha__range=[fecha_inicio, fecha_fin]).select_related('docente', 'curso')
-    asistencias_diarias_qs = AsistenciaDiaria.objects.filter(fecha__range=[fecha_inicio, fecha_fin]).select_related('docente')
-    asistencias_diarias_map = {(ad.docente_id, ad.fecha): ad for ad in asistencias_diarias_qs}
-
-    semestre_activo = Semestre.objects.filter(estado='ACTIVO').first()
-    cursos_programados_qs = Curso.objects.filter(semestre=semestre_activo, dia__isnull=False)
-    if curso_id:
-        curso_obj = cursos_programados_qs.filter(id=curso_id).first()
-        if curso_obj:
-            docentes_qs = docentes_qs.filter(id=curso_obj.docente_id)
-
-    # 3. PROCESAR REPORTE (Lógica idéntica a la vista)
-    reporte_final = []
+    reporte_final, _ = _generar_datos_reporte_asistencia(request.GET)
     configuracion = ConfiguracionInstitucion.load()
-    limite_tardanza = configuracion.tiempo_limite_tardanza or 10
 
-    justificaciones_aprobadas = Justificacion.objects.filter(
-        estado='APROBADO',
-        fecha_inicio__lte=fecha_fin,
-        fecha_fin__gte=fecha_inicio
-    )
-    justificaciones_set = set()
-    for just in justificaciones_aprobadas:
-        d = just.fecha_inicio
-        while d <= just.fecha_fin:
-            justificaciones_set.add((just.docente_id, d))
-            d += timedelta(days=1)
-
-    dias_del_rango = [fecha_inicio + timedelta(days=i) for i in range((fecha_fin - fecha_inicio).days + 1)]
-    dias_semana_map = {0: 'Lunes', 1: 'Martes', 2: 'Miércoles', 3: 'Jueves', 4: 'Viernes', 5: 'Sábado', 6: 'Domingo'}
-
-    for docente in docentes_qs:
-        for dia_actual in dias_del_rango:
-            dia_semana_str = dias_semana_map[dia_actual.weekday()]
-            cursos_del_dia = cursos_programados_qs.filter(docente=docente, dia=dia_semana_str)
-            asistencias_del_dia = asistencias_qs.filter(docente=docente, fecha=dia_actual)
-            estado_dia, tiene_tardanza = 'No Requerido', False
-            if cursos_del_dia.exists():
-                estado_dia = 'Falta'
-                if asistencias_del_dia.exists():
-                    estado_dia = 'Presente'
-                    for asis in asistencias_del_dia:
-                        if asis.hora_entrada and asis.curso.horario_inicio:
-                            hora_inicio_dt = timezone.make_aware(timezone.datetime.combine(dia_actual, asis.curso.horario_inicio))
-                            if (asis.hora_entrada - hora_inicio_dt) > timedelta(minutes=limite_tardanza):
-                                asis.es_tardanza = True
-                                tiene_tardanza = True
-                            else:
-                                asis.es_tardanza = False
-                    if tiene_tardanza:
-                        estado_dia = 'Tardanza'
-
-            if estado_dia == 'Falta':
-                if (docente.id, dia_actual) in justificaciones_set:
-                    estado_dia = 'Justificado'
-
-            if estado_filtro == 'todos' or estado_dia.lower() == estado_filtro:
-                if estado_dia != 'No Requerido' or estado_filtro == 'todos':
-                    reporte_final.append({'docente': docente, 'fecha': dia_actual, 'estado': estado_dia, 'asistencias': asistencias_del_dia})
-
-    # 4. GENERACIÓN DEL PDF
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="Reporte_Asistencia_{fecha_inicio_str}_a_{fecha_fin_str}.pdf"'
     buffer = BytesIO()
@@ -179,14 +107,10 @@ def exportar_reporte_pdf(request):
     doc = ReportePDFTemplate(buffer, **template_kwargs)
     elements = [Spacer(1, 1.0*inch)]
     
-    # Definir la zona horaria de Perú
     peru_tz = pytz.timezone('America/Lima')
-
-    # Encabezados de la tabla
     table_headers = ["Fecha", "Docente", "Estado", "Detalle de Asistencias"]
     table_data = [[Paragraph(txt, STYLES['TableHeader']) for txt in table_headers]]
     
-    # Estilos para los estados
     status_styles = {
         'Presente': STYLES['StatusPresente'],
         'Tardanza': ParagraphStyle(name='StatusTardanza', parent=STYLES['TableCellCenter'], backColor=colors.orange, textColor=colors.white, borderRadius=4, borderPadding=(6, 2)),
@@ -195,30 +119,15 @@ def exportar_reporte_pdf(request):
         'No Requerido': STYLES['TableCellCenter'],
     }
 
-    # Llenar la tabla con los datos procesados
     for record in reporte_final:
         docente_cell = Paragraph(f"{record['docente'].last_name}, {record['docente'].first_name}", STYLES['TableCell'])
         fecha_cell = Paragraph(record['fecha'].strftime('%d/%m/%Y'), STYLES['TableCellCenter'])
         estado_cell = Paragraph(record['estado'], status_styles.get(record['estado'], STYLES['TableCellCenter']))
         
         detalles_cells = []
-        asistencia_diaria = asistencias_diarias_map.get((record['docente'].id, record['fecha']))
-
-        if asistencia_diaria:
-            hora_general_str = asistencia_diaria.hora_entrada.astimezone(peru_tz).strftime('%H:%M:%S')
-            detalle_general_str = f"<b>Asistencia General: {hora_general_str}</b>"
-            detalles_cells.append(Paragraph(detalle_general_str, STYLES['TableCellSmall']))
-
-            if asistencia_diaria.foto_verificacion and asistencia_diaria.foto_verificacion.storage.exists(asistencia_diaria.foto_verificacion.name):
-                try:
-                    foto_file = asistencia_diaria.foto_verificacion.open('rb')
-                    foto_img = Image(foto_file, width=0.8*inch, height=0.8*inch, hAlign='LEFT')
-                    detalles_cells.append(foto_img)
-                    foto_file.close()
-                except Exception:
-                    detalles_cells.append(Paragraph("<i>(Error al cargar foto)</i>", STYLES['TableCellSmall']))
-            detalles_cells.append(Spacer(1, 6))
-
+        if record['asistencia_diaria']:
+            hora_general_str = record['asistencia_diaria'].hora_entrada.astimezone(peru_tz).strftime('%H:%M:%S')
+            detalles_cells.append(Paragraph(f"<b>Asistencia General: {hora_general_str}</b>", STYLES['TableCellSmall']))
 
         if record['asistencias']:
             for asis in record['asistencias']:
@@ -227,99 +136,31 @@ def exportar_reporte_pdf(request):
                 if asis.es_tardanza:
                     detalle_str += " <font color='orange'><b>(TARDE)</b></font>"
                 detalles_cells.append(Paragraph(detalle_str, STYLES['TableCellSmall']))
-        elif not asistencia_diaria: # Si no hay ni asistencia diaria ni a cursos
+        elif not record['asistencia_diaria']:
             detalles_cells.append(Paragraph("N/A", STYLES['TableCellSmall']))
 
         table_data.append([fecha_cell, docente_cell, estado_cell, detalles_cells])
 
     table = Table(table_data, colWidths=[1.5*inch, 3*inch, 1.5*inch, 3.5*inch], repeatRows=1)
-    
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.Color(0.2, 0.2, 0.2)),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('TOPPADDING', (0, 0), (-1, -1), 8), ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('ALIGN', (2, 1), (2, -1), 'CENTER'),
         ('LINEBELOW', (0, 0), (-1, -1), 0.5, colors.lightgrey),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.Color(0.95, 0.95, 0.95)])
     ]))
     elements.append(table)
     
-    doc = ReportePDFTemplate(buffer, **template_kwargs)
     doc.build(elements)
-
     response.write(buffer.getvalue())
     buffer.close()
     return response
 
 def exportar_reporte_excel(request):
-    # 1. OBTENER Y PROCESAR FILTROS (Lógica idéntica a la vista)
-    fecha_inicio_str = request.GET.get('fecha_inicio')
-    fecha_fin_str = request.GET.get('fecha_fin')
-    estado_filtro = request.GET.get('estado', 'todos')
-    curso_id = request.GET.get('curso')
-    especialidad_id = request.GET.get('especialidad')
+    fecha_inicio_str = request.GET.get('fecha_inicio', date.today().strftime('%Y-%m-%d'))
+    fecha_fin_str = request.GET.get('fecha_fin', date.today().strftime('%Y-%m-%d'))
 
-    try:
-        fecha_inicio = timezone.datetime.strptime(fecha_inicio_str, '%Y-%m-%d').date() if fecha_inicio_str else date.today()
-        fecha_fin = timezone.datetime.strptime(fecha_fin_str, '%Y-%m-%d').date() if fecha_fin_str else date.today()
-    except ValueError:
-        fecha_inicio = fecha_fin = date.today()
+    reporte_final, _ = _generar_datos_reporte_asistencia(request.GET)
 
-    # 2. OBTENER Y FILTRAR DATOS (Lógica idéntica a la vista)
-    docentes_qs = Docente.objects.all().order_by('last_name', 'first_name')
-    if especialidad_id:
-        docentes_qs = docentes_qs.filter(especialidades__id=especialidad_id)
-
-    asistencias_qs = Asistencia.objects.filter(fecha__range=[fecha_inicio, fecha_fin]).select_related('docente', 'curso')
-    semestre_activo = Semestre.objects.filter(estado='ACTIVO').first()
-    cursos_programados_qs = Curso.objects.filter(semestre=semestre_activo, dia__isnull=False)
-    if curso_id:
-        curso_obj = cursos_programados_qs.filter(id=curso_id).first()
-        if curso_obj:
-            docentes_qs = docentes_qs.filter(id=curso_obj.docente_id)
-
-    # 3. PROCESAR REPORTE (Lógica idéntica a la vista, incluyendo justificaciones)
-    reporte_final = []
-    configuracion = ConfiguracionInstitucion.load()
-    limite_tardanza = configuracion.tiempo_limite_tardanza or 10
-
-    justificaciones_aprobadas = Justificacion.objects.filter(estado='APROBADO', fecha_inicio__lte=fecha_fin, fecha_fin__gte=fecha_inicio)
-    justificaciones_set = set()
-    for just in justificaciones_aprobadas:
-        d = just.fecha_inicio
-        while d <= just.fecha_fin:
-            justificaciones_set.add((just.docente_id, d))
-            d += timedelta(days=1)
-
-    dias_del_rango = [fecha_inicio + timedelta(days=i) for i in range((fecha_fin - fecha_inicio).days + 1)]
-    dias_semana_map = {0: 'Lunes', 1: 'Martes', 2: 'Miércoles', 3: 'Jueves', 4: 'Viernes', 5: 'Sábado', 6: 'Domingo'}
-
-    for docente in docentes_qs:
-        for dia_actual in dias_del_rango:
-            dia_semana_str = dias_semana_map[dia_actual.weekday()]
-            cursos_del_dia = cursos_programados_qs.filter(docente=docente, dia=dia_semana_str)
-            asistencias_del_dia = asistencias_qs.filter(docente=docente, fecha=dia_actual)
-            estado_dia, tiene_tardanza = 'No Requerido', False
-            if cursos_del_dia.exists():
-                estado_dia = 'Falta'
-                if asistencias_del_dia.exists():
-                    estado_dia = 'Presente'
-                    for asis in asistencias_del_dia:
-                        if asis.hora_entrada and asis.curso.horario_inicio:
-                            hora_inicio_dt = timezone.make_aware(timezone.datetime.combine(dia_actual, asis.curso.horario_inicio))
-                            if (asis.hora_entrada - hora_inicio_dt) > timedelta(minutes=limite_tardanza):
-                                tiene_tardanza = True
-                    if tiene_tardanza:
-                        estado_dia = 'Tardanza'
-                if estado_dia == 'Falta' and (docente.id, dia_actual) in justificaciones_set:
-                    estado_dia = 'Justificado'
-
-            if estado_filtro == 'todos' or estado_dia.lower() == estado_filtro:
-                if estado_dia != 'No Requerido' or estado_filtro == 'todos':
-                    reporte_final.append({'docente': docente, 'fecha': dia_actual, 'estado': estado_dia, 'asistencias': asistencias_del_dia})
-
-    # 4. GENERACIÓN DEL EXCEL
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = f'attachment; filename="Reporte_Asistencia_{fecha_inicio_str}_a_{fecha_fin_str}.xlsx"'
     workbook = Workbook()
@@ -330,6 +171,7 @@ def exportar_reporte_excel(request):
     worksheet.append(headers)
 
     peru_tz = pytz.timezone('America/Lima')
+    limite_tardanza = (ConfiguracionInstitucion.load().tiempo_limite_tardanza or 10)
 
     for record in reporte_final:
         docente_nombre = f"{record['docente'].last_name}, {record['docente'].first_name}"
@@ -342,7 +184,6 @@ def exportar_reporte_excel(request):
             for asis in record['asistencias']:
                 hora_entrada_str = asis.hora_entrada.astimezone(peru_tz).strftime('%H:%M') if asis.hora_entrada else "--:--"
                 detalle = f"{asis.curso.nombre} (Entrada: {hora_entrada_str})"
-                # Re-calculamos la tardanza aquí para el detalle
                 if asis.hora_entrada and asis.curso.horario_inicio:
                     hora_inicio_dt = timezone.make_aware(timezone.datetime.combine(record['fecha'], asis.curso.horario_inicio))
                     if (asis.hora_entrada - hora_inicio_dt) > timedelta(minutes=limite_tardanza):
@@ -350,7 +191,6 @@ def exportar_reporte_excel(request):
                 detalles_list.append(detalle)
 
         detalles_str = " | ".join(detalles_list) if detalles_list else "N/A"
-
         worksheet.append([fecha_str, docente_nombre, docente_dni, estado_str, detalles_str])
 
     workbook.save(response)
