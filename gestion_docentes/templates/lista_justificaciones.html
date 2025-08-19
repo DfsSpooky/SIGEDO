@@ -1,0 +1,148 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+    {% if is_admin_view %}
+        Gestionar Justificaciones
+    {% else %}
+        Mis Solicitudes de Justificación
+    {% endif %}
+{% endblock %}
+
+{% block breadcrumb %}
+    Justificaciones
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-4 lg:p-8 space-y-8">
+
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row justify-between md:items-center gap-4">
+        <div>
+            <h1 class="text-3xl md:text-4xl font-bold text-base-content">
+                {% if is_admin_view %}
+                    <i class="fas fa-inbox mr-3 text-primary"></i>Bandeja de Justificaciones
+                {% else %}
+                    <i class="fas fa-file-alt mr-3 text-primary"></i>Mis Solicitudes de Justificación
+                {% endif %}
+            </h1>
+            <p class="text-base-content/70 mt-1">
+                {% if is_admin_view %}
+                    Revisa y gestiona las solicitudes de ausencia de los docentes.
+                {% else %}
+                    Aquí puedes solicitar justificaciones por ausencia y ver el historial de tus solicitudes.
+                {% endif %}
+            </p>
+        </div>
+        <a href="{% url 'solicitar_justificacion' %}" class="btn btn-primary btn-md">
+            <i class="fas fa-plus mr-2"></i>Nueva Solicitud
+        </a>
+    </div>
+
+    <!-- Admin View: Tabs -->
+    {% if is_admin_view %}
+    <div role="tablist" class="tabs tabs-bordered">
+        <a role="tab" class="tab tab-active" data-tab="pendientes">
+            <i class="fas fa-hourglass-half mr-2"></i>
+            Pendientes
+            <div class="badge badge-warning ml-2">{{ justificaciones.pending_count }}</div>
+        </a>
+        <a role="tab" class="tab" data-tab="aprobadas">
+            <i class="fas fa-check-circle mr-2"></i>
+            Aprobadas
+        </a>
+        <a role="tab" class="tab" data-tab="rechazadas">
+            <i class="fas fa-times-circle mr-2"></i>
+            Rechazadas
+        </a>
+    </div>
+    {% endif %}
+
+    <!-- Content Area -->
+    <div class="space-y-6">
+        {% if is_admin_view %}
+            <!-- Admin: Tab Content -->
+            <div id="tab-content-pendientes" class="tab-content active">
+                {% with justificaciones_list=justificaciones.pending %}
+                    {% include 'partials/justificacion_card.html' %}
+                {% endwith %}
+            </div>
+            <div id="tab-content-aprobadas" class="tab-content">
+                {% with justificaciones_list=justificaciones.approved %}
+                    {% include 'partials/justificacion_card.html' %}
+                {% endwith %}
+            </div>
+            <div id="tab-content-rechazadas" class="tab-content">
+                {% with justificaciones_list=justificaciones.rejected %}
+                    {% include 'partials/justificacion_card.html' %}
+                {% endwith %}
+            </div>
+        {% else %}
+            <!-- Teacher View: Simple List -->
+            <div class="bg-base-100 shadow-xl rounded-lg">
+                <div class="overflow-x-auto">
+                    <table class="table w-full">
+                        <thead class="bg-base-200">
+                            <tr>
+                                <th>Tipo</th>
+                                <th>Fechas</th>
+                                <th>Estado</th>
+                                <th>Documento</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for justificacion in justificaciones %}
+                            <tr>
+                                <td class="font-medium">{{ justificacion.tipo.nombre }}</td>
+                                <td>{{ justificacion.fecha_inicio|date:"d/m/Y" }} - {{ justificacion.fecha_fin|date:"d/m/Y" }}</td>
+                                <td>
+                                    <span class="badge
+                                        {% if justificacion.estado == 'APROBADO' %}badge-success
+                                        {% elif justificacion.estado == 'RECHAZADO' %}badge-error
+                                        {% else %}badge-warning{% endif %}">
+                                        {{ justificacion.get_estado_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if justificacion.documento_adjunto %}
+                                        <a href="{{ justificacion.documento_adjunto.url }}" target="_blank" class="link link-primary">Ver Adjunto</a>
+                                    {% else %}
+                                        <span class="text-base-content/50">N/A</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center py-8 text-base-content/60">
+                                    No has realizado ninguna solicitud de justificación todavía.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tabs = document.querySelectorAll('[role="tablist"] [role="tab"]');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            // Deactivate all tabs and content
+            tabs.forEach(t => t.classList.remove('tab-active'));
+            tabContents.forEach(c => c.classList.remove('active'));
+
+            // Activate the clicked tab and its content
+            tab.classList.add('tab-active');
+            const contentId = `tab-content-${tab.dataset.tab}`;
+            document.getElementById(contentId).classList.add('active');
+        });
+    });
+});
+</script>
+{% endblock %}
