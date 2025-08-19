@@ -575,16 +575,23 @@ def get_teacher_info(request):
                     'canMarkExit': can_mark_exit, # Nueva bandera para el frontend
                 })
 
+            # --- CORRECCIÓN DE ESTRUCTURA DE RESPUESTA ---
+            # Se anida la información del docente bajo la clave "teacher" para que coincida
+            # con lo que espera el JavaScript del kiosco (displayInfoAndActions).
+            # También se añade el qrId a la respuesta para usarlo en las acciones de marcado.
             response_data = {
                 'status': 'success',
-                'name': f'{docente.first_name} {docente.last_name}',
-                'dni': docente.dni,
-                'photoUrl': photo_url,
+                'qrId': qr_id,  # El frontend necesita esto para las acciones posteriores
+                'teacher': {
+                    'name': f'{docente.first_name} {docente.last_name}',
+                    'dni': docente.dni,
+                    'photoUrl': photo_url,
+                },
                 'isDailyAttendanceMarked': is_daily_marked,
                 'courses': courses_data
             }
             return JsonResponse(response_data)
-            
+
         except Docente.DoesNotExist:
             return JsonResponse({'status': 'error', 'message': 'QR no válido o docente no encontrado.'}, status=404)
         except Exception as e:
