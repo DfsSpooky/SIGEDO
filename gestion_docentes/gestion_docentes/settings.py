@@ -35,6 +35,9 @@ ID_ENCRYPTION_KEY = os.environ.get('ID_ENCRYPTION_KEY', '').encode()
 DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 't')
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost').split(',')
+# ... cerca de ALLOWED_HOSTS ...
+
+CSRF_TRUSTED_ORIGINS = ['https://aquienpasco.lat', 'https://www.aquienpasco.lat']
 
 
 # Application definition
