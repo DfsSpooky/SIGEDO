@@ -218,8 +218,12 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const response = await fetch(`/api/reporte/chart-data/?${params}`);
             if (!response.ok) throw new Error('Network response was not ok');
-            const data = await response.json();
-            renderCharts(data);
+            const jsonResponse = await response.json();
+            if (jsonResponse.data) {
+                renderCharts(jsonResponse.data);
+            } else {
+                console.error('Chart data not found in response:', jsonResponse);
+            }
         } catch (error) {
             console.error('Failed to fetch chart data:', error);
             // Optionally, display an error message on the chart canvases
@@ -244,7 +248,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     },
                     {
                         label: 'Ausentes',
-                        data: data.bar_chart.ausentes,
+                        data: data.bar_chart.faltas, // Corrected from 'ausentes' to 'faltas' to match API
                         backgroundColor: 'rgba(239, 68, 68, 0.6)',
                         borderColor: 'rgba(239, 68, 68, 1)',
                         borderWidth: 1
@@ -262,7 +266,7 @@ document.addEventListener('DOMContentLoaded', function() {
             data: {
                 labels: ['Presentes', 'Ausentes', 'Con Tardanza'],
                 datasets: [{
-                    data: [data.pie_chart.presentes, data.pie_chart.ausentes, data.pie_chart.tardanzas],
+                    data: [data.pie_chart.presentes, data.pie_chart.faltas, data.pie_chart.tardanzas], // Corrected from 'ausentes' to 'faltas'
                     backgroundColor: ['rgba(34, 197, 94, 0.8)', 'rgba(239, 68, 68, 0.8)', 'rgba(245, 158, 11, 0.8)'],
                     hoverOffset: 4
                 }]
@@ -276,10 +280,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Re-fetch chart data when the main form is submitted (filters are applied)
     const filterForm = document.getElementById('filter-form');
     filterForm.addEventListener('submit', function(e) {
-        // We let the form submit normally to reload the page with new table data,
-        // and the chart data will be fetched on the new page's DOMContentLoaded.
-        // For a SPA-like feel, we would preventDefault and fetch both table and chart data with JS.
-        // But for this implementation, letting the page reload is simpler and fine.
+        // Let the form submit normally
     });
 
     // --- MODAL LOGIC ---
@@ -287,7 +288,10 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.btn-modal-trigger').forEach(button => {
         button.addEventListener('click', async function() {
             const docenteId = this.dataset.docenteId;
-            const url = `/reporte-asistencia/detalle/${docenteId}/`;
+            const fechaInicio = document.getElementById('fecha_inicio').value;
+            const fechaFin = document.getElementById('fecha_fin').value;
+            const url = `/reporte-asistencia/detalle/${docenteId}/?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`;
+
 
             // Show a loading state in the modal
             modal.innerHTML = '<div class="modal-box"><span class="loading loading-spinner loading-lg"></span></div>';
@@ -297,7 +301,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 const response = await fetch(url);
                 if (!response.ok) throw new Error('Error al cargar los datos.');
 
-                const data = await response.json();
+                const jsonResponse = await response.json();
+                const data = jsonResponse.data;
+
+                if (!data) {
+                    throw new Error('No se encontraron datos en la respuesta.');
+                }
 
                 // Build the modal content with the fetched data
                 let asistenciasCursosHtml = data.asistencias_cursos.map(asis => `
@@ -322,7 +331,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             </div>
                         </div>
                         <div class="divider"></div>
-                        <h4 class="font-bold text-lg mb-2">Asistencias a Cursos</h4>
+                        <h4 class="font-bold text-lg mb-2">Asistencias a Cursos (del ${fechaInicio} al ${fechaFin})</h4>
                         <ul class="space-y-2 max-h-64 overflow-y-auto">${asistenciasCursosHtml}</ul>
                     </div>
                 `;
