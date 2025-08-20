@@ -1,40 +1,42 @@
 {% extends 'base.html' %}
-{% block title %}Dashboard de Analíticas{% endblock %}
-{% block breadcrumb %}Dashboard de Analíticas{% endblock %}
+{% load i18n %}
+
+{% block title %}{% trans "Dashboard de Analíticas" %}{% endblock %}
+{% block breadcrumb %}{% trans "Dashboard de Analíticas" %}{% endblock %}
 
 {% block content %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 
 <div class="mb-8">
-    <h1 class="text-3xl md:text-4xl font-bold text-base-content">Dashboard de Analíticas</h1>
-    <p class="text-base-content/70 mt-1">Visualización de datos clave sobre la asistencia y rendimiento.</p>
+    <h1 class="text-3xl md:text-4xl font-bold text-base-content">{% trans "Dashboard de Analíticas" %}</h1>
+    <p class="text-base-content/70 mt-1">{% trans "Visualización de datos clave sobre la asistencia y rendimiento." %}</p>
 </div>
 
 <!-- Filters -->
 <div class="card bg-base-100 shadow-md mb-8">
     <div class="card-body">
-        <h2 class="card-title">Filtros</h2>
+        <h2 class="card-title">{% trans "Filtros" %}</h2>
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-                <label class="label"><span class="label-text">Desde</span></label>
+                <label class="label"><span class="label-text">{% trans "Desde" %}</span></label>
                 <input type="date" id="filter-fecha-inicio" class="input input-bordered w-full">
             </div>
             <div>
-                <label class="label"><span class="label-text">Hasta</span></label>
+                <label class="label"><span class="label-text">{% trans "Hasta" %}</span></label>
                 <input type="date" id="filter-fecha-fin" class="input input-bordered w-full">
             </div>
             <div>
-                <label class="label"><span class="label-text">Especialidad</span></label>
+                <label class="label"><span class="label-text">{% trans "Especialidad" %}</span></label>
                 <select id="filter-especialidad" class="select select-bordered w-full">
-                    <option value="">Todas</option>
+                    <option value="">{% trans "Todas" %}</option>
                     {% for esp in especialidades %}
                         <option value="{{ esp.id }}">{{ esp.nombre }}</option>
                     {% endfor %}
                 </select>
             </div>
             <div class="self-end">
-                <button id="apply-filters-btn" class="btn btn-primary w-full">Aplicar</button>
+                <button id="apply-filters-btn" class="btn btn-primary w-full">{% trans "Aplicar" %}</button>
             </div>
         </div>
     </div>
@@ -45,14 +47,14 @@
     <!-- Bar Chart -->
     <div class="card bg-base-100 shadow-md">
         <div class="card-body">
-            <h2 class="card-title">Asistencia a lo Largo del Tiempo</h2>
+            <h2 class="card-title">{% trans "Asistencia a lo Largo del Tiempo" %}</h2>
             <canvas id="attendance-over-time-chart"></canvas>
         </div>
     </div>
     <!-- Pie Chart -->
     <div class="card bg-base-100 shadow-md">
         <div class="card-body">
-            <h2 class="card-title">Resumen General de Asistencias</h2>
+            <h2 class="card-title">{% trans "Resumen General de Asistencias" %}</h2>
             <canvas id="overall-status-chart"></canvas>
         </div>
     </div>
@@ -86,8 +88,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             const chartData = await response.json();
 
-            renderAttendanceChart(chartData.bar_chart);
-            renderOverallChart(chartData.pie_chart);
+            renderAttendanceChart(chartData.data.bar_chart);
+            renderOverallChart(chartData.data.pie_chart);
 
         } catch (error) {
             console.error("Error fetching chart data:", error);
@@ -106,17 +108,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 labels: data.labels,
                 datasets: [
                     {
-                        label: 'Presentes',
+                        label: '{% trans "Presentes" %}',
                         data: data.presentes,
                         backgroundColor: 'rgba(34, 197, 94, 0.7)',
                     },
                     {
-                        label: 'Faltas',
+                        label: '{% trans "Faltas" %}',
                         data: data.faltas,
                         backgroundColor: 'rgba(239, 68, 68, 0.7)',
                     },
                     {
-                        label: 'Tardanzas',
+                        label: '{% trans "Tardanzas" %}',
                         data: data.tardanzas,
                         backgroundColor: 'rgba(245, 158, 11, 0.7)',
                     }
@@ -141,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
         overallChart = new Chart(ctx, {
             type: 'doughnut',
             data: {
-                labels: ['Presentes', 'Faltas', 'Tardanzas'],
+                labels: ['{% trans "Presentes" %}', '{% trans "Faltas" %}', '{% trans "Tardanzas" %'],
                 datasets: [{
                     data: [data.presentes, data.faltas, data.tardanzas],
                     backgroundColor: [

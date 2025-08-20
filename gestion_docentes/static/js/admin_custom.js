@@ -1,8 +1,11 @@
 document.addEventListener('DOMContentLoaded', function() {
     // This script replaces the default Django admin date/time widgets with flatpickr.
 
-    // Initialize for date fields
     if (typeof flatpickr !== 'undefined') {
+        // Set the locale globally for all flatpickr instances
+        flatpickr.localize(flatpickr.l10ns.es);
+
+        // Initialize for date fields
         flatpickr('.vDateField', {
             dateFormat: "Y-m-d",
             altInput: true,
@@ -26,7 +29,6 @@ document.addEventListener('DOMContentLoaded', function() {
             altInput: true,
             altFormat: "F j, Y H:i",
             time_24hr: true,
-            allowInput: true,
         });
     }
 });

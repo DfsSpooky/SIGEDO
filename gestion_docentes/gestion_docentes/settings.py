@@ -154,6 +154,7 @@ UNFOLD = {
     ],
     "SCRIPTS": [
         "https://cdn.jsdelivr.net/npm/flatpickr",
+        "https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js",
         lambda request: static("js/admin_custom.js"),
     ],
     "SIDEBAR": {
