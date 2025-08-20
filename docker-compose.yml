@@ -3,7 +3,8 @@ version: '3.8'
 services:
   web:
     build: .
-    command: gunicorn gestion_docentes.gestion_docentes.wsgi:application --bind 0.0.0.0:8000
+    
+    command: gunicorn --chdir gestion_docentes gestion_docentes.wsgi:application --bind 0.0.0.0:8000
     volumes:
       - .:/app
       - static_volume:/app/gestion_docentes/staticfiles
