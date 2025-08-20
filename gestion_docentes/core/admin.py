@@ -164,8 +164,6 @@ class ConfiguracionInstitucionAdmin(ModelAdmin):
         }),
     )
 
-    def has_add_permission(self, request):
-        return not ConfiguracionInstitucion.objects.exists()
 
 @admin.register(Notificacion)
 class NotificacionAdmin(ModelAdmin):
