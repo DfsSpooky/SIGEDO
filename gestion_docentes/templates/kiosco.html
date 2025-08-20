@@ -101,7 +101,7 @@
             }, 500); // 500ms para que coincida con la transición de opacidad
         }
         
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } }).then(stream => { video.srcObject = stream; video.setAttribute("playsinline", true); video.play(); requestAnimationFrame(tick); }).catch(err => { console.error("Error al acceder a la cámara: ", err); scanFeedback.textContent = "Error: No se pudo acceder a la cámara."; });
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(stream => { video.srcObject = stream; video.setAttribute("playsinline", true); video.play(); requestAnimationFrame(tick); }).catch(err => { console.error("Error al acceder a la cámara: ", err); scanFeedback.textContent = "Error: No se pudo acceder a la cámara."; });
 
         function tick() {
             if (qrScanned) return;
