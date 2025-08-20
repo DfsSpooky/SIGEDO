@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 from django.urls import reverse_lazy
+from django.templatetags.static import static
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -146,6 +147,15 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 UNFOLD = {
     "SITE_HEADER": "Gestión de Docentes",
     "DASHBOARD_CALLBACK": "core.dashboard.dashboard_callback",
+    "STYLES": [
+        "https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css",
+        "https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css",
+        lambda request: static("css/admin_custom.css"),
+    ],
+    "SCRIPTS": [
+        "https://cdn.jsdelivr.net/npm/flatpickr",
+        lambda request: static("js/admin_custom.js"),
+    ],
     "SIDEBAR": {
         "navigation": [
             {
