@@ -436,8 +436,12 @@ document.addEventListener('DOMContentLoaded', function () {
         DOMElements.unassignedContainer.innerHTML = '<div class="skeleton-loader h-16 w-full"></div>';
 
         try {
-            const data = await callApi(`/api/get-cursos-no-asignados/?especialidad_id=${especialidadId}&semestre_cursado=${semestreNum}`);
-            renderPlanner(data);
+            const response = await callApi(`/api/get-cursos-no-asignados/?especialidad_id=${especialidadId}&semestre_cursado=${semestreNum}`);
+            if (response.status === 'success') {
+                renderPlanner(response.data);
+            } else {
+                throw new Error(response.message || 'El servidor devolvió una respuesta inesperada.');
+            }
         } catch (error) {
             Swal.fire({ icon: 'error', title: 'Error al cargar datos', text: error.message });
         }
