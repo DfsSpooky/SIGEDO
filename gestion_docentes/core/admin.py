@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
+from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils import timezone
@@ -150,6 +151,8 @@ class VersionDocumentoAdmin(ModelAdmin):
 class ConfiguracionInstitucionAdmin(ModelAdmin):
     """
     Panel de administración personalizado para la Configuración de la Institución.
+    Este panel está diseñado como un 'singleton' para asegurar que solo exista
+    una única configuración para toda la aplicación.
     """
     fieldsets = (
         ('Información Principal', {
@@ -163,6 +166,17 @@ class ConfiguracionInstitucionAdmin(ModelAdmin):
             'classes': ('collapse',),
         }),
     )
+
+    def add_view(self, request, form_url='', extra_context=None):
+        # Si ya existe una configuración, redirige a su página de edición.
+        if ConfiguracionInstitucion.objects.exists():
+            obj = ConfiguracionInstitucion.objects.first()
+            return HttpResponseRedirect(reverse('admin:core_configuracioninstitucion_change', args=[obj.pk]))
+        return super().add_view(request, form_url, extra_context)
+
+    def has_delete_permission(self, request, obj=None):
+        # Deshabilita la acción de borrado para la configuración.
+        return False
 
 
 @admin.register(Notificacion)
