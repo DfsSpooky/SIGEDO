@@ -23,7 +23,7 @@ def _generar_datos_reporte_asistencia(filters):
         fecha_inicio = fecha_fin = date.today()
 
     # 2. PRE-CARGAR DATOS DE FORMA EFICIENTE
-    docentes_qs = Docente.objects.select_related('user_ptr').order_by('last_name', 'first_name')
+    docentes_qs = Docente.objects.order_by('last_name', 'first_name')
     if especialidad_id:
         docentes_qs = docentes_qs.filter(especialidades__id=especialidad_id)
     if docente_id:
