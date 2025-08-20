@@ -12,6 +12,7 @@ import base64
 from django.core.files.base import ContentFile
 import random
 import io
+from collections import defaultdict
 from django.db import models
 from django.db.models import Q, Count
 from django.templatetags.static import static
@@ -855,90 +856,40 @@ def analytics_dashboard(request):
 
 @staff_member_required
 def api_get_report_chart_data(request):
-    # 1. GET FILTERS
-    fecha_inicio_str = request.GET.get('fecha_inicio')
-    fecha_fin_str = request.GET.get('fecha_fin')
-    especialidad_id = request.GET.get('especialidad')
+    """
+    API endpoint to get chart data. Reuses the main report generation logic
+    for consistency and performance.
+    """
+    # 1. REUTILIZAR LA LÓGICA DEL REPORTE PRINCIPAL
+    # Pasamos request.GET directamente para que la función de reporte use los mismos filtros.
+    report_data, _ = _generar_datos_reporte_asistencia(request.GET)
 
-    try:
-        fecha_inicio = timezone.datetime.strptime(fecha_inicio_str, '%Y-%m-%d').date() if fecha_inicio_str else date.today() - timedelta(days=7)
-        fecha_fin = timezone.datetime.strptime(fecha_fin_str, '%Y-%m-%d').date() if fecha_fin_str else date.today()
-    except (ValueError, TypeError):
-        fecha_fin = date.today()
-        fecha_inicio = fecha_fin - timedelta(days=7)
+    # 2. PROCESAR LOS DATOS DEL REPORTE PARA GENERAR ESTADÍSTICAS
+    # Agrupar los estados por día
+    daily_stats = defaultdict(lambda: {'Presente': 0, 'Falta': 0, 'Tardanza': 0, 'Justificado': 0})
 
-    # 2. PROCESS DATA (similar to reporte_asistencia view)
-    docentes_qs = Docente.objects.all()
-    if especialidad_id:
-        docentes_qs = docentes_qs.filter(especialidades__id=especialidad_id)
+    for record in report_data:
+        # Solo contamos los estados relevantes para el gráfico
+        if record['estado'] in ['Presente', 'Falta', 'Tardanza', 'Justificado']:
+            fecha_str = record['fecha'].strftime('%d/%m')
+            daily_stats[fecha_str][record['estado']] += 1
 
-    semestre_activo = Semestre.objects.filter(estado='ACTIVO').first()
-    if not semestre_activo:
-        return error_response("No hay semestre activo.", status_code=400)
+    # Ordenar las fechas para el gráfico de barras
+    sorted_labels = sorted(daily_stats.keys(), key=lambda d: timezone.datetime.strptime(d, '%d/%m').date())
 
-    cursos_programados_qs = Curso.objects.filter(semestre=semestre_activo, dia__isnull=False)
-    asistencias_qs = Asistencia.objects.filter(fecha__range=[fecha_inicio, fecha_fin]).select_related('curso')
-
-    justificaciones_aprobadas = Justificacion.objects.filter(
-        estado='APROBADO',
-        fecha_inicio__lte=fecha_fin,
-        fecha_fin__gte=fecha_inicio
-    )
-    justificaciones_set = set()
-    for just in justificaciones_aprobadas:
-        d = just.fecha_inicio
-        while d <= just.fecha_fin:
-            justificaciones_set.add((just.docente_id, d))
-            d += timedelta(days=1)
-
-    dias_del_rango = [fecha_inicio + timedelta(days=i) for i in range((fecha_fin - fecha_inicio).days + 1)]
-    dias_semana_map = {0: 'Lunes', 1: 'Martes', 2: 'Miércoles', 3: 'Jueves', 4: 'Viernes', 5: 'Sábado', 6: 'Domingo'}
-
-    daily_stats = {d.strftime('%d/%m'): {'presente': 0, 'falta': 0, 'tardanza': 0} for d in dias_del_rango}
-
-    configuracion = ConfiguracionInstitucion.load()
-    limite_tardanza = configuracion.tiempo_limite_tardanza or 10
-
-    for dia_actual in dias_del_rango:
-        dia_semana_str = dias_semana_map[dia_actual.weekday()]
-
-        docentes_requeridos_ids = cursos_programados_qs.filter(
-            dia=dia_semana_str, docente__in=docentes_qs
-        ).values_list('docente_id', flat=True).distinct()
-
-        for docente_id in docentes_requeridos_ids:
-            if (docente_id, dia_actual) in justificaciones_set:
-                continue
-
-            asistencias_del_docente_dia = asistencias_qs.filter(docente_id=docente_id, fecha=dia_actual)
-
-            if not asistencias_del_docente_dia.exists():
-                daily_stats[dia_actual.strftime('%d/%m')]['falta'] += 1
-            else:
-                es_tardio = False
-                for asis in asistencias_del_docente_dia:
-                    if asis.hora_entrada and asis.curso.horario_inicio:
-                        hora_inicio_dt = timezone.make_aware(timezone.datetime.combine(dia_actual, asis.curso.horario_inicio))
-                        if (asis.hora_entrada - hora_inicio_dt) > timedelta(minutes=limite_tardanza):
-                            es_tardio = True
-                            break
-
-                if es_tardio:
-                    daily_stats[dia_actual.strftime('%d/%m')]['tardanza'] += 1
-                else:
-                    daily_stats[dia_actual.strftime('%d/%m')]['presente'] += 1
-
-    # 3. FORMAT FOR CHART.JS
+    # 3. FORMATEAR PARA CHART.JS
     bar_chart_data = {
-        'labels': list(daily_stats.keys()),
-        'presentes': [d['presente'] for d in daily_stats.values()],
-        'faltas': [d['falta'] for d in daily_stats.values()],
-        'tardanzas': [d['tardanza'] for d in daily_stats.values()],
+        'labels': sorted_labels,
+        'presentes': [daily_stats[label]['Presente'] for label in sorted_labels],
+        'faltas': [daily_stats[label]['Falta'] for label in sorted_labels],
+        'tardanzas': [daily_stats[label]['Tardanza'] for label in sorted_labels],
     }
 
+    # Calcular totales para el gráfico de pie
     total_presentes = sum(bar_chart_data['presentes'])
     total_faltas = sum(bar_chart_data['faltas'])
     total_tardanzas = sum(bar_chart_data['tardanzas'])
+    # total_justificados = sum(stats['Justificado'] for stats in daily_stats.values()) # Opcional si se quiere añadir al pie
 
     pie_chart_data = {
         'presentes': total_presentes,
@@ -951,33 +902,44 @@ def api_get_report_chart_data(request):
 
 @staff_member_required
 def detalle_asistencia_docente_ajax(request, docente_id):
-    """Devuelve los detalles de asistencia de un docente en formato JSON."""
+    """
+    Devuelve los detalles de asistencia de un docente en formato JSON.
+    Esta vista ha sido mejorada para ser más robusta.
+    """
     try:
         docente = Docente.objects.get(pk=docente_id)
-        asistencias_generales = Asistencia.objects.filter(docente=docente, curso__isnull=True).order_by('-fecha')
-        asistencias_cursos = Asistencia.objects.filter(docente=docente, curso__isnull=False).order_by('-fecha')
         
+        # Obtenemos todas las asistencias del docente en el rango de fechas del reporte
+        # (o un rango por defecto si no se especifica)
+        fecha_inicio_str = request.GET.get('fecha_inicio')
+        fecha_fin_str = request.GET.get('fecha_fin')
+
+        try:
+            fecha_inicio = timezone.datetime.strptime(fecha_inicio_str, '%Y-%m-%d').date() if fecha_inicio_str else date.today() - timedelta(days=30)
+            fecha_fin = timezone.datetime.strptime(fecha_fin_str, '%Y-%m-%d').date() if fecha_fin_str else date.today()
+        except (ValueError, TypeError):
+            fecha_fin = date.today()
+            fecha_inicio = fecha_fin - timedelta(days=30)
+
+        asistencias_cursos = Asistencia.objects.filter(
+            docente=docente,
+            curso__isnull=False,
+            fecha__range=[fecha_inicio, fecha_fin]
+        ).select_related('curso').order_by('-fecha', '-hora_entrada')
+
+        # Construcción de datos segura
         data = {
             'docente': {
                 'nombre_completo': f'{docente.first_name} {docente.last_name}',
                 'dni': docente.dni,
-                'foto_url': docente.foto.url if docente.foto else None,
+                'foto_url': docente.foto.url if docente.foto and hasattr(docente.foto, 'url') else static('placeholder.png'),
             },
-            'asistencias_generales': [
-                {
-                    'fecha': asis.fecha,
-                    'hora_entrada': asis.hora_entrada.strftime('%H:%M') if asis.hora_entrada else None,
-                    'hora_salida': asis.hora_salida.strftime('%H:%M') if asis.hora_salida else None,
-                    'foto_entrada_url': asis.foto_entrada.url if asis.foto_entrada else None,
-                }
-                for asis in asistencias_generales
-            ],
             'asistencias_cursos': [
                 {
-                    'curso': asis.curso.nombre,
-                    'fecha': asis.fecha,
-                    'hora_entrada': asis.hora_entrada.strftime('%H:%M') if asis.hora_entrada else None,
-                    'hora_salida': asis.hora_salida.strftime('%H:%M') if asis.hora_salida else None,
+                    'curso': asis.curso.nombre if asis.curso else 'N/A',
+                    'fecha': asis.fecha.strftime('%d/%m/%Y'),
+                    'hora_entrada': asis.hora_entrada.strftime('%H:%M') if asis.hora_entrada else '-',
+                    'hora_salida': asis.hora_salida.strftime('%H:%M') if asis.hora_salida else '-',
                     'foto_entrada_url': asis.foto_entrada.url if asis.foto_entrada else None,
                     'foto_salida_url': asis.foto_salida.url if asis.foto_salida else None,
                 }
@@ -987,6 +949,9 @@ def detalle_asistencia_docente_ajax(request, docente_id):
         return success_response(data=data)
     except Docente.DoesNotExist:
         return not_found_response('Docente no encontrado')
+    except Exception as e:
+        # Captura cualquier otro error inesperado para evitar que el servidor crashee.
+        return server_error_response(f'Error inesperado: {str(e)}')
         
 from django.contrib.auth.decorators import permission_required
 
