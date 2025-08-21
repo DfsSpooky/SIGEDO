@@ -564,3 +564,82 @@ class RfidAsistenciaTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['status'], 'weekend_off')
         self.assertEqual(AsistenciaDiaria.objects.count(), 0)
+
+
+from django.core.management import call_command
+from io import StringIO
+
+from datetime import datetime
+
+class AutoCheckoutTest(TestCase):
+
+    def setUp(self):
+        self.docente = PersonalDocente.objects.create_user(username='checkout_user', dni='87654321')
+        self.carrera = Carrera.objects.create(nombre="Ingeniería de Checkout")
+        self.semestre = Semestre.objects.create(nombre="Test Semestre Checkout", fecha_inicio=date.today()-timedelta(days=30), fecha_fin=date.today()+timedelta(days=30), estado='ACTIVO')
+
+        self.curso_pasado = Curso.objects.create(
+            docente=self.docente,
+            nombre="Curso Pasado",
+            dia='Lunes',
+            horario_inicio=time(8, 0),
+            horario_fin=time(10, 0),
+            semestre=self.semestre,
+            carrera=self.carrera
+        )
+
+        self.curso_futuro = Curso.objects.create(
+            docente=self.docente,
+            nombre="Curso Futuro",
+            dia='Lunes',
+            horario_inicio=time(18, 0),
+            horario_fin=time(20, 0),
+            semestre=self.semestre,
+            carrera=self.carrera
+        )
+
+        # Create an attendance record for a course that has already ended today
+        # but has no checkout time.
+        self.asistencia_abierta = Asistencia.objects.create(
+            docente=self.docente,
+            curso=self.curso_pasado,
+            fecha=date.today() - timedelta(days=7), # Last week
+            hora_entrada=timezone.make_aware(datetime.combine(date.today() - timedelta(days=7), time(8, 5)))
+        )
+
+        # Create an attendance record for a course that has not yet ended today.
+        self.asistencia_futura = Asistencia.objects.create(
+            docente=self.docente,
+            curso=self.curso_futuro,
+            fecha=date.today(),
+            hora_entrada=timezone.now()
+        )
+
+    @patch('django.utils.timezone.now')
+    def test_auto_checkout_command(self, mock_now):
+        """
+        Test that the auto_checkout_courses command correctly closes open attendances
+        for courses that have already ended.
+        """
+        # Mock 'now' to be a time after the past course has ended, but before the future one.
+        mock_now.return_value = timezone.make_aware(datetime.combine(date.today(), time(12, 0)))
+
+        out = StringIO()
+        call_command('auto_checkout_courses', stdout=out)
+
+        self.asistencia_abierta.refresh_from_db()
+        self.asistencia_futura.refresh_from_db()
+
+        # The open attendance for the past course should now be closed.
+        self.assertIsNotNone(self.asistencia_abierta.hora_salida)
+
+        # The exit time should be the scheduled end time of the course.
+        expected_checkout_time = timezone.make_aware(
+            datetime.combine(self.asistencia_abierta.fecha, self.curso_pasado.horario_fin)
+        )
+        self.assertEqual(self.asistencia_abierta.hora_salida, expected_checkout_time)
+
+        # The open attendance for the future course should remain open.
+        self.assertIsNone(self.asistencia_futura.hora_salida)
+
+        self.assertIn("1 attendances were closed", out.getvalue())
