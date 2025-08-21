@@ -1,0 +1,10 @@
+# Archivos de entorno y secretos
+.env
+certbot/
+
+# Archivos de Python compilados
+__pycache__/
+*.pyc
+
+# Archivos de la base de datos local (si la tuvieras)
+db.sqlite3
