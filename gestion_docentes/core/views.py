@@ -1651,12 +1651,9 @@ class DisponibilidadEquiposView(LoginRequiredMixin, TemplateView):
         except (ValueError, Activo.DoesNotExist, FranjaHoraria.DoesNotExist) as e:
             messages.error(request, f'Ocurrió un error al procesar la reserva: {e}')
 
-        from django.urls import reverse
-
-        url = reverse('reservas:disponibilidad')
-        if fecha_str:
-            url += f'?fecha={fecha_str}'
-        return redirect(url)
+        # Se utiliza la variable redirect_url construida al inicio del método
+        # para asegurar consistencia y evitar errores.
+        return redirect(redirect_url)
 
 class MisReservasView(LoginRequiredMixin, ListView):
     model = Reserva

@@ -20,8 +20,9 @@
         box-shadow: 0 2px 6px rgba(37, 99, 235, 0.4);
     }
     .slot-chip.in-range {
-        background-color: #93c5fd; /* blue-300 */
-        border-color: #60a5fa; /* blue-400 */
+        background-color: #60a5fa; /* blue-400 */
+        color: white;
+        border-color: #3b82f6; /* blue-500 */
     }
     .slot-chip.disabled {
         background-color: #fca5a5; /* red-300 */
@@ -64,7 +65,7 @@
                     {% if franjas_turno %}
                     <div class="mb-4">
                         <h3 class="font-semibold text-gray-700 mb-3">{{ turno_nombre }}</h3>
-                        <div class="flex flex-wrap gap-2">
+                        <div class="flex flex-wrap gap-x-2 gap-y-3">
                             {% for slot in item.franjas %}
                                 {% if slot.franja.turno == turno_nombre %}
                                     {% if slot.reservado %}
@@ -87,7 +88,7 @@
             </div>
             <!-- Confirmation Area per Card -->
             <div class="confirmation-area bg-gray-50 p-4 border-t border-gray-200 hidden">
-                <p class="confirmation-text text-sm text-gray-700 mb-3">Seleccione un rango de horas.</p>
+                <p class="confirmation-text text-center font-semibold text-blue-800 mb-3 p-2 bg-blue-100 border border-blue-200 rounded-lg">Seleccione un rango de horas.</p>
                 <form class="reserva-form" method="post" action="{% url 'reservas:disponibilidad' %}">
                     {% csrf_token %}
                     <input type="hidden" name="activo_id" value="{{ item.activo.id }}" class="form-activo-id">
