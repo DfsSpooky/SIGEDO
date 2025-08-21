@@ -20,6 +20,13 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, TemplateView
 from django.urls import reverse_lazy
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+import unicodedata
+
+def remove_accents(input_str):
+    if not input_str:
+        return ""
+    nfkd_form = unicodedata.normalize('NFKD', input_str)
+    return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
 
 # Importamos todos los modelos, incluyendo los nuevos
 from .models import (
@@ -567,7 +574,17 @@ def get_teacher_info(request):
             is_daily_marked = AsistenciaDiaria.objects.filter(docente=docente, fecha=today).exists()
             dia_actual_str = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'][today.weekday()]
             
-            cursos_hoy = Curso.objects.filter(docente=docente, dia=dia_actual_str, semestre=semestre_activo)
+            # NORMALIZAMOS LOS DÍAS PARA EVITAR PROBLEMAS CON TILDES
+            dia_actual_normalized = remove_accents(dia_actual_str).lower()
+
+            # Obtenemos todos los cursos del docente en el semestre activo
+            cursos_del_docente = Curso.objects.filter(docente=docente, semestre=semestre_activo)
+
+            # Filtramos por día en Python
+            cursos_hoy = [
+                c for c in cursos_del_docente
+                if c.dia and remove_accents(c.dia).lower() == dia_actual_normalized
+            ]
             
             courses_data = []
             for curso in cursos_hoy:
