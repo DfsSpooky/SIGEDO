@@ -228,6 +228,8 @@
                         buttonWrapper.appendChild(createInfo('Completo', 'text-green-400 text-sm', 'fa-check-double'));
                     } else if (course.canMarkExit) {
                         buttonWrapper.appendChild(createButton('Salida', 'bg-red-600', () => markAttendance('course_exit', data.qrId, course.id), 'fa-arrow-right-from-bracket', 'px-4 py-2'));
+                    } else if (course.hora_salida_permitida_str) {
+                        buttonWrapper.appendChild(createInfo(`Salida a las ${course.hora_salida_permitida_str}`, 'text-blue-400 text-sm', 'fa-hourglass-half'));
                     } else {
                         buttonWrapper.appendChild(createInfo('En curso...', 'text-blue-400 text-sm', 'fa-hourglass-half'));
                     }

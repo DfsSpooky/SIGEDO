@@ -603,6 +603,7 @@ def get_teacher_info(request):
                     'entryMarked': asistencia_curso is not None and asistencia_curso.hora_entrada is not None,
                     'exitMarked': asistencia_curso is not None and asistencia_curso.hora_salida is not None,
                     'canMarkExit': can_mark_exit, # Nueva bandera para el frontend
+                    'hora_salida_permitida_str': asistencia_curso.hora_salida_permitida.strftime('%H:%M:%S') if asistencia_curso and asistencia_curso.hora_salida_permitida else None,
                 })
 
             # --- CORRECCIÓN DE ESTRUCTURA DE RESPUESTA ---
