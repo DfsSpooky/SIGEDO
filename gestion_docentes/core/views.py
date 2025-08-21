@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.admin.views.decorators import staff_member_required
-from django.http import JsonResponse, Http404, HttpResponse
+from django.http import JsonResponse, Http404, HttpResponse, HttpResponseRedirect
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 from datetime import time, timedelta, date, datetime
@@ -1611,7 +1611,7 @@ class DisponibilidadEquiposView(LoginRequiredMixin, TemplateView):
 
             if not all([activo_id, franja_id_inicio, franja_id_fin, fecha_str]):
                 messages.error(request, 'Información incompleta. Por favor, seleccione un activo y un rango de horas.')
-                return redirect(redirect_url)
+                return HttpResponseRedirect(redirect_url)
 
             activo = get_object_or_404(Activo, pk=activo_id)
             franja_inicio = get_object_or_404(FranjaHoraria, pk=franja_id_inicio)
@@ -1621,11 +1621,11 @@ class DisponibilidadEquiposView(LoginRequiredMixin, TemplateView):
 
             if fecha < timezone.now().date():
                 messages.error(request, 'No se pueden hacer reservas para fechas pasadas.')
-                return redirect(redirect_url)
+                return HttpResponseRedirect(redirect_url)
 
             if franja_inicio.hora_inicio >= franja_fin.hora_inicio:
                 messages.error(request, 'La hora de inicio debe ser anterior a la hora de fin de la reserva.')
-                return redirect(redirect_url)
+                return HttpResponseRedirect(redirect_url)
 
             # Comprobar conflictos de solapamiento
             conflictos = Reserva.objects.filter(
@@ -1653,7 +1653,7 @@ class DisponibilidadEquiposView(LoginRequiredMixin, TemplateView):
 
         # Se utiliza la variable redirect_url construida al inicio del método
         # para asegurar consistencia y evitar errores.
-        return redirect(redirect_url)
+        return HttpResponseRedirect(redirect_url)
 
 class MisReservasView(LoginRequiredMixin, ListView):
     model = Reserva
