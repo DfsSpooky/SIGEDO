@@ -1600,6 +1600,10 @@ class DisponibilidadEquiposView(LoginRequiredMixin, TemplateView):
 
     def post(self, request, *args, **kwargs):
         fecha_str = request.POST.get('fecha')
+        redirect_url = reverse('reservas:disponibilidad')
+        if fecha_str:
+            redirect_url += f'?fecha={fecha_str}'
+
         try:
             activo_id = request.POST.get('activo_id')
             franja_id_inicio = request.POST.get('franja_id_inicio')
@@ -1607,7 +1611,7 @@ class DisponibilidadEquiposView(LoginRequiredMixin, TemplateView):
 
             if not all([activo_id, franja_id_inicio, franja_id_fin, fecha_str]):
                 messages.error(request, 'Información incompleta. Por favor, seleccione un activo y un rango de horas.')
-                return redirect('reservas:disponibilidad' + (f'?fecha={fecha_str}' if fecha_str else ''))
+                return redirect(redirect_url)
 
             activo = get_object_or_404(Activo, pk=activo_id)
             franja_inicio = get_object_or_404(FranjaHoraria, pk=franja_id_inicio)
@@ -1617,11 +1621,11 @@ class DisponibilidadEquiposView(LoginRequiredMixin, TemplateView):
 
             if fecha < timezone.now().date():
                 messages.error(request, 'No se pueden hacer reservas para fechas pasadas.')
-                return redirect('reservas:disponibilidad' + f'?fecha={fecha_str}')
+                return redirect(redirect_url)
 
             if franja_inicio.hora_inicio >= franja_fin.hora_inicio:
                 messages.error(request, 'La hora de inicio debe ser anterior a la hora de fin de la reserva.')
-                return redirect('reservas:disponibilidad' + f'?fecha={fecha_str}')
+                return redirect(redirect_url)
 
             # Comprobar conflictos de solapamiento
             conflictos = Reserva.objects.filter(
@@ -1647,7 +1651,12 @@ class DisponibilidadEquiposView(LoginRequiredMixin, TemplateView):
         except (ValueError, Activo.DoesNotExist, FranjaHoraria.DoesNotExist) as e:
             messages.error(request, f'Ocurrió un error al procesar la reserva: {e}')
 
-        return redirect('reservas:disponibilidad' + (f'?fecha={fecha_str}' if fecha_str else ''))
+        from django.urls import reverse
+
+        url = reverse('reservas:disponibilidad')
+        if fecha_str:
+            url += f'?fecha={fecha_str}'
+        return redirect(url)
 
 class MisReservasView(LoginRequiredMixin, ListView):
     model = Reserva

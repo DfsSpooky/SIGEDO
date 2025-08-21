@@ -5,251 +5,218 @@
 
 {% block extra_css %}
 <style>
-    .slot-button {
+    .slot-chip {
         transition: all 0.2s ease-in-out;
+        cursor: pointer;
     }
-    .slot-button.available:hover {
-        transform: scale(1.1);
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    .slot-chip.available:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     }
-    .slot-selected {
-        background-color: #3b82f6 !important; /* blue-600 */
+    .slot-chip.selected {
+        background-color: #2563eb; /* blue-600 */
         color: white;
-        transform: scale(1.1);
+        font-weight: 600;
+        box-shadow: 0 2px 6px rgba(37, 99, 235, 0.4);
     }
-    .slot-in-range {
-        background-color: #93c5fd !important; /* blue-300 */
-        border-color: #3b82f6;
+    .slot-chip.in-range {
+        background-color: #93c5fd; /* blue-300 */
+        border-color: #60a5fa; /* blue-400 */
     }
-    .slot-disabled {
-        background-color: #f3f4f6; /* gray-100 */
+    .slot-chip.disabled {
+        background-color: #fca5a5; /* red-300 */
+        color: #991b1b; /* red-900 */
         cursor: not-allowed;
-        opacity: 0.7;
+        opacity: 0.8;
     }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container mx-auto px-4 py-8">
-    <h1 class="text-3xl font-bold text-gray-800 mb-2">Disponibilidad de Equipos</h1>
-    <p class="text-gray-600 mb-6">Seleccione un rango de horas para reservar un equipo. Haga clic en la hora de inicio y luego en la hora de fin.</p>
-
-    <!-- Date Filter Form -->
-    <div class="bg-white p-4 rounded-lg shadow-md mb-6">
-        <form method="get" action="{% url 'reservas:disponibilidad' %}" class="flex items-center space-x-4">
-            <label for="fecha" class="font-semibold text-gray-700">Seleccionar fecha:</label>
-            <input type="date" id="fecha" name="fecha" value="{{ fecha_seleccionada_str }}" class="border-gray-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-            <button type="submit" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                Ver Disponibilidad
-            </button>
-        </form>
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800">Disponibilidad de Equipos</h1>
+            <p class="mt-1 text-gray-600">Selecciona una fecha y luego elige un equipo para ver y seleccionar las horas disponibles.</p>
+        </div>
+        <!-- Date Filter Form -->
+        <div class="mt-4 md:mt-0">
+            <form method="get" action="{% url 'reservas:disponibilidad' %}" class="flex items-center space-x-3 bg-white p-3 rounded-lg shadow-sm">
+                <label for="fecha" class="font-semibold text-gray-700">Fecha:</label>
+                <input type="date" id="fecha" name="fecha" value="{{ fecha_seleccionada_str }}" class="border-gray-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700">
+                    Buscar
+                </button>
+            </form>
+        </div>
     </div>
 
-    <!-- Availability Grid -->
-    <div class="overflow-x-auto bg-white rounded-lg shadow">
-        <table id="availability-table" class="min-w-full border-collapse">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b sticky left-0 bg-gray-50 z-10 w-48">Equipo</th>
-                    {% for turno_nombre, franjas_turno in turnos.items %}
-                        {% if franjas_turno %}
-                            <th colspan="{{ franjas_turno|length }}" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-b bg-gray-100">{{ turno_nombre }}</th>
-                        {% endif %}
-                    {% endfor %}
-                </tr>
-                <tr>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b sticky left-0 bg-gray-50 z-10 w-48">&nbsp;</th>
-                    {% for franja in franjas %}
-                        <th class="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                            {{ franja.hora_inicio|time:"H:i" }}
-                        </th>
-                    {% endfor %}
-                </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-                {% for item in grid %}
-                <tr data-activo-id="{{ item.activo.id }}">
-                    <td class="px-4 py-4 whitespace-nowrap font-medium text-gray-900 border-b sticky left-0 bg-white z-10 w-48">{{ item.activo.nombre }}</td>
-                    {% for slot in item.franjas %}
-                        <td class="px-2 py-2 whitespace-nowrap text-center border-b" data-franja-id="{{ slot.franja.id }}">
-                            {% if slot.reservado %}
-                                <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                                    Reservado
-                                </span>
-                            {% else %}
-                                <button class="w-full h-10 border border-gray-300 rounded-md bg-green-50 text-green-700 text-xs slot-button available"
-                                        data-activo-id="{{ item.activo.id }}"
-                                        data-franja-id="{{ slot.franja.id }}"
-                                        data-franja-time="{{ slot.franja.hora_inicio|time:'H:i:s' }}">
-                                    Disponible
-                                </button>
-                            {% endif %}
-                        </td>
-                    {% endfor %}
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="{{ franjas|length|add:1 }}" class="px-6 py-4 text-center text-gray-500">
-                        No hay equipos disponibles para reservar.
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-
-    <!-- Confirmation and Form Area -->
-    <div id="confirmation-area" class="mt-8 bg-white p-6 rounded-lg shadow-md hidden">
-        <h2 class="text-xl font-bold text-gray-800 mb-4">Confirmar Reserva</h2>
-        <p id="confirmation-text" class="text-gray-700 mb-4">Por favor, seleccione un rango de horas.</p>
-        <form id="reserva-form" method="post" action="{% url 'reservas:disponibilidad' %}">
-            {% csrf_token %}
-            <input type="hidden" name="activo_id" id="form-activo-id">
-            <input type="hidden" name="franja_id_inicio" id="form-franja-id-inicio">
-            <input type="hidden" name="franja_id_fin" id="form-franja-id-fin">
-            <input type="hidden" name="fecha" value="{{ fecha_seleccionada_str }}">
-
-            <div class="flex items-center space-x-4">
-                <button type="submit" id="confirm-button" class="px-6 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
-                    Confirmar Reserva
-                </button>
-                <button type="button" id="cancel-selection-button" class="px-6 py-2 bg-gray-200 text-gray-800 font-semibold rounded-md hover:bg-gray-300">
-                    Cancelar Selección
-                </button>
+    <!-- Equipment Cards Grid -->
+    <div id="equipment-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {% for item in grid %}
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden equipment-card" data-activo-id="{{ item.activo.id }}">
+            <div class="p-6">
+                <h2 class="text-xl font-bold text-gray-900">{{ item.activo.nombre }}</h2>
+                <p class="text-sm text-gray-500">{{ item.activo.tipo.nombre }}</p>
             </div>
-        </form>
+            <div class="px-6 pb-6">
+                {% for turno_nombre, franjas_turno in turnos.items %}
+                    {% if franjas_turno %}
+                    <div class="mb-4">
+                        <h3 class="font-semibold text-gray-700 mb-3">{{ turno_nombre }}</h3>
+                        <div class="flex flex-wrap gap-2">
+                            {% for slot in item.franjas %}
+                                {% if slot.franja.turno == turno_nombre %}
+                                    {% if slot.reservado %}
+                                        <div class="slot-chip disabled px-3 py-1.5 text-sm font-medium rounded-full" title="No disponible">
+                                            {{ slot.franja.hora_inicio|time:"H:i" }}
+                                        </div>
+                                    {% else %}
+                                        <button class="slot-chip available bg-gray-100 text-gray-800 px-3 py-1.5 text-sm font-medium rounded-full hover:bg-blue-100"
+                                                data-franja-id="{{ slot.franja.id }}"
+                                                data-franja-time="{{ slot.franja.hora_inicio|time:'H:i:s' }}">
+                                            {{ slot.franja.hora_inicio|time:"H:i" }}
+                                        </button>
+                                    {% endif %}
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            <!-- Confirmation Area per Card -->
+            <div class="confirmation-area bg-gray-50 p-4 border-t border-gray-200 hidden">
+                <p class="confirmation-text text-sm text-gray-700 mb-3">Seleccione un rango de horas.</p>
+                <form class="reserva-form" method="post" action="{% url 'reservas:disponibilidad' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="activo_id" value="{{ item.activo.id }}" class="form-activo-id">
+                    <input type="hidden" name="franja_id_inicio" class="form-franja-id-inicio">
+                    <input type="hidden" name="franja_id_fin" class="form-franja-id-fin">
+                    <input type="hidden" name="fecha" value="{{ fecha_seleccionada_str }}">
+                    <div class="flex items-center space-x-3">
+                        <button type="submit" class="confirm-button w-full px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 disabled:bg-gray-400" disabled>
+                            Confirmar Reserva
+                        </button>
+                        <button type="button" class="cancel-selection-button flex-shrink-0 px-4 py-2 bg-gray-200 text-gray-800 font-semibold rounded-md hover:bg-gray-300">
+                            Cancelar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-span-full text-center py-12">
+            <p class="text-gray-500">No hay equipos disponibles para reservar en esta fecha.</p>
+        </div>
+        {% endfor %}
     </div>
-
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const table = document.getElementById('availability-table');
-    const confirmationArea = document.getElementById('confirmation-area');
-    const confirmationText = document.getElementById('confirmation-text');
-    const confirmButton = document.getElementById('confirm-button');
-    const cancelSelectionButton = document.getElementById('cancel-selection-button');
-
-    const formActivoId = document.getElementById('form-activo-id');
-    const formFranjaIdInicio = document.getElementById('form-franja-id-inicio');
-    const formFranjaIdFin = document.getElementById('form-franja-id-fin');
+    const grid = document.getElementById('equipment-grid');
 
     let selection = {
-        activoId: null,
+        card: null,
         startFranjaId: null,
         endFranjaId: null,
         startFranjaTime: null,
-        endFranjaTime: null,
-        startElement: null,
     };
 
     function clearSelection() {
-        if (selection.activoId) {
-            const row = table.querySelector(`tr[data-activo-id="${selection.activoId}"]`);
-            row.querySelectorAll('.slot-button').forEach(btn => {
-                btn.classList.remove('slot-selected', 'slot-in-range', 'slot-disabled');
-                if(btn.classList.contains('available')) {
-                   btn.textContent = 'Disponible';
-                }
+        if (selection.card) {
+            selection.card.querySelectorAll('.slot-chip.available').forEach(btn => {
+                btn.classList.remove('selected', 'in-range');
             });
+            const confirmationArea = selection.card.querySelector('.confirmation-area');
+            const confirmButton = selection.card.querySelector('.confirm-button');
+            const confirmationText = selection.card.querySelector('.confirmation-text');
+
+            confirmationArea.classList.add('hidden');
+            confirmButton.disabled = true;
+            confirmationText.textContent = 'Seleccione un rango de horas.';
         }
 
         selection = {
-            activoId: null,
+            card: null,
             startFranjaId: null,
             endFranjaId: null,
             startFranjaTime: null,
-            endFranjaTime: null,
-            startElement: null,
         };
-
-        confirmationArea.classList.add('hidden');
-        confirmButton.disabled = true;
-        confirmationText.textContent = 'Por favor, seleccione un rango de horas.';
     }
 
     function updateUI() {
-        if (!selection.activoId) return;
+        if (!selection.card) return;
 
-        const row = table.querySelector(`tr[data-activo-id="${selection.activoId}"]`);
-        if (!row) return;
+        const availableSlots = Array.from(selection.card.querySelectorAll('.slot-chip.available'));
+        availableSlots.forEach(btn => btn.classList.remove('selected', 'in-range'));
 
-        // Limpiar estilos previos en la fila
-        row.querySelectorAll('.slot-button').forEach(btn => {
-            btn.classList.remove('slot-selected', 'slot-in-range');
-            if (btn.classList.contains('available')) {
-                btn.textContent = 'Disponible';
-            }
-        });
+        const startIndex = availableSlots.findIndex(btn => btn.dataset.franjaId === selection.startFranjaId);
+        if (startIndex === -1) return;
 
-        if (selection.startFranjaId) {
-            const startBtn = row.querySelector(`button[data-franja-id="${selection.startFranjaId}"]`);
-            if (startBtn) {
-                startBtn.classList.add('slot-selected');
-                startBtn.textContent = 'Inicio';
-            }
-        }
+        availableSlots[startIndex].classList.add('selected');
 
         if (selection.endFranjaId) {
-             // Validar que el rango no contenga celdas reservadas
-            const franjas = Array.from(row.querySelectorAll('.slot-button.available'));
-            const startIndex = franjas.findIndex(btn => btn.dataset.franjaId === selection.startFranjaId);
-            const endIndex = franjas.findIndex(btn => btn.dataset.franjaId === selection.endFranjaId);
+            const endIndex = availableSlots.findIndex(btn => btn.dataset.franjaId === selection.endFranjaId);
+            if (endIndex === -1) return;
 
-            // Asegurarse de que el inicio es antes del fin
             const [minIdx, maxIdx] = [Math.min(startIndex, endIndex), Math.max(startIndex, endIndex)];
 
             for (let i = minIdx; i <= maxIdx; i++) {
-                franjas[i].classList.add('slot-in-range');
+                availableSlots[i].classList.add('in-range');
             }
-
-            const endBtn = row.querySelector(`button[data-franja-id="${selection.endFranjaId}"]`);
-            if(endBtn) {
-                endBtn.classList.add('slot-selected');
-                endBtn.textContent = 'Fin';
-            }
+            availableSlots[endIndex].classList.add('selected');
         }
     }
 
-
-    table.addEventListener('click', function(e) {
+    grid.addEventListener('click', function(e) {
         const target = e.target;
-        if (!target.matches('.slot-button.available')) {
+
+        if (target.matches('.cancel-selection-button')) {
+            clearSelection();
             return;
         }
 
-        const clickedActivoId = target.dataset.activoId;
-        const clickedFranjaId = target.dataset.franjaId;
-        const clickedFranjaTime = target.dataset.franjaTime;
+        if (!target.matches('.slot-chip.available')) {
+            return;
+        }
 
-        // Si se hace clic en una fila diferente, se reinicia la selección
-        if (selection.activoId && selection.activoId !== clickedActivoId) {
+        const clickedCard = target.closest('.equipment-card');
+        if (!clickedCard) return;
+
+        if (selection.card && selection.card !== clickedCard) {
             clearSelection();
         }
 
+        selection.card = clickedCard;
+        const confirmationArea = selection.card.querySelector('.confirmation-area');
+        const confirmButton = selection.card.querySelector('.confirm-button');
+        const confirmationText = selection.card.querySelector('.confirmation-text');
+        const formFranjaIdInicio = selection.card.querySelector('.form-franja-id-inicio');
+        const formFranjaIdFin = selection.card.querySelector('.form-franja-id-fin');
+
         confirmationArea.classList.remove('hidden');
 
-        // Si no hay nada seleccionado, este es el inicio
+        const clickedFranjaId = target.dataset.franjaId;
+        const clickedFranjaTime = target.dataset.franjaTime;
+
         if (!selection.startFranjaId) {
-            selection.activoId = clickedActivoId;
             selection.startFranjaId = clickedFranjaId;
             selection.startFranjaTime = clickedFranjaTime;
-            selection.startElement = target;
-            confirmationText.textContent = `Ha seleccionado el inicio. Ahora, por favor seleccione la hora de fin en la misma fila.`;
-        } else { // Si ya hay un inicio, este es el fin
-            // Validar que el rango no contenga celdas reservadas
-            const row = table.querySelector(`tr[data-activo-id="${selection.activoId}"]`);
-            const allSlotsInRow = Array.from(row.querySelectorAll('td'));
-            const startSlotIndex = allSlotsInRow.findIndex(td => td.dataset.franjaId === selection.startFranjaId);
-            const endSlotIndex = allSlotsInRow.findIndex(td => td.dataset.franjaId === clickedFranjaId);
+            confirmationText.textContent = `Inicio: ${clickedFranjaTime.substring(0,5)}. Seleccione la hora de fin.`;
+        } else {
+            const allSlotsInCard = Array.from(selection.card.querySelectorAll('.slot-chip'));
+            const startIndex = allSlotsInCard.findIndex(chip => chip.dataset.franjaId === selection.startFranjaId);
+            const endIndex = allSlotsInCard.findIndex(chip => chip.dataset.franjaId === clickedFranjaId);
 
-            const [minIdx, maxIdx] = [Math.min(startSlotIndex, endSlotIndex), Math.max(startSlotIndex, endSlotIndex)];
+            const [minIdx, maxIdx] = [Math.min(startIndex, endIndex), Math.max(startIndex, endIndex)];
 
             let hasConflict = false;
-            for(let i = minIdx; i <= maxIdx; i++) {
-                if (!allSlotsInRow[i].querySelector('.slot-button.available')) {
+            for (let i = minIdx; i <= maxIdx; i++) {
+                if (allSlotsInCard[i].classList.contains('disabled')) {
                     hasConflict = true;
                     break;
                 }
@@ -261,31 +228,33 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            // Asignar inicio y fin correctos
+            let finalStartId, finalEndId, finalStartTime, finalEndTime;
+
             if (new Date('1970-01-01T' + clickedFranjaTime) < new Date('1970-01-01T' + selection.startFranjaTime)) {
-                selection.endFranjaId = selection.startFranjaId;
-                selection.endFranjaTime = selection.startFranjaTime;
-                selection.startFranjaId = clickedFranjaId;
-                selection.startFranjaTime = clickedFranjaTime;
+                finalStartId = clickedFranjaId;
+                finalEndId = selection.startFranjaId;
+                finalStartTime = clickedFranjaTime;
+                finalEndTime = selection.startFranjaTime;
             } else {
-                selection.endFranjaId = clickedFranjaId;
-                selection.endFranjaTime = clickedFranjaTime;
+                finalStartId = selection.startFranjaId;
+                finalEndId = clickedFranjaId;
+                finalStartTime = selection.startFranjaTime;
+                finalEndTime = clickedFranjaTime;
             }
 
-            // Llenar el formulario y habilitar el botón
-            formActivoId.value = selection.activoId;
-            formFranjaIdInicio.value = selection.startFranjaId;
-            formFranjaIdFin.value = selection.endFranjaId;
+            selection.startFranjaId = finalStartId;
+            selection.endFranjaId = finalEndId;
+            selection.startFranjaTime = finalStartTime;
+
+            formFranjaIdInicio.value = finalStartId;
+            formFranjaIdFin.value = finalEndId;
             confirmButton.disabled = false;
 
-            const activoNombre = row.querySelector('td:first-child').textContent;
-            confirmationText.textContent = `Reservar "${activoNombre}" desde las ${selection.startFranjaTime.substring(0,5)} hasta las ${selection.endFranjaTime.substring(0,5)}.`;
+            confirmationText.textContent = `Reservar de ${finalStartTime.substring(0,5)} a ${finalEndTime.substring(0,5)}.`;
         }
 
         updateUI();
     });
-
-    cancelSelectionButton.addEventListener('click', clearSelection);
 });
 </script>
 {% endblock %}
