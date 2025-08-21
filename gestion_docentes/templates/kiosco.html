@@ -134,7 +134,13 @@
                 const response = await fetch('/api/mark-attendance/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ qrId, actionType, courseId, photoBase64 }) });
                 const result = await response.json();
                 if (result.status === 'success') {
-                    showKioskAlert(`Asistencia registrada a las ${horaDeMarcacion}`, 'success');
+                    let message = `Asistencia registrada a las ${horaDeMarcacion}`;
+                    let alertType = 'success';
+                    if (result.data && result.data.es_tardanza) {
+                        message += ' (Tardanza)';
+                        alertType = 'warning';
+                    }
+                    showKioskAlert(message, alertType);
                     setTimeout(resetKiosk, 4000);
                 } else { throw new Error(result.message); }
             } catch (error) {

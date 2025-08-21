@@ -5,7 +5,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.http import JsonResponse, Http404, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
-from datetime import time, timedelta, date
+from datetime import time, timedelta, date, datetime
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 import json
 import base64
@@ -658,18 +658,23 @@ def mark_attendance_kiosk(request):
             elif action_type in ['course_entry', 'course_exit']:
                 curso_id = data.get('courseId')
                 curso = Curso.objects.get(id=curso_id)
-                
-                # Esta función ahora encontrará el registro correcto porque la fecha coincide.
                 asistencia, created = Asistencia.objects.get_or_create(docente=docente, curso=curso, fecha=today)
+
+                response_data = {}
 
                 if action_type == 'course_entry' and not asistencia.hora_entrada:
                     asistencia.hora_entrada = now
                     asistencia.foto_entrada = photo_file
                     
-                    duracion_minima_minutos = (curso.duracion_bloques * 50) - 15 
-                    if duracion_minima_minutos < 15:
-                        duracion_minima_minutos = 15
-                    
+                    # Lógica de tardanza
+                    configuracion = ConfiguracionInstitucion.load()
+                    horario_inicio_dt = timezone.make_aware(datetime.combine(today, curso.horario_inicio))
+                    limite_tardanza = horario_inicio_dt + timedelta(minutes=configuracion.tiempo_limite_tardanza)
+                    es_tardanza = now > limite_tardanza
+                    response_data['es_tardanza'] = es_tardanza
+
+                    duracion_minima_minutos = (curso.duracion_bloques * 50) - 15
+                    if duracion_minima_minutos < 15: duracion_minima_minutos = 15
                     asistencia.hora_salida_permitida = now + timedelta(minutes=duracion_minima_minutos)
                     asistencia.save()
                 
@@ -678,8 +683,10 @@ def mark_attendance_kiosk(request):
                         asistencia.hora_salida = now
                         asistencia.foto_salida = photo_file
                         asistencia.save()
-            
-            return success_response(message='Asistencia registrada correctamente.')
+                    else:
+                        return error_response(message="Aún no puede marcar la salida.")
+
+                return success_response(message='Asistencia registrada correctamente.', data=response_data)
 
         except Exception as e:
             print(f"Error en mark_attendance_kiosk: {e}")
