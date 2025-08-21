@@ -152,6 +152,7 @@
 
         function createButton(text, bgColor, onClick, iconClass = null, extraClasses = 'w-full p-5 text-lg') {
             const button = document.createElement('button');
+            button.type = 'button'; // Explicitly set type to prevent form submission
             const iconHTML = iconClass ? `<i class="fa-solid ${iconClass} mr-3"></i>` : '';
             button.innerHTML = `${iconHTML}${text}`;
             button.className = `rounded-lg font-bold text-white transition ${bgColor} hover:opacity-90 disabled:opacity-50 flex items-center justify-center ${extraClasses} animate-fade-in`;
