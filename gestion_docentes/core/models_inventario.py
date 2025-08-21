@@ -66,7 +66,8 @@ class Reserva(models.Model):
 
     activo = models.ForeignKey(Activo, on_delete=models.CASCADE, related_name='reservas')
     docente = models.ForeignKey('core.Docente', on_delete=models.CASCADE, related_name='reservas')
-    franja_horaria = models.ForeignKey('core.FranjaHoraria', on_delete=models.PROTECT, related_name='reservas')
+    franja_horaria_inicio = models.ForeignKey('core.FranjaHoraria', on_delete=models.PROTECT, related_name='reservas_inicio')
+    franja_horaria_fin = models.ForeignKey('core.FranjaHoraria', on_delete=models.PROTECT, related_name='reservas_fin', null=True, blank=True)
     fecha_reserva = models.DateField()
     estado = models.CharField(max_length=30, choices=ESTADO_CHOICES, default='RESERVADO')
 
@@ -75,16 +76,11 @@ class Reserva(models.Model):
     fecha_finalizacion = models.DateTimeField(null=True, blank=True, help_text="Momento en que se devuelve el equipo.")
 
     def __str__(self):
-        return f"Reserva de {self.activo.nombre} para {self.docente.username} el {self.fecha_reserva} a las {self.franja_horaria.hora_inicio}"
+        if self.franja_horaria_fin:
+            return f"Reserva de {self.activo.nombre} para {self.docente.username} el {self.fecha_reserva} de {self.franja_horaria_inicio.hora_inicio} a {self.franja_horaria_fin.hora_fin}"
+        return f"Reserva de {self.activo.nombre} para {self.docente.username} el {self.fecha_reserva} a las {self.franja_horaria_inicio.hora_inicio}"
 
     class Meta:
         verbose_name = "Reserva de Activo"
         verbose_name_plural = "Reservas de Activos"
-        ordering = ['-fecha_reserva', '-franja_horaria__hora_inicio']
-        constraints = [
-            models.UniqueConstraint(
-                fields=['activo', 'fecha_reserva', 'franja_horaria'],
-                condition=Q(estado__in=['RESERVADO', 'EN_USO']),
-                name='unique_reserva_activa'
-            )
-        ]
+        ordering = ['-fecha_reserva', '-franja_horaria_inicio__hora_inicio']

@@ -1549,61 +1549,105 @@ class DisponibilidadEquiposView(LoginRequiredMixin, TemplateView):
         except ValueError:
             fecha_seleccionada = timezone.now().date()
 
-        franjas = FranjaHoraria.objects.all().order_by('hora_inicio')
+        franjas_qs = FranjaHoraria.objects.all().order_by('hora_inicio')
+        franjas_map = {franja.id: franja for franja in franjas_qs}
+        franjas_list = list(franjas_qs)
+
         activos = Activo.objects.filter(estado__in=['DISPONIBLE', 'ASIGNADO'])
 
-        # Obtenemos todas las reservas activas para la fecha seleccionada para optimizar
-        reservas_activas = set(
-            Reserva.objects.filter(
-                fecha_reserva=fecha_seleccionada,
-                estado__in=['RESERVADO', 'EN_USO']
-            ).values_list('activo_id', 'franja_horaria_id')
-        )
+        reservas_activas = Reserva.objects.filter(
+            fecha_reserva=fecha_seleccionada,
+            estado__in=['RESERVADO', 'EN_USO']
+        ).select_related('franja_horaria_inicio', 'franja_horaria_fin')
+
+        # Usamos un diccionario para marcar las celdas ocupadas
+        reservas_grid = defaultdict(bool)
+        for reserva in reservas_activas:
+            # Si es una reserva de un solo bloque (legado o intencional)
+            if not reserva.franja_horaria_fin or reserva.franja_horaria_inicio == reserva.franja_horaria_fin:
+                reservas_grid[(reserva.activo_id, reserva.franja_horaria_inicio_id)] = True
+                continue
+
+            # Para reservas de múltiples bloques
+            try:
+                start_index = franjas_list.index(reserva.franja_horaria_inicio)
+                end_index = franjas_list.index(reserva.franja_horaria_fin)
+                for i in range(start_index, end_index + 1):
+                    reservas_grid[(reserva.activo_id, franjas_list[i].id)] = True
+            except ValueError:
+                # Si una franja no está en la lista (raro), simplemente la ignoramos
+                continue
 
         grid = []
         for activo in activos:
             row = {'activo': activo, 'franjas': []}
-            for franja in franjas:
-                esta_reservado = (activo.id, franja.id) in reservas_activas
+            for franja in franjas_list:
+                esta_reservado = reservas_grid[(activo.id, franja.id)]
                 row['franjas'].append({'franja': franja, 'reservado': esta_reservado})
             grid.append(row)
 
         context['grid'] = grid
-        context['franjas'] = franjas
+        context['franjas'] = franjas_list
         context['fecha_seleccionada'] = fecha_seleccionada
         context['fecha_seleccionada_str'] = fecha_seleccionada.strftime('%Y-%m-%d')
+        context['turnos'] = {
+            'MANANA': [f for f in franjas_list if f.turno == 'MANANA'],
+            'TARDE': [f for f in franjas_list if f.turno == 'TARDE'],
+            'NOCHE': [f for f in franjas_list if f.turno == 'NOCHE'],
+        }
 
         return context
 
     def post(self, request, *args, **kwargs):
+        fecha_str = request.POST.get('fecha')
         try:
             activo_id = request.POST.get('activo_id')
-            franja_id = request.POST.get('franja_id')
-            fecha_str = request.POST.get('fecha')
+            franja_id_inicio = request.POST.get('franja_id_inicio')
+            franja_id_fin = request.POST.get('franja_id_fin')
+
+            if not all([activo_id, franja_id_inicio, franja_id_fin, fecha_str]):
+                messages.error(request, 'Información incompleta. Por favor, seleccione un activo y un rango de horas.')
+                return redirect('reservas:disponibilidad' + (f'?fecha={fecha_str}' if fecha_str else ''))
 
             activo = get_object_or_404(Activo, pk=activo_id)
-            franja = get_object_or_404(FranjaHoraria, pk=franja_id)
+            franja_inicio = get_object_or_404(FranjaHoraria, pk=franja_id_inicio)
+            franja_fin = get_object_or_404(FranjaHoraria, pk=franja_id_fin)
             fecha = timezone.datetime.strptime(fecha_str, '%Y-%m-%d').date()
             docente = request.user
 
-            # Doble chequeo de disponibilidad y fecha
             if fecha < timezone.now().date():
                 messages.error(request, 'No se pueden hacer reservas para fechas pasadas.')
-            elif Reserva.objects.filter(activo=activo, franja_horaria=franja, fecha_reserva=fecha, estado__in=['RESERVADO', 'EN_USO']).exists():
-                messages.error(request, 'Este equipo ya no está disponible en la franja seleccionada. Alguien más lo reservó.')
+                return redirect('reservas:disponibilidad' + f'?fecha={fecha_str}')
+
+            if franja_inicio.hora_inicio >= franja_fin.hora_inicio:
+                messages.error(request, 'La hora de inicio debe ser anterior a la hora de fin de la reserva.')
+                return redirect('reservas:disponibilidad' + f'?fecha={fecha_str}')
+
+            # Comprobar conflictos de solapamiento
+            conflictos = Reserva.objects.filter(
+                activo=activo,
+                fecha_reserva=fecha,
+                estado__in=['RESERVADO', 'EN_USO'],
+                franja_horaria_inicio__hora_inicio__lt=franja_fin.hora_fin,
+                franja_horaria_fin__hora_fin__gt=franja_inicio.hora_inicio
+            ).exists()
+
+            if conflictos:
+                messages.error(request, 'El rango seleccionado se solapa con otra reserva existente.')
             else:
                 Reserva.objects.create(
                     activo=activo,
-                    franja_horaria=franja,
+                    franja_horaria_inicio=franja_inicio,
+                    franja_horaria_fin=franja_fin,
                     fecha_reserva=fecha,
                     docente=docente
                 )
-                messages.success(request, f'Equipo "{activo.nombre}" reservado con éxito para el {fecha} a las {franja.hora_inicio.strftime("%H:%M")}.')
+                messages.success(request, f'Equipo "{activo.nombre}" reservado con éxito para el {fecha} de {franja_inicio.hora_inicio.strftime("%H:%M")} a {franja_fin.hora_fin.strftime("%H:%M")}.')
 
         except (ValueError, Activo.DoesNotExist, FranjaHoraria.DoesNotExist) as e:
             messages.error(request, f'Ocurrió un error al procesar la reserva: {e}')
 
-        return redirect('reservas:disponibilidad' + f'?fecha={fecha_str}')
+        return redirect('reservas:disponibilidad' + (f'?fecha={fecha_str}' if fecha_str else ''))
 
 class MisReservasView(LoginRequiredMixin, ListView):
     model = Reserva
@@ -1612,14 +1656,14 @@ class MisReservasView(LoginRequiredMixin, ListView):
     paginate_by = 10
 
     def get_queryset(self):
-        return Reserva.objects.filter(docente=self.request.user).order_by('-fecha_reserva', '-franja_horaria__hora_inicio')
+        return Reserva.objects.filter(docente=self.request.user).order_by('-fecha_reserva', '-franja_horaria_inicio__hora_inicio')
 
 @login_required
 def cancelar_reserva(request, pk):
     reserva = get_object_or_404(Reserva, pk=pk, docente=request.user)
 
     hora_inicio_reserva = timezone.make_aware(
-        timezone.datetime.combine(reserva.fecha_reserva, reserva.franja_horaria.hora_inicio)
+        timezone.datetime.combine(reserva.fecha_reserva, reserva.franja_horaria_inicio.hora_inicio)
     )
     if reserva.estado == 'RESERVADO' and hora_inicio_reserva > timezone.now():
         reserva.estado = 'CANCELADO'

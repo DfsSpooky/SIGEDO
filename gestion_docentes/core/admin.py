@@ -235,10 +235,10 @@ class ActivoAdmin(ModelAdmin):
 
 @admin.register(Reserva)
 class ReservaAdmin(ModelAdmin):
-    list_display = ('id', 'activo', 'docente', 'fecha_reserva', 'franja_horaria', 'estado')
+    list_display = ('id', 'activo', 'docente', 'fecha_reserva', 'franja_horaria_inicio', 'franja_horaria_fin', 'estado')
     list_filter = ('estado', 'fecha_reserva')
     search_fields = ('activo__nombre', 'docente__username', 'docente__first_name')
-    autocomplete_fields = ('activo', 'docente', 'franja_horaria')
+    autocomplete_fields = ('activo', 'docente', 'franja_horaria_inicio', 'franja_horaria_fin')
     readonly_fields = ('fecha_creacion', 'fecha_confirmacion', 'fecha_finalizacion')
     list_per_page = 20
 
