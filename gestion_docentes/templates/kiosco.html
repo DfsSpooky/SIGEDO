@@ -30,10 +30,12 @@
         <div id="kiosk-container">
             <div id="scanning-state" class="text-center">
                 <h1 class="text-5xl font-bold mb-3 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">Kiosco de Asistencia</h1>
-                <p class="text-lg text-gray-400 mb-6">Por favor, acerque el código QR de su credencial a la cámara.</p>
+                <p class="text-lg text-gray-400 mb-6">Acerque su credencial QR a la cámara o su tarjeta RFID al lector.</p>
                 <div class="relative w-full max-w-lg mx-auto aspect-video rounded-2xl overflow-hidden shadow-2xl shadow-blue-500/10 border border-gray-700">
                     <video id="camera-feed" class="w-full h-full object-cover"></video>
                     <div class="absolute inset-0 border-4 border-blue-500 rounded-2xl pointer-events-none animate-pulse"></div>
+                    <!-- Input oculto para el lector RFID -->
+                    <input type="text" id="rfid-input" class="absolute top-0 left-0 w-full h-full opacity-0 cursor-default" autofocus>
                 </div>
                 <div id="scan-feedback" class="text-center mt-6 text-xl text-yellow-400 h-8 transition-all"></div>
             </div>
@@ -55,7 +57,7 @@
     <canvas id="snapshot-canvas" class="hidden"></canvas>
 
     <script>
-        const video = document.getElementById('camera-feed'), clockElement = document.getElementById('real-time-clock'), canvasElement = document.getElementById('snapshot-canvas'), canvas = canvasElement.getContext('2d'), scanFeedback = document.getElementById('scan-feedback'), scanningState = document.getElementById('scanning-state'), actionsState = document.getElementById('actions-state'), teacherName = document.getElementById('teacher-name'), teacherDni = document.getElementById('teacher-dni'), teacherPhoto = document.getElementById('teacher-photo'), attendanceActions = document.getElementById('attendance-actions');
+        const video = document.getElementById('camera-feed'), clockElement = document.getElementById('real-time-clock'), canvasElement = document.getElementById('snapshot-canvas'), canvas = canvasElement.getContext('2d'), scanFeedback = document.getElementById('scan-feedback'), scanningState = document.getElementById('scanning-state'), actionsState = document.getElementById('actions-state'), teacherName = document.getElementById('teacher-name'), teacherDni = document.getElementById('teacher-dni'), teacherPhoto = document.getElementById('teacher-photo'), attendanceActions = document.getElementById('attendance-actions'), rfidInput = document.getElementById('rfid-input');
         let qrScanned = false;
 
         function updateClock() { clockElement.textContent = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }); }
@@ -64,16 +66,42 @@
         function showKioskAlert(message, isSuccess = true) {
             const alertElement = document.getElementById('kiosk-alert'), alertIcon = document.getElementById('kiosk-alert-icon'), alertMessage = document.getElementById('kiosk-alert-message');
             alertMessage.textContent = message;
-            alertElement.classList.remove('bg-green-500', 'bg-red-500');
-            alertElement.classList.add(isSuccess ? 'bg-green-500' : 'bg-red-500');
-            alertIcon.className = `fa-solid ${isSuccess ? 'fa-check-circle' : 'fa-times-circle'} text-2xl`;
+            alertElement.classList.remove('bg-green-500', 'bg-red-500', 'bg-yellow-500');
+            alertIcon.className = `fa-solid text-2xl`;
+            if (isSuccess === 'success') { alertElement.classList.add('bg-green-500'); alertIcon.classList.add('fa-check-circle'); }
+            else if (isSuccess === 'warning') { alertElement.classList.add('bg-yellow-500'); alertIcon.classList.add('fa-exclamation-triangle'); }
+            else { alertElement.classList.add('bg-red-500'); alertIcon.classList.add('fa-times-circle'); }
             alertElement.classList.add('show');
             setTimeout(() => { alertElement.classList.remove('show'); }, 4000);
         }
 
-        function resetKiosk() { actionsState.classList.add('fade-out'); setTimeout(() => { location.reload(); }, 500); }
+        function resetKiosk() {
+            // Anima la salida del panel de acciones
+            actionsState.classList.add('fade-out');
+
+            // Después de la animación, resetea el estado de la UI sin recargar la página
+            setTimeout(() => {
+                actionsState.classList.add('hidden');
+                actionsState.classList.remove('fade-out');
+                scanningState.classList.remove('hidden', 'fade-out');
+
+                // Limpia la información mostrada
+                teacherName.textContent = '';
+                teacherDni.textContent = '';
+                teacherPhoto.src = '';
+                attendanceActions.innerHTML = '';
+                scanFeedback.textContent = '';
+
+                // Reanuda el escaneo de la cámara
+                qrScanned = false;
+                requestAnimationFrame(tick);
+
+                // Devuelve el foco al input de RFID
+                rfidInput.focus();
+            }, 500); // 500ms para que coincida con la transición de opacidad
+        }
         
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } }).then(stream => { video.srcObject = stream; video.setAttribute("playsinline", true); video.play(); requestAnimationFrame(tick); }).catch(err => { console.error("Error al acceder a la cámara: ", err); scanFeedback.textContent = "Error: No se pudo acceder a la cámara."; });
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(stream => { video.srcObject = stream; video.setAttribute("playsinline", true); video.play(); requestAnimationFrame(tick); }).catch(err => { console.error("Error al acceder a la cámara: ", err); scanFeedback.textContent = "Error: No se pudo acceder a la cámara."; });
 
         function tick() {
             if (qrScanned) return;
@@ -92,46 +120,8 @@
             try {
                 const response = await fetch('/api/get-teacher-info/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ qrId: qrId }) });
                 const data = await response.json();
-                if (data.status === 'weekend_off') { scanFeedback.textContent = data.message; setTimeout(resetKiosk, 5000); return; }
                 if (!response.ok) { throw new Error(data.message || 'Error desconocido.'); }
-                
-                teacherName.textContent = data.name; teacherDni.textContent = `ID: ${data.dni}`; teacherPhoto.src = data.photoUrl; attendanceActions.innerHTML = ''; 
-
-                if (data.status === 'special_day') {
-                    // Lógica de día especial (sin cambios)
-                } else {
-                    if (!data.isDailyAttendanceMarked) { attendanceActions.appendChild(createButton('Marcar Entrada General del Día', 'bg-blue-600', () => markAttendance('general_entry', qrId), 'fa-user-check')); } 
-                    else { attendanceActions.appendChild(createInfo('Entrada General ya marcada.', 'text-lg', 'fa-check-circle')); }
-
-                    if (data.courses.length > 0) { attendanceActions.appendChild(createInfo('Asistencia por Curso', 'text-xl font-bold mt-4 mb-2 text-left', 'fa-chalkboard-teacher')); }
-
-                    // --- INICIO: LÓGICA DE BOTONES MEJORADA ---
-                    data.courses.forEach((course, index) => {
-                        const courseContainer = document.createElement('div');
-                        courseContainer.className = 'p-4 bg-gray-800/50 rounded-lg flex justify-between items-center animate-fade-in';
-                        courseContainer.style.animationDelay = `${100 * (index + 1)}ms`;
-                        courseContainer.innerHTML = `<h3 class="font-semibold text-lg">${course.name}</h3>`;
-                        const buttonWrapper = document.createElement('div');
-
-                        if (!course.entryMarked) {
-                            buttonWrapper.appendChild(createButton('Entrada', 'bg-green-600', () => markAttendance('course_entry', qrId, course.id), 'fa-arrow-right-to-bracket', 'px-4 py-2'));
-                        } else if (course.exitMarked) {
-                            buttonWrapper.appendChild(createInfo('Completo', 'text-green-400 text-sm', 'fa-check-double'));
-                        } else if (course.canMarkExit) {
-                            buttonWrapper.appendChild(createButton('Salida', 'bg-red-600', () => markAttendance('course_exit', qrId, course.id), 'fa-arrow-right-from-bracket', 'px-4 py-2'));
-                        } else {
-                            buttonWrapper.appendChild(createInfo('En curso...', 'text-blue-400 text-sm', 'fa-hourglass-half'));
-                        }
-                        
-                        courseContainer.appendChild(buttonWrapper);
-                        attendanceActions.appendChild(courseContainer);
-                    });
-                    // --- FIN: LÓGICA DE BOTONES MEJORADA ---
-                }
-                
-                scanningState.classList.add('fade-out');
-                setTimeout(() => { scanningState.classList.add('hidden'); actionsState.classList.remove('hidden'); actionsState.classList.remove('fade-out'); }, 500);
-
+                displayInfoAndActions(data);
             } catch (error) { console.error("Error:", error); scanFeedback.textContent = error.message; setTimeout(resetKiosk, 3000); }
         }
         
@@ -144,7 +134,13 @@
                 const response = await fetch('/api/mark-attendance/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ qrId, actionType, courseId, photoBase64 }) });
                 const result = await response.json();
                 if (result.status === 'success') {
-                    showKioskAlert(`Asistencia registrada a las ${horaDeMarcacion}`);
+                    let message = `Asistencia registrada a las ${horaDeMarcacion}`;
+                    let alertType = 'success';
+                    if (result.data && result.data.es_tardanza) {
+                        message += ' (Tardanza)';
+                        alertType = 'warning';
+                    }
+                    showKioskAlert(message, alertType);
                     setTimeout(resetKiosk, 4000);
                 } else { throw new Error(result.message); }
             } catch (error) {
@@ -170,6 +166,132 @@
             p.className = `p-4 ${customClasses} flex items-center justify-center animate-fade-in`;
             return p;
         }
+
+        // --- LÓGICA PARA RFID ---
+        rfidInput.addEventListener('blur', () => setTimeout(() => rfidInput.focus(), 10));
+        rfidInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                const uid = rfidInput.value.trim();
+                if (uid) { qrScanned = true; handleRFID(uid); } // Marcar como escaneado para detener la cámara
+            }
+        });
+
+        async function handleRFID(uid) {
+            scanFeedback.textContent = "Procesando tarjeta RFID...";
+            try {
+                const response = await fetch('/api/asistencia_rfid/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid: uid }) });
+                const data = await response.json();
+                if (!response.ok && response.status !== 404) { throw new Error(data.message || 'Error desconocido.'); }
+                displayInfoAndActions(data); // Reutilizamos la función de display
+            } catch (error) {
+                console.error("Error en RFID:", error);
+                scanFeedback.textContent = error.message;
+                setTimeout(resetKiosk, 3000);
+            } finally {
+                rfidInput.value = '';
+            }
+        }
+
+        function displayInfoAndActions(data) {
+            if (data.status === 'weekend_off') {
+                scanFeedback.textContent = data.message;
+                showKioskAlert(data.message, 'warning');
+                setTimeout(resetKiosk, 5000);
+                return;
+            }
+
+            if (data.status === 'error') {
+                scanFeedback.textContent = data.message;
+                showKioskAlert(data.message, false);
+                setTimeout(resetKiosk, 5000);
+                return;
+            }
+
+            // Si llegamos aquí, tenemos información de un docente
+            teacherName.textContent = data.teacher.name;
+            teacherDni.textContent = `ID: ${data.teacher.dni}`;
+            teacherPhoto.src = data.teacher.photoUrl;
+            attendanceActions.innerHTML = '';
+
+            // Lógica para QR: Muestra botones de acción
+            if (data.courses) {
+                if (!data.isDailyAttendanceMarked) { attendanceActions.appendChild(createButton('Marcar Entrada General del Día', 'bg-blue-600', () => markAttendance('general_entry', data.qrId), 'fa-user-check')); }
+                else { attendanceActions.appendChild(createInfo('Entrada General ya marcada.', 'text-lg', 'fa-check-circle')); }
+
+                if (data.courses.length > 0) { attendanceActions.appendChild(createInfo('Asistencia por Curso', 'text-xl font-bold mt-4 mb-2 text-left', 'fa-chalkboard-teacher')); }
+
+                data.courses.forEach((course, index) => {
+                    const courseContainer = document.createElement('div');
+                    courseContainer.className = 'p-4 bg-gray-800/50 rounded-lg flex justify-between items-center animate-fade-in';
+                    courseContainer.style.animationDelay = `${100 * (index + 1)}ms`;
+                    courseContainer.innerHTML = `<h3 class="font-semibold text-lg">${course.name}</h3>`;
+                    const buttonWrapper = document.createElement('div');
+
+                    if (!course.entryMarked) {
+                        buttonWrapper.appendChild(createButton('Entrada', 'bg-green-600', () => markAttendance('course_entry', data.qrId, course.id), 'fa-arrow-right-to-bracket', 'px-4 py-2'));
+                    } else if (course.exitMarked) {
+                        buttonWrapper.appendChild(createInfo('Completo', 'text-green-400 text-sm', 'fa-check-double'));
+                    } else if (course.canMarkExit) {
+                        buttonWrapper.appendChild(createButton('Salida', 'bg-red-600', () => markAttendance('course_exit', data.qrId, course.id), 'fa-arrow-right-from-bracket', 'px-4 py-2'));
+                    } else if (course.hora_salida_permitida_str) {
+                        buttonWrapper.appendChild(createInfo(`Salida a las ${course.hora_salida_permitida_str}`, 'text-blue-400 text-sm', 'fa-hourglass-half'));
+                    } else {
+                        buttonWrapper.appendChild(createInfo('En curso...', 'text-blue-400 text-sm', 'fa-hourglass-half'));
+                    }
+
+                    courseContainer.appendChild(buttonWrapper);
+                    attendanceActions.appendChild(courseContainer);
+                });
+            // Lógica para RFID: Muestra solo el mensaje de estado
+            } else {
+                let iconClass = 'fa-info-circle';
+                if (data.status === 'success') iconClass = 'fa-check-circle';
+                if (data.status === 'warning') iconClass = 'fa-exclamation-triangle';
+                attendanceActions.appendChild(createInfo(data.message, 'text-2xl text-center', iconClass));
+                setTimeout(resetKiosk, 5000); // Resetea el kiosko tras mostrar el mensaje
+            }
+
+            // Transición de vistas
+            scanningState.classList.add('fade-out');
+            setTimeout(() => {
+                scanningState.classList.add('hidden');
+                actionsState.classList.remove('hidden');
+                actionsState.classList.remove('fade-out');
+            }, 500);
+        }
+
+        // --- LÓGICA PARA WEBSOCKETS ---
+        const kioskSocket = new WebSocket(
+            'ws://'
+            + window.location.host
+            + '/ws/kiosk/'
+        );
+
+        kioskSocket.onopen = function(e) {
+            console.log('Kiosk WebSocket connection established.');
+        };
+
+        kioskSocket.onmessage = function(e) {
+            const eventData = JSON.parse(e.data);
+            console.log('Data received from WebSocket:', eventData);
+
+            if (eventData.type === 'kiosk.update') {
+                // Detener el escaneo de la cámara si está activo
+                qrScanned = true;
+                // Usar la función existente para mostrar la información
+                displayInfoAndActions(eventData.data);
+            }
+        };
+
+        kioskSocket.onclose = function(e) {
+            console.error('Kiosk WebSocket connection closed unexpectedly. Trying to reconnect...');
+            // Opcional: intentar reconectar después de un breve retraso
+            setTimeout(function() {
+                // Lógica de reconexión podría ir aquí
+            }, 2000);
+        };
+
     </script>
 </body>
 </html>
