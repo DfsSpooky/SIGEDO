@@ -34,13 +34,14 @@ urlpatterns = [
     # --- URLS PARA EL KIOSCO ---
     # Esta ruta mostrará la página del kiosco
     path('kiosco/', views.kiosco_page, name='kiosco_page'),
-    
-    # APIs que usará el JavaScript del kiosco
-    path('api/get-teacher-info/', views.get_teacher_info, name='api_get_teacher_info'),
-    path('api/mark-attendance/', views.mark_attendance_kiosk, name='api_mark_attendance'),
-    path('api/asistencia_rfid/', views.registrar_asistencia_rfid, name='api_asistencia_rfid'),
 
-        # --- INICIO DE URLS PARA CREDENCIALES ---
+    # --- URLs de la API (ahora en su propio módulo) ---
+    # Se agrupan todas las URLs de la API bajo el prefijo /api/
+    path('api/', include('core.api.urls', namespace='api')),
+    
+    # Las URLs de la API que antes estaban aquí han sido movidas a core/api/urls.py
+
+    # --- INICIO DE URLS PARA CREDENCIALES ---
     path('credenciales/', views.lista_docentes_credenciales, name='lista_credenciales'),
     path('credenciales/<str:encrypted_id>/', views.generar_credencial_docente, name='generar_credencial'),
     path('credenciales/<int:docente_id>/rotate-qr/', views.rotate_qr_code, name='rotate_qr_code'),
@@ -48,12 +49,6 @@ urlpatterns = [
     path('reportes/asistencia/', views.reporte_asistencia, name='reporte_asistencia'),
 
     path('planificador/', views.planificador_horarios, name='planificador_horarios'),
-    path('api/asignar-horario/', views.api_asignar_horario, name='api_asignar_horario'),
-    path('api/desasignar-horario/', views.api_desasignar_horario, name='api_desasignar_horario'),
-    path('api/get-teacher-conflicts/', views.api_get_teacher_conflicts, name='api_get_teacher_conflicts'),
-    path('api/auto-asignar/', views.api_auto_asignar, name='api_auto_asignar'),
-    path('api/generar-horario-automatico/', views.generar_horario_automatico, name='generar_horario_automatico'),
-    path('api/get-cursos-no-asignados/', views.api_get_cursos_no_asignados, name='api_get_cursos_no_asignados'),
 
     path('horarios/ver/', views.vista_publica_horarios, name='vista_publica_horarios'),
 
@@ -62,8 +57,6 @@ urlpatterns = [
     # Las URLs de exportación ahora apuntan al nuevo módulo
     path('reporte-asistencia/excel/', exports.exportar_reporte_excel, name='exportar_excel'),
     path('reporte-asistencia/pdf/', exports.exportar_reporte_pdf, name='exportar_pdf'),
-    path('reporte-asistencia/detalle/<int:docente_id>/', views.detalle_asistencia_docente_ajax, name='detalle_asistencia_docente_ajax'),
-    path('api/reporte/chart-data/', views.api_get_report_chart_data, name='api_report_chart_data'),
     path('notificaciones/', views.ver_notificaciones, name='ver_notificaciones'),
     path('anuncios/', views.ver_anuncios, name='ver_anuncios'),
     path('docente/<int:docente_id>/ficha/', views.generar_ficha_docente, name='generar_ficha_docente'),
