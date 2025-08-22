@@ -226,7 +226,7 @@ class ReporteAsistenciaTest(TestCase):
         Test the API endpoint that retrieves detailed attendance info for the modal.
         """
         # URL for the detail API
-        url = reverse('detalle_asistencia_docente_ajax', args=[self.docente.id])
+        url = reverse('api:detalle_asistencia_docente_ajax', args=[self.docente.id])
 
         # Make the request
         response = self.client.get(url)
@@ -489,7 +489,7 @@ class RfidAsistenciaTest(TestCase):
             rfid_uid=self.rfid_uid
         )
         self.client = Client()
-        self.url = reverse('api_asistencia_rfid')
+        self.url = reverse('api:asistencia_rfid')
 
     @patch('django.utils.timezone.now')
     def test_registrar_asistencia_rfid_success(self, mock_now):
@@ -550,7 +550,7 @@ class RfidAsistenciaTest(TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()['status'], 'error')
-        self.assertIn('no proporcionado', response.json()['message'])
+        self.assertIn('Datos inválidos', response.json()['message'])
 
     @patch('django.utils.timezone.now')
     def test_registrar_asistencia_rfid_weekend(self, mock_now):
