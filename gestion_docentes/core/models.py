@@ -159,6 +159,38 @@ class Asistencia(models.Model):
 
     def __str__(self): return f"Asistencia {self.docente} - {self.curso} ({self.fecha})"
 
+    def es_tardanza(self):
+        """
+        Determina si la marca de entrada de esta asistencia se considera tardanza.
+        """
+        if not self.hora_entrada or not self.curso or not self.curso.horario_inicio:
+            return False
+
+        # Cargar la configuración de la institución para obtener el límite de tardanza
+        configuracion = ConfiguracionInstitucion.load()
+
+        # Combinar la fecha de la asistencia con la hora de inicio del curso para crear un datetime
+        # Es importante usar la fecha de la asistencia, no la fecha actual.
+        horario_inicio_dt = timezone.make_aware(
+            datetime.combine(self.fecha, self.curso.horario_inicio)
+        )
+
+        # Calcular el tiempo límite para marcar sin ser considerado tardanza
+        limite_tardanza = horario_inicio_dt + timedelta(minutes=configuracion.tiempo_limite_tardanza)
+
+        # Comparar la hora de entrada (que es un datetime) con el límite (que también es un datetime)
+        return self.hora_entrada > limite_tardanza
+
+    @property
+    def puede_marcar_salida(self):
+        """
+        Determina si ya se puede marcar la salida para esta asistencia.
+        """
+        if self.hora_entrada and not self.hora_salida:
+            if self.hora_salida_permitida and timezone.now() >= self.hora_salida_permitida:
+                return True
+        return False
+
 class AsistenciaDiaria(models.Model):
     docente = models.ForeignKey(Docente, on_delete=models.CASCADE)
     fecha = models.DateField(default=date.today)

@@ -68,10 +68,8 @@ def get_teacher_info(request):
             for curso in cursos_hoy:
                 asistencia_curso = Asistencia.objects.filter(docente=docente, curso=curso, fecha=today).first()
 
-                can_mark_exit = False
-                if asistencia_curso and asistencia_curso.hora_entrada and not asistencia_curso.hora_salida:
-                    if asistencia_curso.hora_salida_permitida and timezone.now() >= asistencia_curso.hora_salida_permitida:
-                        can_mark_exit = True
+                # La lógica para determinar si se puede marcar la salida ahora está en el modelo.
+                can_mark_exit = asistencia_curso.puede_marcar_salida if asistencia_curso else False
 
                 courses_data.append({
                     'id': curso.id,
@@ -142,11 +140,9 @@ def mark_attendance_kiosk(request):
                     asistencia.hora_entrada = now
                     asistencia.foto_entrada = photo_file
 
-                    configuracion = ConfiguracionInstitucion.load()
-                    horario_inicio_dt = timezone.make_aware(datetime.combine(today, curso.horario_inicio))
-                    limite_tardanza = horario_inicio_dt + timedelta(minutes=configuracion.tiempo_limite_tardanza)
-                    es_tardanza = now > limite_tardanza
-                    response_data['es_tardanza'] = es_tardanza
+                    # Lógica de tardanza (ahora en el modelo)
+                    # El método es_tardanza() usa asistencia.hora_entrada que acabamos de asignar.
+                    response_data['es_tardanza'] = asistencia.es_tardanza()
 
                     duracion_minima_minutos = (curso.duracion_bloques * 50) - 15
                     if duracion_minima_minutos < 15: duracion_minima_minutos = 15
