@@ -1,9 +1,9 @@
-from django.db.models.signals import pre_save
+from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 from django.urls import reverse
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
-from .models import Documento, Notificacion, SolicitudIntercambio, Curso
+from .models import Documento, Notificacion, SolicitudIntercambio, Curso, Anuncio, Docente
 
 
 @receiver(pre_save, sender=Documento)
@@ -152,3 +152,34 @@ def crear_notificacion_asignacion_curso(sender, instance, **kwargs):
                 }
             }
         )
+
+@receiver(post_save, sender=Anuncio)
+def crear_notificacion_anuncio(sender, instance, created, **kwargs):
+    """
+    Crea una notificación para todos los usuarios cuando se publica un nuevo anuncio.
+    """
+    if created:
+        channel_layer = get_channel_layer()
+        message = f"Nuevo anuncio publicado: '{instance.titulo}'"
+
+        # Iterar sobre todos los docentes para crear y enviar notificaciones
+        for docente in Docente.objects.all():
+            notificacion = Notificacion.objects.create(
+                destinatario=docente,
+                mensaje=message,
+                url=reverse('ver_anuncios')
+            )
+
+            async_to_sync(channel_layer.group_send)(
+                f'notifications_{docente.id}',
+                {
+                    'type': 'send_notification',
+                    'message': {
+                        'id': notificacion.id,
+                        'mensaje': notificacion.mensaje,
+                        'url': notificacion.url,
+                        'leido': notificacion.leido,
+                        'fecha_creacion': notificacion.fecha_creacion.isoformat()
+                    }
+                }
+            )
