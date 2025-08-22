@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}Mis Notificaciones{% endblock %}
+{% block breadcrumb %}Notificaciones{% endblock %}
+
+{% block content %}
+<div class="card bg-base-100 shadow-xl">
+    <div class="card-body">
+        <h1 class="card-title text-3xl">Mis Notificaciones</h1>
+
+        <div class="mt-6 space-y-4">
+            {% for notificacion in notificaciones %}
+                <div class="alert {% if not notificacion.leido %}alert-info{% else %}bg-base-200{% endif %}">
+                    <div class="flex-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 mx-2 stroke-current">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <label>
+                            <p class="font-semibold">{{ notificacion.mensaje }}</p>
+                            <span class="text-xs text-base-content/70">{{ notificacion.fecha_creacion|timesince }} ago</span>
+                        </label>
+                    </div>
+                    <div class="flex-none">
+                        {% if notificacion.url %}
+                        <a href="{{ notificacion.url }}" class="btn btn-sm btn-primary">Ver Detalle</a>
+                        {% endif %}
+                    </div>
+                </div>
+            {% empty %}
+                <div class="text-center py-12">
+                    <i class="fas fa-bell-slash fa-3x text-base-content/30 mb-4"></i>
+                    <h3 class="text-xl font-semibold">No tienes notificaciones.</h3>
+                    <p class="text-base-content/60">Cuando algo importante ocurra, lo verás aquí.</p>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

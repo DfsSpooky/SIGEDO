@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Solicitar Justificación{% endblock %}
+
+{% block breadcrumb %}
+    <a href="{% url 'lista_justificaciones' %}">Justificaciones</a> / Nueva Solicitud
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-4 lg:p-8">
+    <div class="max-w-3xl mx-auto">
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h1 class="card-title text-3xl mb-4"><i class="fas fa-file-medical-alt mr-3 text-primary"></i>Nueva Solicitud de Justificación</h1>
+
+                <form method="post" enctype="multipart/form-data" class="space-y-6">
+                    {% csrf_token %}
+
+                    <div class="form-control w-full">
+                        <label class="label" for="{{ form.tipo.id_for_label }}">
+                            <span class="label-text font-semibold">Tipo de Justificación</span>
+                        </label>
+                        {{ form.tipo }}
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="form-control">
+                            <label class="label" for="{{ form.fecha_inicio.id_for_label }}">
+                                <span class="label-text font-semibold">Fecha de Inicio</span>
+                            </label>
+                            {{ form.fecha_inicio }}
+                        </div>
+                        <div class="form-control">
+                            <label class="label" for="{{ form.fecha_fin.id_for_label }}">
+                                <span class="label-text font-semibold">Fecha de Fin</span>
+                            </label>
+                            {{ form.fecha_fin }}
+                        </div>
+                    </div>
+
+                    <div class="form-control">
+                        <label class="label" for="{{ form.motivo.id_for_label }}">
+                            <span class="label-text font-semibold">Motivo de la Ausencia</span>
+                            <span class="label-text-alt">Explique brevemente la razón</span>
+                        </label>
+                        {{ form.motivo }}
+                    </div>
+
+                    <div class="form-control">
+                        <label class="label" for="{{ form.documento_adjunto.id_for_label }}">
+                            <span class="label-text font-semibold">Documento de Respaldo (Opcional)</span>
+                            <span class="label-text-alt">PDF, JPG, PNG</span>
+                        </label>
+                        {{ form.documento_adjunto }}
+                    </div>
+
+                    {% if form.errors %}
+                        <div class="alert alert-error">
+                            <i class="fas fa-times-circle"></i>
+                            <span>Por favor, corrige los errores en el formulario.</span>
+                        </div>
+                    {% endif %}
+
+                    <div class="card-actions justify-end pt-4">
+                        <a href="{% url 'lista_justificaciones' %}" class="btn btn-ghost">Cancelar</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-paper-plane mr-2"></i>
+                            Enviar Solicitud
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
