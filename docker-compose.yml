@@ -4,7 +4,7 @@ services:
   web:
     build: .
     
-    command: daphne -b 0.0.0.0 -p 8000 gestion_docentes.asgi:application
+    command: daphne -b 0.0.0.0 -p 8000 gestion_docentes.gestion_docentes.asgi:application
     volumes:
       - .:/app
       - static_volume:/app/gestion_docentes/staticfiles
