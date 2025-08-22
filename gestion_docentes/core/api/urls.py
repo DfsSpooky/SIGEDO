@@ -6,9 +6,9 @@ app_name = 'api'
 
 urlpatterns = [
     # --- URLs para el Kiosco ---
-    path('get-teacher-info/', views.get_teacher_info, name='get_teacher_info'),
-    path('mark-attendance/', views.mark_attendance_kiosk, name='mark_attendance'),
-    path('asistencia_rfid/', views.registrar_asistencia_rfid, name='asistencia_rfid'),
+    path('get-teacher-info/', views.TeacherInfoView.as_view(), name='get_teacher_info'),
+    path('mark-attendance/', views.MarkAttendanceView.as_view(), name='mark_attendance'),
+    path('asistencia_rfid/', views.RegistrarAsistenciaRfidView.as_view(), name='asistencia_rfid'),
 
     # --- URLs para el Planificador de Horarios ---
     path('asignar-horario/', views.api_asignar_horario, name='asignar_horario'),

@@ -10,6 +10,8 @@ constantly==23.10.4
 cryptography==42.0.8
 daphne==4.2.1
 Django==5.2.4
+djangorestframework
+drf-yasg
 django-tailwind==4.2.0
 django-unfold==0.63.0
 et_xmlfile==2.0.0

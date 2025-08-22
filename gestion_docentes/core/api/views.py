@@ -24,206 +24,206 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from ..utils.responses import success_response, error_response, not_found_response, server_error_response
 from ..utils.reports import _generar_datos_reporte_asistencia
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+
 from ..views import remove_accents # Importamos la función de `views` temporalmente
+from .serializers import DocenteInfoSerializer, CursoAsistenciaSerializer
 
 # --- VISTAS PARA EL KIOSCO (AHORA EN SU PROPIO ARCHIVO DE API) ---
 
-@csrf_exempt
-def get_teacher_info(request):
-    if request.method == 'POST':
+class TeacherInfoView(APIView):
+    """
+    API View para obtener la información de un docente y sus cursos del día.
+    Reemplaza la función original get_teacher_info con una vista basada en clases de DRF.
+    """
+    def post(self, request, *args, **kwargs):
+        qr_id = request.data.get('qrId')
+        if not qr_id:
+            return Response({'status': 'error', 'message': 'qrId no proporcionado.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        today = timezone.localtime(timezone.now()).date()
+
+        if today.weekday() in [5, 6]: # Sábado=5, Domingo=6
+            return Response({'status': 'weekend_off', 'message': 'El kiosco no está disponible los fines de semana.'})
+
         try:
-            data = json.loads(request.body)
-            qr_id = data.get('qrId')
-            today = timezone.localtime(timezone.now()).date()
-
-            if today.weekday() in [5, 6]:
-                return JsonResponse({'status': 'weekend_off', 'message': 'El kiosco de asistencia no está disponible los fines de semana.'})
-
             docente = Docente.objects.get(id_qr=qr_id)
-
-            photo_url = request.build_absolute_uri(docente.foto.url) if docente.foto and hasattr(docente.foto, 'url') else request.build_absolute_uri(static('placeholder.png'))
-
-            dia_especial = DiaEspecial.objects.filter(fecha=today).first()
-            if dia_especial:
-                # ... (la lógica de día especial no cambia)
-                pass
-
-            semestre_activo = Semestre.objects.filter(estado='ACTIVO', fecha_inicio__lte=today, fecha_fin__gte=today).first()
-            if not semestre_activo:
-                return JsonResponse({'status': 'error', 'message': 'No hay un semestre académico activo.'}, status=400)
-
-            is_daily_marked = AsistenciaDiaria.objects.filter(docente=docente, fecha=today).exists()
-
-            # Optimización: Usar el nuevo campo `dia_semana` para filtrar en la BD
-            # weekday() devuelve Lunes=0, Martes=1, ..., Domingo=6
-            dia_semana_hoy = today.weekday()
-
-            # Filtramos directamente en la base de datos usando el nuevo campo indexado.
-            # Esto es mucho más eficiente que traer todos los cursos y filtrarlos en Python.
-            cursos_hoy = Curso.objects.filter(
-                docente=docente,
-                semestre=semestre_activo,
-                dia_semana=dia_semana_hoy
-            )
-
-            courses_data = []
-            for curso in cursos_hoy:
-                asistencia_curso = Asistencia.objects.filter(docente=docente, curso=curso, fecha=today).first()
-
-                # La lógica para determinar si se puede marcar la salida ahora está en el modelo.
-                can_mark_exit = asistencia_curso.puede_marcar_salida if asistencia_curso else False
-
-                courses_data.append({
-                    'id': curso.id,
-                    'name': f'{curso.nombre} ({curso.horario_inicio.strftime("%H:%M")} - {curso.horario_fin.strftime("%H:%M")})',
-                    'entryMarked': asistencia_curso is not None and asistencia_curso.hora_entrada is not None,
-                    'exitMarked': asistencia_curso is not None and asistencia_curso.hora_salida is not None,
-                    'canMarkExit': can_mark_exit,
-                    'hora_salida_permitida_str': asistencia_curso.hora_salida_permitida.strftime('%H:%M:%S') if asistencia_curso and asistencia_curso.hora_salida_permitida else None,
-                })
-
-            response_data = {
-                'status': 'success',
-                'qrId': qr_id,
-                'teacher': {
-                    'name': f'{docente.first_name} {docente.last_name}',
-                    'dni': docente.dni,
-                    'photoUrl': photo_url,
-                },
-                'isDailyAttendanceMarked': is_daily_marked,
-                'courses': courses_data
-            }
-            return JsonResponse(response_data)
-
         except Docente.DoesNotExist:
-            return not_found_response('QR no válido o docente no encontrado.')
-        except Exception as e:
-            return server_error_response(str(e))
-    return error_response('Método no permitido', status_code=405)
+            return Response({'status': 'error', 'message': 'QR no válido o docente no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+
+        semestre_activo = Semestre.objects.filter(estado='ACTIVO', fecha_inicio__lte=today, fecha_fin__gte=today).first()
+        if not semestre_activo:
+            return Response({'status': 'error', 'message': 'No hay un semestre académico activo.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Usamos la consulta optimizada con el campo `dia_semana`
+        dia_semana_hoy = today.weekday()
+        cursos_hoy = Curso.objects.filter(
+            docente=docente,
+            semestre=semestre_activo,
+            dia_semana=dia_semana_hoy
+        )
+
+        # Para cada curso del día, nos aseguramos de que exista un registro de asistencia
+        # Esto simplifica la lógica y asegura que siempre tengamos un objeto para serializar.
+        asistencias = []
+        for curso in cursos_hoy:
+            asistencia, _ = Asistencia.objects.get_or_create(
+                docente=docente,
+                curso=curso,
+                fecha=today
+            )
+            asistencias.append(asistencia)
+
+        # Usamos los serializers para construir la respuesta
+        docente_serializer = DocenteInfoSerializer(docente, context={'request': request})
+        cursos_asistencia_serializer = CursoAsistenciaSerializer(asistencias, many=True)
+        is_daily_marked = AsistenciaDiaria.objects.filter(docente=docente, fecha=today).exists()
+
+        response_data = {
+            'status': 'success',
+            'qrId': qr_id,
+            'teacher': docente_serializer.data,
+            'isDailyAttendanceMarked': is_daily_marked,
+            'courses': cursos_asistencia_serializer.data
+        }
+
+        return Response(response_data)
 
 
-@csrf_exempt
-def mark_attendance_kiosk(request):
-    if request.method == 'POST':
+from .serializers import DocenteInfoSerializer, CursoAsistenciaSerializer, MarkAttendanceSerializer, RegistrarAsistenciaRfidSerializer
+
+class MarkAttendanceView(APIView):
+    """
+    API View para marcar la asistencia de un docente.
+    Reemplaza la función mark_attendance_kiosk.
+    """
+    def post(self, request, *args, **kwargs):
+        serializer = MarkAttendanceSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({'status': 'error', 'message': 'Datos inválidos.', 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        validated_data = serializer.validated_data
+        qr_id = validated_data['qrId']
+        action_type = validated_data['actionType']
+        photo_base64 = validated_data['photoBase64']
+
         try:
-            data = json.loads(request.body)
-            qr_id = data.get('qrId')
-            action_type = data.get('actionType')
-            photo_base64 = data.get('photoBase64')
-
             docente = Docente.objects.get(id_qr=qr_id)
+        except Docente.DoesNotExist:
+            return Response({'status': 'error', 'message': 'QR no válido o docente no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
 
-            today = timezone.localtime(timezone.now()).date()
-            now = timezone.now()
+        today = timezone.localtime(timezone.now()).date()
+        now = timezone.now()
 
+        try:
             format, imgstr = photo_base64.split(';base64,')
             ext = format.split('/')[-1]
             photo_file = ContentFile(base64.b64decode(imgstr), name=f'{docente.username}_{now.timestamp()}.{ext}')
+        except:
+            return Response({'status': 'error', 'message': 'Formato de photoBase64 inválido.'}, status=status.HTTP_400_BAD_REQUEST)
 
-            if action_type == 'general_entry':
-                asistencia_diaria, created = AsistenciaDiaria.objects.get_or_create(
-                    docente=docente,
-                    fecha=today,
-                    defaults={'foto_verificacion': photo_file}
-                )
-                if created:
-                    return success_response(message='Entrada general registrada correctamente.')
-                else:
-                    return success_response(message='La entrada general ya ha sido marcada hoy.', data={'already_marked': True})
+        if action_type == 'general_entry':
+            _, created = AsistenciaDiaria.objects.get_or_create(
+                docente=docente,
+                fecha=today,
+                defaults={'foto_verificacion': photo_file}
+            )
+            if created:
+                return Response({'status': 'success', 'message': 'Entrada general registrada correctamente.'})
+            else:
+                return Response({'status': 'success', 'message': 'La entrada general ya ha sido marcada hoy.', 'data': {'already_marked': True}})
 
-            elif action_type in ['course_entry', 'course_exit']:
-                curso_id = data.get('courseId')
+        elif action_type in ['course_entry', 'course_exit']:
+            curso_id = validated_data.get('courseId')
+            if not curso_id:
+                return Response({'status': 'error', 'message': 'courseId es requerido para esta acción.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            try:
                 curso = Curso.objects.get(id=curso_id)
-                asistencia, created = Asistencia.objects.get_or_create(docente=docente, curso=curso, fecha=today)
+            except Curso.DoesNotExist:
+                return Response({'status': 'error', 'message': 'Curso no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
 
-                response_data = {}
+            asistencia, _ = Asistencia.objects.get_or_create(docente=docente, curso=curso, fecha=today)
+            response_data = {}
 
-                if action_type == 'course_entry' and not asistencia.hora_entrada:
-                    asistencia.hora_entrada = now
-                    asistencia.foto_entrada = photo_file
+            if action_type == 'course_entry':
+                if asistencia.hora_entrada:
+                    return Response({'status': 'warning', 'message': 'La entrada para este curso ya fue marcada.'})
 
-                    # Lógica de tardanza (ahora en el modelo)
-                    # El método es_tardanza() usa asistencia.hora_entrada que acabamos de asignar.
-                    response_data['es_tardanza'] = asistencia.es_tardanza()
+                asistencia.hora_entrada = now
+                asistencia.foto_entrada = photo_file
+                response_data['es_tardanza'] = asistencia.es_tardanza()
 
-                    duracion_minima_minutos = (curso.duracion_bloques * 50) - 15
-                    if duracion_minima_minutos < 15: duracion_minima_minutos = 15
-                    asistencia.hora_salida_permitida = now + timedelta(minutes=duracion_minima_minutos)
-                    asistencia.save()
+                duracion_minima_minutos = (curso.duracion_bloques * 50) - 15
+                if duracion_minima_minutos < 15: duracion_minima_minutos = 15
+                asistencia.hora_salida_permitida = now + timedelta(minutes=duracion_minima_minutos)
+                asistencia.save()
 
-                elif action_type == 'course_exit' and asistencia.hora_entrada and not asistencia.hora_salida:
-                    if asistencia.hora_salida_permitida and now >= asistencia.hora_salida_permitida:
-                        asistencia.hora_salida = now
-                        asistencia.foto_salida = photo_file
-                        asistencia.save()
-                    else:
-                        return error_response(message="Aún no puede marcar la salida.")
+            elif action_type == 'course_exit':
+                if not asistencia.hora_entrada:
+                    return Response({'status': 'error', 'message': 'Debe marcar la entrada antes de poder marcar la salida.'}, status=status.HTTP_400_BAD_REQUEST)
+                if asistencia.hora_salida:
+                    return Response({'status': 'warning', 'message': 'La salida para este curso ya fue marcada.'})
+                if not asistencia.puede_marcar_salida:
+                    return Response({'status': 'error', 'message': 'Aún no puede marcar la salida.'}, status=status.HTTP_400_BAD_REQUEST)
 
-                return success_response(message='Asistencia registrada correctamente.', data=response_data)
+                asistencia.hora_salida = now
+                asistencia.foto_salida = photo_file
+                asistencia.save()
 
-        except Exception as e:
-            print(f"Error en mark_attendance_kiosk: {e}")
-            return server_error_response(str(e))
-    return error_response('Método no permitido', status_code=405)
+            return Response({'status': 'success', 'message': 'Asistencia registrada correctamente.', 'data': response_data})
+
+        return Response({'status': 'error', 'message': 'Tipo de acción no válida.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-@csrf_exempt
-def registrar_asistencia_rfid(request):
-    if request.method == 'POST':
+class RegistrarAsistenciaRfidView(APIView):
+    """
+    API View para registrar la asistencia diaria de un docente mediante RFID.
+    Reemplaza la función registrar_asistencia_rfid.
+    """
+    def post(self, request, *args, **kwargs):
+        serializer = RegistrarAsistenciaRfidSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({'status': 'error', 'message': 'Datos inválidos.', 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        uid = serializer.validated_data['uid']
+        today = timezone.localtime(timezone.now()).date()
+
+        if today.weekday() in [5, 6]:
+            return Response({'status': 'weekend_off', 'message': 'El registro de asistencia no está disponible los fines de semana.'})
+
         try:
-            data = json.loads(request.body)
-            rfid_uid = data.get('uid')
-            today = timezone.localtime(timezone.now()).date()
+            docente = Docente.objects.get(rfid_uid=uid)
+        except Docente.DoesNotExist:
+            return Response({'status': 'error', 'message': 'Tarjeta RFID no reconocida o no asignada.'}, status=status.HTTP_404_NOT_FOUND)
 
-            if not rfid_uid:
-                return error_response('UID de RFID no proporcionado.')
+        asistencia_diaria, created = AsistenciaDiaria.objects.get_or_create(docente=docente, fecha=today)
 
-            if today.weekday() in [5, 6]:
-                return JsonResponse({'status': 'weekend_off', 'message': 'El registro de asistencia no está disponible los fines de semana.'})
+        teacher_serializer = DocenteInfoSerializer(docente, context={'request': request})
 
-            docente = Docente.objects.get(rfid_uid=rfid_uid)
-
-            photo_url = request.build_absolute_uri(docente.foto.url) if docente.foto and hasattr(docente.foto, 'url') else request.build_absolute_uri(static('placeholder.png'))
-            teacher_data = {
-                'name': f'{docente.first_name} {docente.last_name}',
-                'dni': docente.dni,
-                'photoUrl': photo_url,
+        if created:
+            response_data = {
+                'status': 'success',
+                'message': 'Asistencia registrada correctamente.',
+                'teacher': teacher_serializer.data
+            }
+        else:
+            response_data = {
+                'status': 'warning',
+                'message': f'La asistencia de hoy ya fue registrada a las {asistencia_diaria.hora_entrada.strftime("%H:%M:%S")}.',
+                'teacher': teacher_serializer.data
             }
 
-            if AsistenciaDiaria.objects.filter(docente=docente, fecha=today).exists():
-                response_data = {
-                    'status': 'warning',
-                    'message': f'La asistencia de hoy ya fue registrada a las {AsistenciaDiaria.objects.get(docente=docente, fecha=today).hora_entrada.strftime("%H:%M:%S")}.',
-                    'teacher': teacher_data
-                }
-            else:
-                AsistenciaDiaria.objects.create(docente=docente, fecha=today)
-                response_data = {
-                    'status': 'success',
-                    'message': 'Asistencia registrada correctamente.',
-                    'teacher': teacher_data
-                }
+        # Enviar actualización a través de Channels
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            'kiosk_group',
+            {'type': 'kiosk.update', 'data': response_data}
+        )
 
-            channel_layer = get_channel_layer()
-            async_to_sync(channel_layer.group_send)(
-                'kiosk_group',
-                {
-                    'type': 'kiosk.update',
-                    'data': response_data
-                }
-            )
-
-            return JsonResponse(response_data)
-
-        except Docente.DoesNotExist:
-            return not_found_response('Tarjeta RFID no reconocida o no asignada.')
-        except json.JSONDecodeError:
-            return error_response('Datos de la petición en formato incorrecto.')
-        except Exception as e:
-            print(f"Error inesperado en registrar_asistencia_rfid: {e}")
-            return server_error_response('Ocurrió un error interno en el servidor.')
-
-    return error_response('Método no permitido', status_code=405)
+        return Response(response_data)
 
 # --- VISTAS DE API PARA EL PLANIFICADOR ---
 
