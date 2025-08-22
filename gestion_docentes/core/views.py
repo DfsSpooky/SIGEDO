@@ -652,8 +652,16 @@ def mark_attendance_kiosk(request):
             photo_file = ContentFile(base64.b64decode(imgstr), name=f'{docente.username}_{now.timestamp()}.{ext}')
             
             if action_type == 'general_entry':
-                if not AsistenciaDiaria.objects.filter(docente=docente, fecha=today).exists():
-                    AsistenciaDiaria.objects.create(docente=docente, foto_verificacion=photo_file)
+                asistencia_diaria, created = AsistenciaDiaria.objects.get_or_create(
+                    docente=docente,
+                    fecha=today,
+                    defaults={'foto_verificacion': photo_file}
+                )
+                if created:
+                    return success_response(message='Entrada general registrada correctamente.')
+                else:
+                    # Devuelve un mensaje diferente si la asistencia ya existía, pero sigue siendo un éxito.
+                    return success_response(message='La entrada general ya ha sido marcada hoy.', data={'already_marked': True})
 
             elif action_type in ['course_entry', 'course_exit']:
                 curso_id = data.get('courseId')
