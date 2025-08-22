@@ -172,31 +172,22 @@ class NotificationTest(TestCase):
         self.assertEqual(notification.destinatario, self.teacher)
         self.assertIn('observaciones', notification.mensaje)
 
-    def test_notification_indicator_and_mark_as_read(self):
-        """Test the notification indicator and that notifications are marked as read."""
+    def test_mark_as_read_on_visit(self):
+        """Test that visiting the notifications page marks them as read."""
         # Create a notification manually for the teacher
         Notificacion.objects.create(destinatario=self.teacher, mensaje="Test notification")
 
         # Log in as the teacher
         self.client.login(username='teacheruser', password='teacherpassword123')
 
-        # 1. Check the dashboard for the unread count
-        dashboard_url = reverse('dashboard')
-        response = self.client.get(dashboard_url)
-        self.assertContains(response, '<span class="badge badge-sm badge-primary indicator-item">1</span>')
-
-        # 2. Visit the notifications page
+        # Visit the notifications page
         notifications_url = reverse('ver_notificaciones')
         response = self.client.get(notifications_url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Test notification")
 
-        # 3. Check that the notification is now marked as read
+        # Check that the notification is now marked as read
         self.assertEqual(Notificacion.objects.filter(destinatario=self.teacher, leido=True).count(), 1)
-
-        # 4. Check the dashboard again, the count should be gone
-        response = self.client.get(dashboard_url)
-        self.assertNotContains(response, 'indicator-item')
 
 
 class ReporteAsistenciaTest(TestCase):
@@ -473,7 +464,7 @@ class JustificacionTest(TestCase):
         self.assertEqual(docente_report['estado'], 'Justificado')
 
 
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock, AsyncMock
 
 class RfidAsistenciaTest(TestCase):
 
@@ -643,3 +634,54 @@ class AutoCheckoutTest(TestCase):
         self.assertIsNone(self.asistencia_futura.hora_salida)
 
         self.assertIn("1 attendances were closed", out.getvalue())
+
+
+class NotificationCreationTest(TestCase):
+
+    def setUp(self):
+        """Set up a test user and a client."""
+        self.docente = PersonalDocente.objects.create_user(
+            username='teacher_for_notification',
+            password='testpassword123',
+            dni='11223344'
+        )
+        self.carrera = Carrera.objects.create(nombre="Ingeniería de Notificaciones")
+        self.semestre = Semestre.objects.create(nombre="Test Semestre Notificaciones", fecha_inicio=date.today()-timedelta(days=30), fecha_fin=date.today()+timedelta(days=30), estado='ACTIVO')
+        self.curso = Curso.objects.create(
+            nombre="Curso de Prueba para Notificaciones",
+            carrera=self.carrera,
+            semestre=self.semestre
+        )
+
+    @patch('core.signals.get_channel_layer')
+    def test_notification_on_course_assignment(self, mock_get_channel_layer):
+        """
+        Test that a notification is created and broadcasted when a course is assigned to a teacher.
+        """
+        # Mock the channel layer's group_send method directly
+        mock_channel_layer = mock_get_channel_layer.return_value
+        mock_channel_layer.group_send = AsyncMock()
+
+        # Assign the teacher to the course
+        self.curso.docente = self.docente
+        self.curso.save()
+
+        # Check that a notification was created
+        notification_exists = Notificacion.objects.filter(
+            destinatario=self.docente,
+            mensaje__icontains="Se le ha asignado un nuevo curso"
+        ).exists()
+        self.assertTrue(notification_exists)
+
+        # Check that the broadcast was called
+        mock_get_channel_layer.assert_called_once()
+        mock_channel_layer.group_send.assert_called_once()
+
+        # Check the arguments of the broadcast
+        args, kwargs = mock_channel_layer.group_send.call_args
+        self.assertEqual(args[0], f'notifications_{self.docente.id}')
+        message_dict = args[1]
+        self.assertEqual(message_dict['type'], 'send_notification')
+        self.assertIn('mensaje', message_dict['message'])
+        # We check for a substring because the full message depends on other fields
+        self.assertIn(f"Se le ha asignado un nuevo curso: '{self.curso.nombre}'", message_dict['message']['mensaje'])

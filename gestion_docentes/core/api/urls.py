@@ -21,4 +21,9 @@ urlpatterns = [
     # --- URLs para la API de Reportes ---
     path('reporte/chart-data/', views.api_get_report_chart_data, name='report_chart_data'),
     path('reporte/detalle/<int:docente_id>/', views.detalle_asistencia_docente_ajax, name='detalle_asistencia_docente_ajax'),
+
+    # --- URLs para Notificaciones ---
+    path('notificaciones/json/', views.notificaciones_json, name='notificaciones_json'),
+    path('notificaciones/<int:notificacion_id>/marcar-leida/', views.marcar_notificacion_como_leida, name='marcar_notificacion_leida'),
+    path('notificaciones/marcar-todas-leidas/', views.marcar_todas_como_leidas, name='marcar_todas_leidas'),
 ]
