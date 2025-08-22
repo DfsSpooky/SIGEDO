@@ -693,3 +693,8 @@ class NotificationCreationTest(TestCase):
         self.assertTrue(Notificacion.objects.filter(destinatario=docente2).exists())
         self.assertEqual(len(callbacks), 2)
         self.assertEqual(mock_channel_layer.group_send.call_count, 2)
+
+        # Verify that group_send was called for each user's specific group
+        expected_groups = {f'notifications_{self.docente.id}', f'notifications_{docente2.id}'}
+        actual_groups = {call[0][0] for call in mock_channel_layer.group_send.call_args_list}
+        self.assertEqual(expected_groups, actual_groups)

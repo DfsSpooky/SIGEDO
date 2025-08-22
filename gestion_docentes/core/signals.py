@@ -4,8 +4,17 @@ from django.dispatch import receiver
 from django.urls import reverse
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+from functools import partial
 from .models import Documento, Notificacion, SolicitudIntercambio, Curso, Anuncio, Docente
 
+
+def do_broadcast(user_id, payload):
+    """Helper function to broadcast a message to a user's notification channel."""
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f'notifications_{user_id}',
+        payload
+    )
 
 @receiver(pre_save, sender=Documento)
 def crear_notificacion_estado_documento(sender, instance, **kwargs):
@@ -25,17 +34,8 @@ def crear_notificacion_estado_documento(sender, instance, **kwargs):
                         mensaje=message,
                         url=reverse('lista_documentos')
                     )
-
-                    def broadcast():
-                        channel_layer = get_channel_layer()
-                        async_to_sync(channel_layer.group_send)(
-                            f'notifications_{instance.docente.id}',
-                            {
-                                'type': 'send_notification',
-                                'message': { 'id': notificacion.id, 'mensaje': notificacion.mensaje, 'url': notificacion.url, 'leido': notificacion.leido, 'fecha_creacion': notificacion.fecha_creacion.isoformat() }
-                            }
-                        )
-                    transaction.on_commit(broadcast)
+                    payload = {'type': 'send_notification', 'message': { 'id': notificacion.id, 'mensaje': notificacion.mensaje, 'url': notificacion.url, 'leido': notificacion.leido, 'fecha_creacion': notificacion.fecha_creacion.isoformat() }}
+                    transaction.on_commit(partial(do_broadcast, instance.docente.id, payload))
         except Documento.DoesNotExist:
             pass
 
@@ -59,17 +59,8 @@ def crear_notificacion_estado_solicitud(sender, instance, **kwargs):
                         mensaje=message,
                         url=reverse('ver_solicitudes')
                     )
-
-                    def broadcast():
-                        channel_layer = get_channel_layer()
-                        async_to_sync(channel_layer.group_send)(
-                            f'notifications_{destinatario.id}',
-                            {
-                                'type': 'send_notification',
-                                'message': { 'id': notificacion.id, 'mensaje': notificacion.mensaje, 'url': notificacion.url, 'leido': notificacion.leido, 'fecha_creacion': notificacion.fecha_creacion.isoformat() }
-                            }
-                        )
-                    transaction.on_commit(broadcast)
+                    payload = {'type': 'send_notification', 'message': { 'id': notificacion.id, 'mensaje': notificacion.mensaje, 'url': notificacion.url, 'leido': notificacion.leido, 'fecha_creacion': notificacion.fecha_creacion.isoformat() }}
+                    transaction.on_commit(partial(do_broadcast, destinatario.id, payload))
         except SolicitudIntercambio.DoesNotExist:
             pass
 
@@ -86,17 +77,8 @@ def crear_notificacion_asignacion_curso(sender, instance, **kwargs):
                     mensaje=message,
                     url=reverse('ver_horarios', args=[instance.carrera.id])
                 )
-
-                def broadcast():
-                    channel_layer = get_channel_layer()
-                    async_to_sync(channel_layer.group_send)(
-                        f'notifications_{instance.docente.id}',
-                        {
-                            'type': 'send_notification',
-                            'message': { 'id': notificacion.id, 'mensaje': notificacion.mensaje, 'url': notificacion.url, 'leido': notificacion.leido, 'fecha_creacion': notificacion.fecha_creacion.isoformat() }
-                        }
-                    )
-                transaction.on_commit(broadcast)
+                payload = {'type': 'send_notification', 'message': { 'id': notificacion.id, 'mensaje': notificacion.mensaje, 'url': notificacion.url, 'leido': notificacion.leido, 'fecha_creacion': notificacion.fecha_creacion.isoformat() }}
+                transaction.on_commit(partial(do_broadcast, instance.docente.id, payload))
         except Curso.DoesNotExist:
             pass
     elif instance.docente is not None:
@@ -111,17 +93,9 @@ def crear_notificacion_asignacion_curso(sender, instance, **kwargs):
             mensaje=message,
             url=url
         )
+        payload = {'type': 'send_notification', 'message': { 'id': notificacion.id, 'mensaje': notificacion.mensaje, 'url': notificacion.url, 'leido': notificacion.leido, 'fecha_creacion': notificacion.fecha_creacion.isoformat() }}
+        transaction.on_commit(partial(do_broadcast, instance.docente.id, payload))
 
-        def broadcast():
-            channel_layer = get_channel_layer()
-            async_to_sync(channel_layer.group_send)(
-                f'notifications_{instance.docente.id}',
-                {
-                    'type': 'send_notification',
-                    'message': { 'id': notificacion.id, 'mensaje': notificacion.mensaje, 'url': notificacion.url, 'leido': notificacion.leido, 'fecha_creacion': notificacion.fecha_creacion.isoformat() }
-                }
-            )
-        transaction.on_commit(broadcast)
 
 @receiver(post_save, sender=Anuncio)
 def crear_notificacion_anuncio(sender, instance, created, **kwargs):
@@ -134,17 +108,5 @@ def crear_notificacion_anuncio(sender, instance, created, **kwargs):
                 mensaje=message,
                 url=reverse('ver_anuncios')
             )
-
-            def broadcast_to_user(user_id, notif_id, msg, url_path, read_status, creation_date):
-                def broadcast():
-                    channel_layer = get_channel_layer()
-                    async_to_sync(channel_layer.group_send)(
-                        f'notifications_{user_id}',
-                        {
-                            'type': 'send_notification',
-                            'message': { 'id': notif_id, 'mensaje': msg, 'url': url_path, 'leido': read_status, 'fecha_creacion': creation_date }
-                        }
-                    )
-                transaction.on_commit(broadcast)
-
-            broadcast_to_user(docente.id, notificacion.id, notificacion.mensaje, notificacion.url, notificacion.leido, notificacion.fecha_creacion.isoformat())
+            payload = {'type': 'send_notification', 'message': { 'id': notificacion.id, 'mensaje': notificacion.mensaje, 'url': notificacion.url, 'leido': notificacion.leido, 'fecha_creacion': notificacion.fecha_creacion.isoformat() }}
+            transaction.on_commit(partial(do_broadcast, docente.id, payload))
