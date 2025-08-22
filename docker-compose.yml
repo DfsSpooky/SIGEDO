@@ -4,7 +4,7 @@ services:
   web:
     build: .
     
-    command: gunicorn --chdir gestion_docentes gestion_docentes.wsgi:application --bind 0.0.0.0:8000
+    command: daphne -b 0.0.0.0 -p 8000 gestion_docentes.asgi:application
     volumes:
       - .:/app
       - static_volume:/app/gestion_docentes/staticfiles
