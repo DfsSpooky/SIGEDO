@@ -128,7 +128,7 @@
         async function markAttendance(actionType, qrId, courseId = null) {
             const horaDeMarcacion = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
             canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
-            const photoBase64 = canvasElement.toDataURL('image/png');
+            const photoBase64 = canvasElement.toDataURL('image/jpeg', 0.7); // Comprimir a JPEG al 70% de calidad
             document.querySelectorAll('#attendance-actions button').forEach(b => { b.disabled = true; b.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...'; b.classList.add('opacity-50'); });
             try {
                 const response = await fetch('/api/mark-attendance/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ qrId, actionType, courseId, photoBase64 }) });

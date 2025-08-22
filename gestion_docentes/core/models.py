@@ -95,6 +95,7 @@ class Curso(models.Model):
     horario_inicio = models.TimeField(null=True, blank=True)
     horario_fin = models.TimeField(null=True, blank=True)
     dia = models.CharField(max_length=20, choices=[('Lunes', 'Lunes'), ('Martes', 'Martes'), ('Miércoles', 'Miércoles'), ('Jueves', 'Jueves'), ('Viernes', 'Viernes')], null=True, blank=True)
+    dia_semana = models.PositiveSmallIntegerField(null=True, blank=True, editable=False, db_index=True, help_text="Día de la semana como número (0=Lunes, 1=Martes...)")
     duracion_bloques = models.IntegerField(default=2, help_text="Número de bloques de 50 minutos que dura el curso.")
 
     class Meta:
@@ -103,6 +104,14 @@ class Curso(models.Model):
         ]
 
     def __str__(self): return f"{self.nombre} ({self.especialidad.nombre if self.especialidad else 'N/A'})"
+
+    def save(self, *args, **kwargs):
+        DIAS = {'Lunes': 0, 'Martes': 1, 'Miércoles': 2, 'Jueves': 3, 'Viernes': 4}
+        if self.dia:
+            self.dia_semana = DIAS.get(self.dia)
+        else:
+            self.dia_semana = None
+        super().save(*args, **kwargs)
 
 class Documento(models.Model):
     ESTADOS_DOCUMENTO = [

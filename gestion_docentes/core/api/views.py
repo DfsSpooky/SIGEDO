@@ -53,16 +53,18 @@ def get_teacher_info(request):
                 return JsonResponse({'status': 'error', 'message': 'No hay un semestre académico activo.'}, status=400)
 
             is_daily_marked = AsistenciaDiaria.objects.filter(docente=docente, fecha=today).exists()
-            dia_actual_str = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'][today.weekday()]
 
-            dia_actual_normalized = remove_accents(dia_actual_str).lower()
+            # Optimización: Usar el nuevo campo `dia_semana` para filtrar en la BD
+            # weekday() devuelve Lunes=0, Martes=1, ..., Domingo=6
+            dia_semana_hoy = today.weekday()
 
-            cursos_del_docente = Curso.objects.filter(docente=docente, semestre=semestre_activo)
-
-            cursos_hoy = [
-                c for c in cursos_del_docente
-                if c.dia and remove_accents(c.dia).lower() == dia_actual_normalized
-            ]
+            # Filtramos directamente en la base de datos usando el nuevo campo indexado.
+            # Esto es mucho más eficiente que traer todos los cursos y filtrarlos en Python.
+            cursos_hoy = Curso.objects.filter(
+                docente=docente,
+                semestre=semestre_activo,
+                dia_semana=dia_semana_hoy
+            )
 
             courses_data = []
             for curso in cursos_hoy:
