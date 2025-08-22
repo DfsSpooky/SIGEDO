@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 from django.urls import reverse
@@ -8,10 +9,7 @@ from .models import Documento, Notificacion, SolicitudIntercambio, Curso, Anunci
 
 @receiver(pre_save, sender=Documento)
 def crear_notificacion_estado_documento(sender, instance, **kwargs):
-    """
-    Crea una notificación cuando el estado de un documento cambia a 'APROBADO' o 'OBSERVADO'.
-    """
-    if instance.pk:  # Solo para objetos que ya existen
+    if instance.pk:
         try:
             old_instance = Documento.objects.get(pk=instance.pk)
             if old_instance.estado != instance.estado:
@@ -28,29 +26,21 @@ def crear_notificacion_estado_documento(sender, instance, **kwargs):
                         url=reverse('lista_documentos')
                     )
 
-                    channel_layer = get_channel_layer()
-                    async_to_sync(channel_layer.group_send)(
-                        f'notifications_{instance.docente.id}',
-                        {
-                            'type': 'send_notification',
-                            'message': {
-                                'id': notificacion.id,
-                                'mensaje': notificacion.mensaje,
-                                'url': notificacion.url,
-                                'leido': notificacion.leido,
-                                'fecha_creacion': notificacion.fecha_creacion.isoformat()
+                    def broadcast():
+                        channel_layer = get_channel_layer()
+                        async_to_sync(channel_layer.group_send)(
+                            f'notifications_{instance.docente.id}',
+                            {
+                                'type': 'send_notification',
+                                'message': { 'id': notificacion.id, 'mensaje': notificacion.mensaje, 'url': notificacion.url, 'leido': notificacion.leido, 'fecha_creacion': notificacion.fecha_creacion.isoformat() }
                             }
-                        }
-                    )
+                        )
+                    transaction.on_commit(broadcast)
         except Documento.DoesNotExist:
-            pass # No hacer nada si el objeto es nuevo
-
+            pass
 
 @receiver(pre_save, sender=SolicitudIntercambio)
 def crear_notificacion_estado_solicitud(sender, instance, **kwargs):
-    """
-    Crea una notificación cuando el estado de una solicitud de intercambio cambia.
-    """
     if instance.pk:
         try:
             old_instance = SolicitudIntercambio.objects.get(pk=instance.pk)
@@ -70,67 +60,51 @@ def crear_notificacion_estado_solicitud(sender, instance, **kwargs):
                         url=reverse('ver_solicitudes')
                     )
 
-                    channel_layer = get_channel_layer()
-                    async_to_sync(channel_layer.group_send)(
-                        f'notifications_{destinatario.id}',
-                        {
-                            'type': 'send_notification',
-                            'message': {
-                                'id': notificacion.id,
-                                'mensaje': notificacion.mensaje,
-                                'url': notificacion.url,
-                                'leido': notificacion.leido,
-                                'fecha_creacion': notificacion.fecha_creacion.isoformat()
+                    def broadcast():
+                        channel_layer = get_channel_layer()
+                        async_to_sync(channel_layer.group_send)(
+                            f'notifications_{destinatario.id}',
+                            {
+                                'type': 'send_notification',
+                                'message': { 'id': notificacion.id, 'mensaje': notificacion.mensaje, 'url': notificacion.url, 'leido': notificacion.leido, 'fecha_creacion': notificacion.fecha_creacion.isoformat() }
                             }
-                        }
-                    )
+                        )
+                    transaction.on_commit(broadcast)
         except SolicitudIntercambio.DoesNotExist:
             pass
 
-
 @receiver(pre_save, sender=Curso)
 def crear_notificacion_asignacion_curso(sender, instance, **kwargs):
-    """
-    Crea una notificación cuando un curso es asignado a un docente.
-    """
-    if instance.pk: # Solo para cursos que ya existen
+    if instance.pk:
         try:
             old_instance = Curso.objects.get(pk=instance.pk)
-            # Notificar si el docente ha cambiado y el nuevo docente no es nulo
             if old_instance.docente != instance.docente and instance.docente is not None:
                 message = f"Se le ha asignado un nuevo curso: '{instance.nombre}' en el horario de {instance.dia} de {instance.horario_inicio} a {instance.horario_fin}."
 
                 notificacion = Notificacion.objects.create(
                     destinatario=instance.docente,
                     mensaje=message,
-                    url=reverse('ver_horarios', args=[instance.carrera.id]) # Asumiendo que quieres que el link vaya a la vista de horarios
+                    url=reverse('ver_horarios', args=[instance.carrera.id])
                 )
 
-                channel_layer = get_channel_layer()
-                async_to_sync(channel_layer.group_send)(
-                    f'notifications_{instance.docente.id}',
-                    {
-                        'type': 'send_notification',
-                        'message': {
-                            'id': notificacion.id,
-                            'mensaje': notificacion.mensaje,
-                            'url': notificacion.url,
-                            'leido': notificacion.leido,
-                            'fecha_creacion': notificacion.fecha_creacion.isoformat()
+                def broadcast():
+                    channel_layer = get_channel_layer()
+                    async_to_sync(channel_layer.group_send)(
+                        f'notifications_{instance.docente.id}',
+                        {
+                            'type': 'send_notification',
+                            'message': { 'id': notificacion.id, 'mensaje': notificacion.mensaje, 'url': notificacion.url, 'leido': notificacion.leido, 'fecha_creacion': notificacion.fecha_creacion.isoformat() }
                         }
-                    }
-                )
+                    )
+                transaction.on_commit(broadcast)
         except Curso.DoesNotExist:
-            pass # No hacer nada si el curso es nuevo
-    elif instance.docente is not None: # Para cursos nuevos que se crean con un docente ya asignado
+            pass
+    elif instance.docente is not None:
         message = f"Se le ha asignado un nuevo curso: '{instance.nombre}'."
-
-        # Necesitamos un delay o algo para asegurar que la carrera está asignada si es un curso nuevo
-        # Pero por ahora, asumimos que la carrera existe para generar el URL
         try:
             url = reverse('ver_horarios', args=[instance.carrera.id])
         except Exception:
-            url = "/" # URL de fallback
+            url = "/"
 
         notificacion = Notificacion.objects.create(
             destinatario=instance.docente,
@@ -138,31 +112,22 @@ def crear_notificacion_asignacion_curso(sender, instance, **kwargs):
             url=url
         )
 
-        channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            f'notifications_{instance.docente.id}',
-            {
-                'type': 'send_notification',
-                'message': {
-                    'id': notificacion.id,
-                    'mensaje': notificacion.mensaje,
-                    'url': notificacion.url,
-                    'leido': notificacion.leido,
-                    'fecha_creacion': notificacion.fecha_creacion.isoformat()
+        def broadcast():
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                f'notifications_{instance.docente.id}',
+                {
+                    'type': 'send_notification',
+                    'message': { 'id': notificacion.id, 'mensaje': notificacion.mensaje, 'url': notificacion.url, 'leido': notificacion.leido, 'fecha_creacion': notificacion.fecha_creacion.isoformat() }
                 }
-            }
-        )
+            )
+        transaction.on_commit(broadcast)
 
 @receiver(post_save, sender=Anuncio)
 def crear_notificacion_anuncio(sender, instance, created, **kwargs):
-    """
-    Crea una notificación para todos los usuarios cuando se publica un nuevo anuncio.
-    """
     if created:
-        channel_layer = get_channel_layer()
         message = f"Nuevo anuncio publicado: '{instance.titulo}'"
 
-        # Iterar sobre todos los docentes para crear y enviar notificaciones
         for docente in Docente.objects.all():
             notificacion = Notificacion.objects.create(
                 destinatario=docente,
@@ -170,16 +135,16 @@ def crear_notificacion_anuncio(sender, instance, created, **kwargs):
                 url=reverse('ver_anuncios')
             )
 
-            async_to_sync(channel_layer.group_send)(
-                f'notifications_{docente.id}',
-                {
-                    'type': 'send_notification',
-                    'message': {
-                        'id': notificacion.id,
-                        'mensaje': notificacion.mensaje,
-                        'url': notificacion.url,
-                        'leido': notificacion.leido,
-                        'fecha_creacion': notificacion.fecha_creacion.isoformat()
-                    }
-                }
-            )
+            def broadcast_to_user(user_id, notif_id, msg, url_path, read_status, creation_date):
+                def broadcast():
+                    channel_layer = get_channel_layer()
+                    async_to_sync(channel_layer.group_send)(
+                        f'notifications_{user_id}',
+                        {
+                            'type': 'send_notification',
+                            'message': { 'id': notif_id, 'mensaje': msg, 'url': url_path, 'leido': read_status, 'fecha_creacion': creation_date }
+                        }
+                    )
+                transaction.on_commit(broadcast)
+
+            broadcast_to_user(docente.id, notificacion.id, notificacion.mensaje, notificacion.url, notificacion.leido, notificacion.fecha_creacion.isoformat())

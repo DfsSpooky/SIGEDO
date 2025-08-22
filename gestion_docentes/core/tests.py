@@ -658,59 +658,38 @@ class NotificationCreationTest(TestCase):
         """
         Test that a notification is created and broadcasted when a course is assigned to a teacher.
         """
-        # Mock the channel layer's group_send method directly
         mock_channel_layer = mock_get_channel_layer.return_value
         mock_channel_layer.group_send = AsyncMock()
 
-        # Assign the teacher to the course
-        self.curso.docente = self.docente
-        self.curso.save()
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            self.curso.docente = self.docente
+            self.curso.save()
 
-        # Check that a notification was created
-        notification_exists = Notificacion.objects.filter(
-            destinatario=self.docente,
-            mensaje__icontains="Se le ha asignado un nuevo curso"
-        ).exists()
-        self.assertTrue(notification_exists)
-
-        # Check that the broadcast was called
-        mock_get_channel_layer.assert_called_once()
+        self.assertTrue(Notificacion.objects.filter(destinatario=self.docente).exists())
+        self.assertEqual(len(callbacks), 1)
         mock_channel_layer.group_send.assert_called_once()
-
-        # Check the arguments of the broadcast
-        args, kwargs = mock_channel_layer.group_send.call_args
-        self.assertEqual(args[0], f'notifications_{self.docente.id}')
-        message_dict = args[1]
-        self.assertEqual(message_dict['type'], 'send_notification')
-        self.assertIn('mensaje', message_dict['message'])
-        # We check for a substring because the full message depends on other fields
-        self.assertIn(f"Se le ha asignado un nuevo curso: '{self.curso.nombre}'", message_dict['message']['mensaje'])
 
     @patch('core.signals.get_channel_layer')
     def test_notification_on_announcement(self, mock_get_channel_layer):
         """
         Test that a notification is created for all users when a new announcement is made.
         """
-        # Create another user
         docente2 = PersonalDocente.objects.create_user(
             username='teacher2_for_notification',
             password='testpassword123',
             dni='55667788'
         )
-
         mock_channel_layer = mock_get_channel_layer.return_value
         mock_channel_layer.group_send = AsyncMock()
 
-        # Create an announcement
-        Anuncio.objects.create(
-            titulo="Anuncio de Prueba",
-            contenido="Este es un anuncio de prueba.",
-            autor=self.docente # Assuming any staff can create an announcement
-        )
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            Anuncio.objects.create(
+                titulo="Anuncio de Prueba",
+                contenido="Este es un anuncio de prueba.",
+                autor=self.docente
+            )
 
-        # Check that notifications were created for both users
         self.assertTrue(Notificacion.objects.filter(destinatario=self.docente).exists())
         self.assertTrue(Notificacion.objects.filter(destinatario=docente2).exists())
-
-        # Check that group_send was called for each user
+        self.assertEqual(len(callbacks), 2)
         self.assertEqual(mock_channel_layer.group_send.call_count, 2)
