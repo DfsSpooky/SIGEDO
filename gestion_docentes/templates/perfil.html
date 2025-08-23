@@ -7,26 +7,29 @@
 
 <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
+    <!-- Columna Izquierda -->
     <div class="lg:col-span-4 space-y-8">
         
-        <div class="card bg-base-100 shadow-xl sticky top-8">
-            <div class="card-body items-center text-center">
+        <div class="card bg-base-100 shadow-xl sticky top-8 text-center">
+            <figure class="px-10 pt-10">
                 <div class="avatar online">
-                    <div class="w-24 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2">
+                    <div class="w-32 rounded-full ring ring-primary ring-offset-base-100 ring-offset-4">
                         <img src="{% if user.foto %}{{ user.foto.url }}{% else %}{% static 'placeholder.png' %}{% endif %}" alt="Foto de {{ user.first_name }}">
                     </div>
                 </div>
-                <h2 class="card-title text-2xl mt-4">{{ user.first_name }} {{ user.last_name }}</h2>
+            </figure>
+            <div class="card-body items-center">
+                <h2 class="card-title text-3xl">{{ user.first_name }} {{ user.last_name }}</h2>
                 <p class="text-base-content/70">DNI: {{ user.dni }}</p>
                 <div class="card-actions justify-center mt-4">
                     <a href="{% url 'generar_ficha_docente' user.id %}" class="btn btn-primary btn-outline">
                         <i class="fas fa-file-pdf mr-2"></i>Generar Ficha Integral
                     </a>
                 </div>
-                <div class="divider">Especialidades</div>
+                <div class="divider px-4">Especialidades</div>
                 <div class="flex flex-wrap justify-center gap-2">
                     {% for especialidad in user.especialidades.all %}
-                        <div class="badge badge-info badge-outline">{{ especialidad.nombre }}</div>
+                        <div class="badge badge-lg badge-ghost">{{ especialidad.nombre }}</div>
                     {% empty %}
                         <p class="text-sm text-base-content/50">Sin especialidades asignadas.</p>
                     {% endfor %}
@@ -36,12 +39,15 @@
 
         <div class="card bg-base-100 shadow-xl">
             <div class="card-body">
-                <h3 class="card-title">Estado de mi Carpeta ({{ total_documentos }} Doc(s))</h3>
+                <h3 class="card-title">Estado de mi Carpeta</h3>
+                <p class="text-sm text-base-content/60 -mt-2 mb-4">Total: {{ total_documentos }} documento(s)</p>
                 <canvas id="documentosChart"></canvas>
             </div>
         </div>
 
     </div>
+
+    <!-- Columna Derecha -->
     <div class="lg:col-span-8">
         <div class="card bg-base-100 shadow-xl">
             <div class="card-body">
@@ -51,74 +57,106 @@
                     {% for item in timeline %}
                     <li>
                         <div class="timeline-middle">
-                            {% if item.tipo == 'asistencia_entrada' %}<i class="fas fa-sign-in-alt bg-success text-success-content text-xl p-2 rounded-full"></i>
-                            {% elif item.tipo == 'asistencia_salida' %}<i class="fas fa-sign-out-alt bg-error text-error-content text-xl p-2 rounded-full"></i>
-                            {% elif item.tipo == 'documento' %}<i class="fas fa-file-upload bg-info text-info-content text-xl p-2 rounded-full"></i>
+                            {% if item.tipo == 'asistencia_entrada' %}<div class="w-8 h-8 flex items-center justify-center rounded-full bg-success/20 text-success"><i class="fas fa-sign-in-alt"></i></div>
+                            {% elif item.tipo == 'asistencia_salida' %}<div class="w-8 h-8 flex items-center justify-center rounded-full bg-error/20 text-error"><i class="fas fa-sign-out-alt"></i></div>
+                            {% elif item.tipo == 'documento' %}<div class="w-8 h-8 flex items-center justify-center rounded-full bg-info/20 text-info"><i class="fas fa-file-upload"></i></div>
                             {% endif %}
                         </div>
-                        <div class="timeline-end mb-10 p-4 bg-base-200 rounded-lg shadow">
-                            <time class="font-mono italic text-sm opacity-70">{{ item.fecha|date:"d/m/Y, h:i A" }}</time>
-                            <div class="text-lg font-black">{{ item.texto }}</div>
+                        <div class="timeline-end mb-10 p-4 bg-base-200/60 rounded-lg shadow-sm border border-base-300/50">
+                            <time class="font-mono text-xs opacity-60">{{ item.fecha|date:"d M, Y, h:i A" }}</time>
+                            <p class="font-semibold mt-1">{{ item.texto }}</p>
                             {% if item.tipo == 'documento' and item.documento.estado == 'OBSERVADO' %}
-                                <div class="mt-2 text-warning font-semibold">
-                                    <i class="fas fa-exclamation-triangle mr-1"></i> Este documento tiene observaciones.
-                                    <a href="{% url 'lista_documentos' %}" class="link link-warning ml-2">Revisar</a>
+                                <div class="mt-2 text-warning font-semibold text-sm flex items-center gap-2">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    <span>Este documento tiene observaciones.</span>
+                                    <a href="{% url 'lista_documentos' %}" class="link link-warning ml-auto">Revisar</a>
                                 </div>
                             {% endif %}
                         </div>
-                        <hr/>
+                        <hr class="bg-base-300"/>
                     </li>
                     {% empty %}
-                    <li class="text-center p-8 text-base-content/60">
-                        <i class="fas fa-history fa-2x mb-4"></i><br>
-                        No hay actividad reciente para mostrar.
+                    <li class="text-center p-8">
+                        <div class="flex flex-col items-center text-base-content/50">
+                            <i class="fas fa-history fa-3x mb-4"></i>
+                            <span class="font-semibold">Sin actividad reciente</span>
+                            <p class="text-sm">Las nuevas acciones aparecerán aquí.</p>
+                        </div>
                     </li>
                     {% endfor %}
                 </ul>
             </div>
         </div>
     </div>
-    </div>
-
+</div>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const ctx = document.getElementById('documentosChart');
         if (!ctx) return;
 
+        // Colores del tema 'winter' de DaisyUI (aproximados)
+        const themeColors = {
+            success: 'rgba(5, 150, 105, 0.7)',    // green-600
+            warning: 'rgba(245, 158, 11, 0.7)',   // amber-500
+            error: 'rgba(220, 38, 38, 0.7)',      // red-600
+            info: 'rgba(59, 130, 246, 0.7)',     // blue-500
+        };
+        const themeBorders = {
+            success: 'rgba(4, 120, 87, 1)',
+            warning: 'rgba(217, 119, 6, 1)',
+            error: 'rgba(185, 28, 28, 1)',
+            info: 'rgba(37, 99, 235, 1)',
+        }
+
+        const labels = {{ documentos_labels_json|safe }};
+        const dataValues = {{ documentos_status_json|safe }};
+
+        const backgroundColors = labels.map(label => {
+            if (label === 'APROBADO') return themeColors.success;
+            if (label === 'EN_REVISION') return themeColors.warning;
+            if (label === 'OBSERVADO') return themeColors.error;
+            if (label === 'RECIBIDO') return themeColors.info;
+            return 'rgba(156, 163, 175, 0.5)'; // gray-400
+        });
+
+        const borderColors = labels.map(label => {
+            if (label === 'APROBADO') return themeBorders.success;
+            if (label === 'EN_REVISION') return themeBorders.warning;
+            if (label === 'OBSERVADO') return themeBorders.error;
+            if (label === 'RECIBIDO') return themeBorders.info;
+            return 'rgba(107, 114, 128, 1)'; // gray-500
+        });
+
         const data = {
-            labels: {{ documentos_labels_json|safe }},
+            labels: labels,
             datasets: [{
-                label: 'Cantidad de Documentos',
-                data: {{ documentos_status_json|safe }},
-                backgroundColor: [
-                    'rgba(34, 197, 94, 0.6)',  // APROBADO (Verde)
-                    'rgba(245, 158, 11, 0.6)', // EN_REVISION (Ámbar)
-                    'rgba(239, 68, 68, 0.6)',   // OBSERVADO (Rojo)
-                    'rgba(59, 130, 246, 0.6)'  // RECIBIDO (Azul)
-                ],
-                borderColor: [
-                    'rgba(34, 197, 94, 1)',
-                    'rgba(245, 158, 11, 1)',
-                    'rgba(239, 68, 68, 1)',
-                    'rgba(59, 130, 246, 1)'
-                ],
-                borderWidth: 1
+                label: 'Cantidad',
+                data: dataValues,
+                backgroundColor: backgroundColors,
+                borderColor: borderColors,
+                borderWidth: 2,
+                hoverOffset: 8
             }]
         };
 
         new Chart(ctx, {
-            type: 'doughnut', // Tipo de gráfico: dona
+            type: 'doughnut',
             data: data,
             options: {
                 responsive: true,
+                cutout: '60%',
                 plugins: {
                     legend: {
-                        position: 'top',
+                        position: 'bottom',
+                        labels: {
+                            padding: 20,
+                            usePointStyle: true,
+                            pointStyle: 'rectRounded'
+                        }
                     },
                     title: {
                         display: false,
-                        text: 'Estado de Documentos'
                     }
                 }
             }

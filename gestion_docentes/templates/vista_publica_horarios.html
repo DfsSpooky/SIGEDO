@@ -3,19 +3,19 @@
 {% block title %}Ver Horarios{% endblock %}
 
 {% block content %}
-<div class="bg-white p-6 rounded-lg shadow-lg">
-    <div class="flex flex-wrap justify-between items-center mb-6 pb-6 border-b">
+<div class="bg-base-100 p-6 rounded-2xl shadow-xl">
+    <div class="flex flex-col md:flex-row md:justify-between md:items-center mb-6 pb-6 border-b border-base-300">
         <div>
             <h1 class="text-3xl font-bold">Consulta de Horarios</h1>
             {% if semestre_activo %}
-                <p class="text-gray-600">Mostrando horarios para el semestre académico: <span class="font-semibold text-blue-600">{{ semestre_activo.nombre }}</span></p>
+                <p class="text-base-content/70 mt-1">Semestre académico: <span class="font-semibold text-primary">{{ semestre_activo.nombre }}</span></p>
             {% endif %}
         </div>
         
-        <form method="get" class="flex items-center gap-2">
+        <form method="get" class="flex items-center gap-2 mt-4 md:mt-0">
             <label for="especialidad" class="text-sm font-medium">Ver horario de:</label>
-            <select name="especialidad" id="especialidad" class="border-gray-300 rounded-lg shadow-sm" onchange="this.form.submit()">
-                <option value="">-- Seleccione Especialidad --</option>
+            <select name="especialidad" id="especialidad" class="select select-bordered select-sm" onchange="this.form.submit()">
+                <option disabled {% if not especialidad_seleccionada %}selected{% endif %}>Seleccione una especialidad</option>
                 {% for esp in especialidades %}
                 <option value="{{ esp.id }}" {% if especialidad_seleccionada.id == esp.id %}selected{% endif %}>{{ esp.nombre }}</option>
                 {% endfor %}
@@ -24,71 +24,79 @@
     </div>
 
     {% if not semestre_activo %}
-        <div class="p-4 my-8 text-center text-red-600">
-            <p>No hay un semestre activo configurado. Contacte al administrador.</p>
+        <div class="text-center py-12">
+            <i class="fas fa-exclamation-triangle fa-3x text-warning mb-4"></i>
+            <h3 class="text-xl font-semibold">No hay semestre activo</h3>
+            <p class="text-base-content/60">Por favor, contacte a un administrador para configurar un semestre.</p>
         </div>
     {% elif not especialidad_seleccionada %}
-        <div class="p-4 my-8 text-center text-gray-500">
-            <p>Por favor, seleccione una especialidad para ver los horarios.</p>
+        <div class="text-center py-12">
+            <i class="fas fa-mouse-pointer fa-3x text-info mb-4"></i>
+            <h3 class="text-xl font-semibold">Seleccione una Especialidad</h3>
+            <p class="text-base-content/60">Usa el menú desplegable para ver el horario de una especialidad.</p>
         </div>
     {% else %}
         {% for semestre_num, horario_grid in horarios_por_semestre_cursado.items %}
             <div class="mb-12">
-                <h2 class="text-2xl font-bold text-gray-800 mb-4">Semestre {{ semestre_num }}</h2>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full border-collapse">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="py-2 px-3 border w-32">Horas</th>
-                                {% for dia in dias_semana %}
-                                <th class="py-2 px-3 border">{{ dia }}</th>
-                                {% endfor %}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for franja in franjas_horarias %}
-                            <tr>
-                                <td class="py-2 px-3 border text-center text-sm font-medium text-gray-500 align-top h-24">
-                                    {{ franja.hora_inicio|time:"h:i" }} - {{ franja.hora_fin|time:"h:i A" }}
-                                </td>
-                                {% for dia in dias_semana %}
-                                    {% with curso=horario_grid|get_item:franja.id|get_item:dia %}
-                                        {% if curso != 'OCUPADO' %}
-                                            <td class="p-1.5 border-b align-top relative"
-                                                {% if curso and curso.duracion_bloques > 1 %}rowspan="{{ curso.duracion_bloques }}"{% endif %}>
+                <h2 class="text-2xl font-bold text-base-content mb-6">Semestre {{ semestre_num }}</h2>
+
+                <div class="grid grid-cols-[auto,1fr,1fr,1fr,1fr,1fr] gap-1">
+                    <!-- Fila de Encabezado -->
+                    <div class="p-2 text-sm font-bold text-center text-base-content/70">Hora</div>
+                    {% for dia in dias_semana %}
+                    <div class="p-2 text-sm font-bold text-center text-base-content/70">{{ dia }}</div>
+                    {% endfor %}
+
+                    <!-- Filas del Horario -->
+                    {% for franja in franjas_horarias %}
+                        <div class="flex items-center justify-center p-2 text-xs font-semibold text-base-content/60 border-r border-base-200">
+                            {{ franja.hora_inicio|time:"h:i" }}
+                        </div>
+
+                        {% for dia in dias_semana %}
+                            {% with curso=horario_grid|get_item:franja.id|get_item:dia %}
+                                {% if curso != 'OCUPADO' %}
+                                    <div class="bg-base-200/50 rounded-lg min-h-[6rem] p-0.5 relative group"
+                                         style="grid-row: span {{ curso.duracion_bloques|default:1 }} / span {{ curso.duracion_bloques|default:1 }};">
+
+                                        {% if curso %}
+                                            {% with tipo_especialidad=curso.tipo_curso == 'ESPECIALIDAD' %}
+                                            <div class="relative z-10 h-full w-full p-3 rounded-lg shadow-sm flex flex-col justify-between text-white transition-all duration-300 transform group-hover:scale-105 group-hover:shadow-lg
+                                                        {% if tipo_especialidad %} bg-gradient-to-br from-sky-500 to-sky-600 border-sky-400
+                                                        {% else %} bg-gradient-to-br from-emerald-500 to-emerald-600 border-emerald-400 {% endif %}">
                                                 
-                                                {% if curso %}
-                                                    {% if curso.tipo_curso == 'ESPECIALIDAD' %}
-                                                        <div class="h-full bg-sky-100 text-sky-900 border-l-4 border-sky-500 p-3 rounded-md text-sm shadow-sm flex flex-col justify-between">
-                                                            <div>
-                                                                <p class="font-bold">{{ curso.nombre }}</p>
-                                                                <p class="text-xs text-gray-700 mt-1">{{ curso.docente }}</p>
-                                                            </div>
-                                                            <span class="text-xs font-semibold text-sky-700 self-end mt-1">Especialidad</span>
-                                                        </div>
-                                                    {% else %}
-                                                        <div class="h-full bg-green-100 text-green-900 border-l-4 border-green-500 p-3 rounded-md text-sm shadow-sm flex flex-col justify-between">
-                                                            <div>
-                                                                <p class="font-bold">{{ curso.nombre }}</p>
-                                                                <p class="text-xs text-gray-700 mt-1">{{ curso.docente }}</p>
-                                                            </div>
-                                                            <span class="text-xs font-semibold text-green-700 self-end mt-1">General</span>
-                                                        </div>
-                                                    {% endif %}
-                                                    {% endif %}
-                                            </td>
+                                                <div>
+                                                    <p class="font-bold text-sm leading-tight">{{ curso.nombre }}</p>
+                                                    <p class="text-xs opacity-80 mt-1">{{ curso.aula|default:"Aula S/N" }}</p>
+                                                </div>
+
+                                                <div class="opacity-0 group-hover:opacity-100 transition-opacity duration-300 mt-2">
+                                                    <div class="flex items-center gap-2 text-xs">
+                                                        <i class="fas fa-user-tie fa-fw"></i>
+                                                        <span>{{ curso.docente }}</span>
+                                                    </div>
+                                                </div>
+
+                                                <div class="absolute top-1 right-1 text-xs font-bold py-0.5 px-1.5 rounded-full
+                                                            {% if tipo_especialidad %} bg-sky-100 text-sky-800
+                                                            {% else %} bg-emerald-100 text-emerald-800 {% endif %}">
+                                                    {{ curso.tipo_curso|slice:":3"|upper }}
+                                                </div>
+                                            </div>
+                                            {% endwith %}
                                         {% endif %}
-                                    {% endwith %}
-                                {% endfor %}
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                                    </div>
+                                {% endif %}
+                            {% endwith %}
+                        {% endfor %}
+                    {% endfor %}
                 </div>
             </div>
         {% empty %}
-            <div class="p-4 my-8 text-center text-gray-500">
-                <p>No hay horarios asignados para la especialidad de <strong>{{ especialidad_seleccionada.nombre }}</strong> en este semestre.</p>
+            <div class="text-center py-12">
+                <i class="fas fa-calendar-times fa-3x text-base-content/30 mb-4"></i>
+                <h3 class="text-xl font-semibold">No hay horarios disponibles</h3>
+                <p class="text-base-content/60">No se han asignado cursos para <strong>{{ especialidad_seleccionada.nombre }}</strong> en este semestre.</p>
             </div>
         {% endfor %}
     {% endif %}

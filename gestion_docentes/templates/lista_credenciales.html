@@ -6,49 +6,61 @@
 {% block content %}
 <div class="card bg-base-100 shadow-xl">
     <div class="card-body">
-        <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
+        <!-- Encabezado y Barra de Búsqueda -->
+        <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-8">
             <div>
                 <h1 class="card-title text-3xl">Generador de Credenciales</h1>
-                <p class="text-base-content/70">Busca un docente y genera su credencial personalizada.</p>
+                <p class="text-base-content/70 mt-1">Busca un docente y genera su credencial personalizada.</p>
             </div>
             <form method="get" action="{% url 'lista_credenciales' %}" class="flex items-center gap-2">
                 <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Buscar por nombre o DNI..." class="input input-bordered w-full max-w-xs">
-                <button type="submit" class="btn btn-primary">Buscar</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-search"></i>
+                </button>
             </form>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Grid de Docentes -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {% for docente in docentes %}
-                <div class="card card-compact bg-base-200 shadow">
+                <div class="card card-compact bg-base-200 shadow-md hover:shadow-xl transition-shadow duration-300 group">
                     <div class="card-body">
-                        <div class="flex items-center gap-4">
-                            <div class="avatar">
-                                <div class="w-16 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2">
+                        <div class="flex flex-col items-center text-center">
+                            <div class="avatar mb-4">
+                                <div class="w-24 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2 group-hover:ring-secondary transition-all duration-300">
                                     <img src="{{ docente.foto.url }}" alt="Foto de {{ docente.first_name }}">
                                 </div>
                             </div>
-                            <div>
-                                <h2 class="card-title text-lg">{{ docente.first_name }} {{ docente.last_name }}</h2>
-                                <p class="text-sm text-base-content/60">DNI: {{ docente.dni }}</p>
-                            </div>
+                            <h2 class="card-title text-lg">{{ docente.first_name }} {{ docente.last_name }}</h2>
+                            <p class="text-sm text-base-content/60">DNI: {{ docente.dni }}</p>
                         </div>
-                        <div class="card-actions justify-end mt-4">
-                            <a href="{% url 'generar_credencial' docente.id|encrypt %}" target="_blank" class="btn btn-primary btn-sm">
-                                <i class="fas fa-id-card"></i>
-                                Generar
+                        <div class="card-actions justify-center mt-4">
+                            <a href="{% url 'generar_credencial' docente.id|encrypt %}" target="_blank" class="btn btn-primary btn-outline btn-sm group-hover:btn-secondary transition-all duration-300">
+                                <i class="fas fa-id-card mr-2"></i>
+                                Generar Credencial
                             </a>
                         </div>
                     </div>
                 </div>
             {% empty %}
-                <div class="lg:col-span-3 text-center py-12">
-                    <i class="fas fa-user-slash fa-3x text-base-content/30 mb-4"></i>
-                    <h3 class="text-xl font-semibold">No se encontraron docentes.</h3>
-                    {% if query %}
-                    <p class="text-base-content/60">Intenta con otro término de búsqueda.</p>
-                    {% else %}
-                    <p class="text-base-content/60">No hay docentes registrados en el sistema.</p>
-                    {% endif %}
+                <div class="sm:col-span-2 lg:col-span-3 xl:col-span-4 text-center py-16">
+                    <div class="flex flex-col items-center text-base-content/50">
+                        <i class="fas fa-user-slash fa-3x mb-4"></i>
+                        <h3 class="text-xl font-semibold">
+                            {% if query %}
+                                No se encontraron docentes para "{{ query }}"
+                            {% else %}
+                                No se encontraron docentes
+                            {% endif %}
+                        </h3>
+                        <p class="text-sm mt-1">
+                            {% if query %}
+                                Intenta con otro término de búsqueda.
+                            {% else %}
+                                No hay docentes registrados en el sistema.
+                            {% endif %}
+                        </p>
+                    </div>
                 </div>
             {% endfor %}
         </div>
