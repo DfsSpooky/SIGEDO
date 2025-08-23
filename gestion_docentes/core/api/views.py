@@ -801,14 +801,19 @@ class ActivoDisponibilidadAPIView(APIView):
             except ValueError:
                 continue
 
-        # Serializar todas las franjas y añadir el campo 'is_reservado'
-        disponibilidad = []
+        # Serializar todas las franjas y añadir el campo 'is_reservado', agrupando por turno
+        disponibilidad_por_turno = {
+            'MANANA': [],
+            'TARDE': [],
+            'NOCHE': []
+        }
         for franja in franjas:
             data = FranjaHorariaSerializer(franja).data
             data['is_reservado'] = franja.id in franjas_ocupadas_ids
-            disponibilidad.append(data)
+            if franja.turno in disponibilidad_por_turno:
+                disponibilidad_por_turno[franja.turno].append(data)
 
-        return Response(disponibilidad)
+        return Response(disponibilidad_por_turno)
 
 
 class ReservaCreateAPIView(generics.CreateAPIView):
