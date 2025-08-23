@@ -1,25 +1,89 @@
 {% extends 'base.html' %}
+{% load template_extras %}
+
 {% block title %}Generar Credenciales{% endblock %}
+{% block breadcrumb %}Credenciales{% endblock %}
 
 {% block content %}
-    <h1 class="text-2xl font-bold mb-4">Generador de Credenciales</h1>
-    <p class="mb-6 text-gray-600">Selecciona un docente de la lista para generar e imprimir su credencial personalizada.</p>
+<div class="card bg-base-100 shadow-xl">
+    <div class="card-body">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <div>
+                <h1 class="card-title text-3xl">Generador de Credenciales</h1>
+                <p class="text-base-content/70">Busca un docente por nombre o DNI para generar su credencial.</p>
+            </div>
+            <form method="get" action="{% url 'lista_credenciales' %}" class="flex items-center gap-2 w-full sm:w-auto">
+                <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Buscar docente..." class="input input-bordered w-full max-w-xs">
+                <button type="submit" class="btn btn-primary btn-square">
+                    <i class="fas fa-search"></i>
+                </button>
+            </form>
+        </div>
 
-    <div class="bg-white p-6 rounded-lg shadow-md">
-        <ul class="space-y-4">
-            {% for docente in docentes %}
-                <li class="flex items-center justify-between p-3 border-b last:border-b-0">
-                    <div>
-                        <p class="font-semibold">{{ docente.first_name }} {{ docente.last_name }}</p>
-                        <p class="text-sm text-gray-500">DNI: {{ docente.dni }}</p>
-                    </div>
-                    <a href="{% url 'generar_credencial' docente.id %}" target="_blank" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
-                        Generar Credencial
-                    </a>
-                </li>
-            {% empty %}
-                <li>No hay docentes registrados.</li>
-            {% endfor %}
-        </ul>
+        <div class="overflow-x-auto">
+            <table class="table table-zebra w-full">
+                <thead>
+                    <tr>
+                        <th class="w-20">Foto</th>
+                        <th>Nombre Completo</th>
+                        <th>DNI</th>
+                        <th class="text-right">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for docente in docentes %}
+                    <tr class="hover">
+                        <td>
+                            <div class="avatar">
+                                <div class="mask mask-squircle w-12 h-12">
+                                    {% if docente.foto %}
+                                    <img src="{{ docente.foto.url }}" alt="Foto de {{ docente.first_name }}">
+                                    {% else %}
+                                    <div class="bg-neutral-focus text-neutral-content rounded-full w-12 h-12 flex items-center justify-center">
+                                        <span class="text-xl">{{ docente.first_name|first }}{{ docente.last_name|first }}</span>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="font-bold">{{ docente.first_name }} {{ docente.last_name }}</div>
+                            <div class="text-sm opacity-50">{{ docente.email|default:"Sin correo electrónico" }}</div>
+                        </td>
+                        <td>
+                            <span class="badge badge-ghost badge-sm">{{ docente.dni }}</span>
+                        </td>
+                        <td class="text-right">
+                            <a href="{% url 'generar_credencial' docente.id|encrypt %}" target="_blank" class="btn btn-primary btn-sm">
+                                <i class="fas fa-id-card mr-2"></i>
+                                Generar Credencial
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            {% if not docentes %}
+                <div class="text-center py-16">
+                    <i class="fas fa-user-slash fa-4x text-base-content/20 mb-4"></i>
+                    <h3 class="text-2xl font-semibold mb-2">
+                        {% if query %}
+                            No se encontraron resultados para "{{ query }}"
+                        {% else %}
+                            No hay docentes registrados
+                        {% endif %}
+                    </h3>
+                    <p class="text-base-content/60">
+                        {% if query %}
+                            Intenta simplificar tu búsqueda o verifica que el nombre o DNI sea correcto.
+                        {% else %}
+                            Cuando registres un nuevo docente, aparecerá en esta lista.
+                        {% endif %}
+                    </p>
+                </div>
+            {% endif %}
+        </div>
     </div>
+</div>
 {% endblock %}
