@@ -5,50 +5,86 @@
 
 {% block extra_css %}
 <style>
+    :root {
+        --brand-color: #4f46e5; /* indigo-600 */
+        --brand-color-light: #c7d2fe; /* indigo-200 */
+        --brand-color-dark: #3730a3; /* indigo-800 */
+        --success-color: #16a34a; /* green-600 */
+        --danger-color: #dc2626; /* red-600 */
+        --light-gray: #f3f4f6; /* gray-100 */
+        --medium-gray: #d1d5db; /* gray-300 */
+        --dark-gray: #4b5563; /* gray-600 */
+    }
+
+    body {
+        background-color: var(--light-gray);
+    }
+
     .slot-chip {
         transition: all 0.2s ease-in-out;
         cursor: pointer;
+        border: 1px solid transparent;
+    }
+    .slot-chip.available {
+        background-color: #e5e7eb; /* gray-200 */
+        color: #374151; /* gray-700 */
     }
     .slot-chip.available:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        background-color: var(--brand-color-light);
+        color: var(--brand-color-dark);
+        border-color: var(--brand-color);
     }
     .slot-chip.selected {
-        background-color: #2563eb; /* blue-600 */
+        background: linear-gradient(45deg, var(--brand-color), var(--brand-color-dark));
         color: white;
         font-weight: 600;
-        box-shadow: 0 2px 6px rgba(37, 99, 235, 0.4);
+        box-shadow: 0 4px 10px rgba(79, 70, 229, 0.4);
+        transform: scale(1.05);
     }
     .slot-chip.in-range {
-        background-color: #60a5fa; /* blue-400 */
-        color: white;
-        border-color: #3b82f6; /* blue-500 */
+        background-color: #a5b4fc; /* indigo-300 */
+        color: var(--brand-color-dark);
+        border-color: var(--brand-color);
     }
     .slot-chip.disabled {
-        background-color: #fca5a5; /* red-300 */
-        color: #991b1b; /* red-900 */
+        background-color: #fee2e2; /* red-100 */
+        color: #9ca3af; /* gray-400 */
         cursor: not-allowed;
-        opacity: 0.8;
+        text-decoration: line-through;
+        opacity: 0.7;
+    }
+    .equipment-card {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .equipment-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.06);
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-8">
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-        <div>
-            <h1 class="text-3xl font-bold text-gray-800">Disponibilidad de Equipos</h1>
-            <p class="mt-1 text-gray-600">Selecciona una fecha y luego elige un equipo para ver y seleccionar las horas disponibles.</p>
-        </div>
-        <!-- Date Filter Form -->
-        <div class="mt-4 md:mt-0">
-            <form method="get" action="{% url 'reservas:disponibilidad' %}" class="flex items-center space-x-3 bg-white p-3 rounded-lg shadow-sm">
-                <label for="fecha" class="font-semibold text-gray-700">Fecha:</label>
-                <input type="date" id="fecha" name="fecha" value="{{ fecha_seleccionada_str }}" class="border-gray-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                <button type="submit" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700">
-                    Buscar
-                </button>
-            </form>
+<div class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- Header -->
+    <div class="bg-white rounded-xl shadow-md p-6 mb-8">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-800">Disponibilidad de Equipos</h1>
+                <p class="mt-1 text-gray-600">Seleccione una fecha y elija un equipo para reservar.</p>
+            </div>
+            <!-- Date Filter Form -->
+            <div class="mt-4 md:mt-0">
+                <form method="get" action="{% url 'reservas:disponibilidad' %}" class="flex items-center space-x-3">
+                    <label for="fecha" class="font-semibold text-gray-700">Fecha:</label>
+                    <input type="date" id="fecha" name="fecha" value="{{ fecha_seleccionada_str }}" class="border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50">
+                    <button type="submit" class="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
+                        Buscar
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -56,16 +92,17 @@
     <div id="equipment-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {% for item in grid %}
         <div class="bg-white rounded-2xl shadow-lg overflow-hidden equipment-card" data-activo-id="{{ item.activo.id }}">
-            <div class="p-6">
-                <h2 class="text-xl font-bold text-gray-900">{{ item.activo.nombre }}</h2>
-                <p class="text-sm text-gray-500">{{ item.activo.tipo.nombre }}</p>
+            <div class="p-6 border-b border-gray-200">
+                <h2 class="text-2xl font-bold text-gray-900">{{ item.activo.nombre }}</h2>
+                <p class="text-sm font-medium text-indigo-600 bg-indigo-100 rounded-full px-3 py-1 inline-block mt-2">{{ item.activo.tipo.nombre }}</p>
             </div>
-            <div class="px-6 pb-6">
+
+            <div class="px-6 py-4">
                 {% for turno_nombre, franjas_turno in turnos.items %}
                     {% if franjas_turno %}
-                    <div class="mb-4">
-                        <h3 class="font-semibold text-gray-700 mb-3">{{ turno_nombre }}</h3>
-                        <div class="flex flex-wrap gap-x-2 gap-y-3">
+                    <div class="mb-5">
+                        <h3 class="font-semibold text-gray-800 mb-3 border-b pb-2">{{ turno_nombre|capfirst }}</h3>
+                        <div class="flex flex-wrap gap-2">
                             {% for slot in item.franjas %}
                                 {% if slot.franja.turno == turno_nombre %}
                                     {% if slot.reservado %}
@@ -73,9 +110,10 @@
                                             {{ slot.franja.hora_inicio|time:"H:i" }}
                                         </div>
                                     {% else %}
-                                        <button class="slot-chip available bg-gray-100 text-gray-800 px-3 py-1.5 text-sm font-medium rounded-full hover:bg-blue-100"
+                                        <button class="slot-chip available px-3 py-1.5 text-sm font-medium rounded-full"
                                                 data-franja-id="{{ slot.franja.id }}"
-                                                data-franja-time="{{ slot.franja.hora_inicio|time:'H:i:s' }}">
+                                                data-franja-time="{{ slot.franja.hora_inicio|time:'H:i:s' }}"
+                                                data-franja-end-time="{{ slot.franja.hora_fin|time:'H:i:s' }}">
                                             {{ slot.franja.hora_inicio|time:"H:i" }}
                                         </button>
                                     {% endif %}
@@ -86,20 +124,21 @@
                     {% endif %}
                 {% endfor %}
             </div>
+
             <!-- Confirmation Area per Card -->
-            <div class="confirmation-area bg-gray-50 p-4 border-t border-gray-200 hidden">
-                <p class="confirmation-text text-center font-semibold text-blue-800 mb-3 p-2 bg-blue-100 border border-blue-200 rounded-lg">Seleccione un rango de horas.</p>
+            <div class="confirmation-area bg-gray-50 p-5 border-t border-gray-200 hidden">
+                <p class="confirmation-text text-center font-semibold text-indigo-800 mb-4 p-3 bg-indigo-100 border border-indigo-200 rounded-lg">Seleccione un rango de horas.</p>
                 <form class="reserva-form" method="post" action="{% url 'reservas:disponibilidad' %}">
                     {% csrf_token %}
                     <input type="hidden" name="activo_id" value="{{ item.activo.id }}" class="form-activo-id">
                     <input type="hidden" name="franja_id_inicio" class="form-franja-id-inicio">
                     <input type="hidden" name="franja_id_fin" class="form-franja-id-fin">
                     <input type="hidden" name="fecha" value="{{ fecha_seleccionada_str }}">
-                    <div class="flex items-center space-x-3">
-                        <button type="submit" class="confirm-button w-full px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 disabled:bg-gray-400" disabled>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button type="submit" class="confirm-button col-span-2 w-full px-4 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-transform transform hover:scale-105" disabled>
                             Confirmar Reserva
                         </button>
-                        <button type="button" class="cancel-selection-button flex-shrink-0 px-4 py-2 bg-gray-200 text-gray-800 font-semibold rounded-md hover:bg-gray-300">
+                        <button type="button" class="cancel-selection-button col-span-2 w-full px-4 py-2 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300">
                             Cancelar
                         </button>
                     </div>
@@ -107,8 +146,12 @@
             </div>
         </div>
         {% empty %}
-        <div class="col-span-full text-center py-12">
-            <p class="text-gray-500">No hay equipos disponibles para reservar en esta fecha.</p>
+        <div class="col-span-full text-center py-16 bg-white rounded-xl shadow-md">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">No hay equipos disponibles</h3>
+            <p class="mt-1 text-sm text-gray-500">Intente seleccionar otra fecha.</p>
         </div>
         {% endfor %}
     </div>
@@ -203,18 +246,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const clickedFranjaId = target.dataset.franjaId;
         const clickedFranjaTime = target.dataset.franjaTime;
+        const clickedFranjaEndTime = target.dataset.franjaEndTime;
 
         if (!selection.startFranjaId) {
+            // This is the first click, setting the start time
             selection.startFranjaId = clickedFranjaId;
             selection.startFranjaTime = clickedFranjaTime;
             confirmationText.textContent = `Inicio: ${clickedFranjaTime.substring(0,5)}. Seleccione la hora de fin.`;
         } else {
+            // This is the second click, setting the end time
             const allSlotsInCard = Array.from(selection.card.querySelectorAll('.slot-chip'));
             const startIndex = allSlotsInCard.findIndex(chip => chip.dataset.franjaId === selection.startFranjaId);
             const endIndex = allSlotsInCard.findIndex(chip => chip.dataset.franjaId === clickedFranjaId);
 
             const [minIdx, maxIdx] = [Math.min(startIndex, endIndex), Math.max(startIndex, endIndex)];
 
+            // Check for disabled slots within the selected range
             let hasConflict = false;
             for (let i = minIdx; i <= maxIdx; i++) {
                 if (allSlotsInCard[i].classList.contains('disabled')) {
@@ -229,29 +276,36 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            let finalStartId, finalEndId, finalStartTime, finalEndTime;
+            let finalStartId, finalEndId, finalStartTime, finalEndTimeForDisplay;
 
+            // Determine the correct start and end slots regardless of click order
             if (new Date('1970-01-01T' + clickedFranjaTime) < new Date('1970-01-01T' + selection.startFranjaTime)) {
                 finalStartId = clickedFranjaId;
                 finalEndId = selection.startFranjaId;
                 finalStartTime = clickedFranjaTime;
-                finalEndTime = selection.startFranjaTime;
+
+                // Find the original start button to get its end time for the display
+                const startButton = selection.card.querySelector(`.slot-chip[data-franja-id='${selection.startFranjaId}']`);
+                finalEndTimeForDisplay = startButton.dataset.franjaEndTime;
             } else {
                 finalStartId = selection.startFranjaId;
                 finalEndId = clickedFranjaId;
                 finalStartTime = selection.startFranjaTime;
-                finalEndTime = clickedFranjaTime;
+                finalEndTimeForDisplay = clickedFranjaEndTime; // Use the end time from the currently clicked button
             }
 
+            // Update selection state
             selection.startFranjaId = finalStartId;
             selection.endFranjaId = finalEndId;
             selection.startFranjaTime = finalStartTime;
 
+            // Update hidden form fields
             formFranjaIdInicio.value = finalStartId;
             formFranjaIdFin.value = finalEndId;
             confirmButton.disabled = false;
 
-            confirmationText.textContent = `Reservar de ${finalStartTime.substring(0,5)} a ${finalEndTime.substring(0,5)}.`;
+            // Update confirmation text with the correct end time
+            confirmationText.textContent = `Reservar de ${finalStartTime.substring(0,5)} a ${finalEndTimeForDisplay.substring(0,5)}.`;
         }
 
         updateUI();
