@@ -18,7 +18,7 @@ from django.templatetags.static import static
 # Imports relativos al estar en un subdirectorio
 from ..models import (
     Docente, Curso, Asistencia, AsistenciaDiaria, ConfiguracionInstitucion,
-    Semestre, DiaEspecial, Especialidad, FranjaHoraria
+    Semestre, DiaEspecial, Especialidad, FranjaHoraria, Notificacion
 )
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
