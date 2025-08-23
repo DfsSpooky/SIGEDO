@@ -1,6 +1,6 @@
 import random
 from django.core.management.base import BaseCommand
-from datetime import date, time
+from datetime import date, time, timedelta, datetime
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from core.models import (
@@ -51,17 +51,33 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS('-> Carrera y Semestre creados.'))
 
         # --- 4. Crear Franjas Horarias ---
-        franjas_data = [
-            ('MANANA', time(8, 0), time(8, 50)), ('MANANA', time(8, 50), time(9, 40)),
-            ('MANANA', time(9, 40), time(10, 30)), ('MANANA', time(10, 30), time(11, 20)),
-            ('MANANA', time(11, 20), time(12, 10)), ('MANANA', time(12, 10), time(13, 0)),
-            ('TARDE', time(15, 0), time(15, 50)), ('TARDE', time(15, 50), time(16, 40)),
-            ('TARDE', time(16, 40), time(17, 30)), ('TARDE', time(17, 30), time(18, 20)),
-            ('TARDE', time(18, 20), time(19, 10)),
-        ]
-        for turno, inicio, fin in franjas_data:
-            FranjaHoraria.objects.get_or_create(turno=turno, hora_inicio=inicio, hora_fin=fin)
-        self.stdout.write(self.style.SUCCESS(f'-> {len(franjas_data)} Franjas Horarias creadas/verificadas.'))
+        self.stdout.write("... Creando franjas horarias uniformes...")
+        FranjaHoraria.objects.all().delete() # Limpiamos para asegurar consistencia
+
+        hora_actual = time(8, 0)
+        hora_fin_dia = time(22, 0)
+        intervalo = timedelta(minutes=30)
+
+        franjas_creadas = 0
+        while hora_actual < hora_fin_dia:
+            hora_fin_franja = (datetime.combine(date.today(), hora_actual) + intervalo).time()
+            turno = ''
+            if hora_actual < time(13, 0):
+                turno = 'MANANA'
+            elif hora_actual < time(18, 0):
+                turno = 'TARDE'
+            else:
+                turno = 'NOCHE'
+
+            FranjaHoraria.objects.create(
+                turno=turno,
+                hora_inicio=hora_actual,
+                hora_fin=hora_fin_franja
+            )
+            hora_actual = hora_fin_franja
+            franjas_creadas += 1
+
+        self.stdout.write(self.style.SUCCESS(f'-> {franjas_creadas} Franjas Horarias de 30 minutos creadas.'))
 
         # --- 5. Crear Grupos, Especialidades, Docentes y Cursos ---
         self.stdout.write('... Creando estructura académica...')

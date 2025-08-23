@@ -787,21 +787,22 @@ class ActivoDisponibilidadAPIView(APIView):
             activo=activo,
             fecha_reserva=fecha,
             estado__in=['RESERVADO', 'EN_USO']
-        ).select_related('franja_horaria_inicio', 'franja_horaria_fin')
+        ).select_related('franja_horaria_inicio', 'franja_horaria_fin', 'docente')
 
-        # Crear un set con los IDs de las franjas ocupadas para una búsqueda rápida
-        franjas_ocupadas_ids = set()
+        # Crear un mapa de las franjas ocupadas y por quién
+        franjas_ocupadas_map = {}
         franjas_list = list(franjas)
         for reserva in reservas_activas:
             try:
                 start_index = franjas_list.index(reserva.franja_horaria_inicio)
                 end_index = franjas_list.index(reserva.franja_horaria_fin)
                 for i in range(start_index, end_index + 1):
-                    franjas_ocupadas_ids.add(franjas_list[i].id)
+                    franja_id = franjas_list[i].id
+                    franjas_ocupadas_map[franja_id] = reserva.docente.get_full_name() if reserva.docente else 'Desconocido'
             except ValueError:
                 continue
 
-        # Serializar todas las franjas y añadir el campo 'is_reservado', agrupando por turno
+        # Serializar todas las franjas y añadir el campo 'is_reservado' y 'reservado_por', agrupando por turno
         disponibilidad_por_turno = {
             'MANANA': [],
             'TARDE': [],
@@ -809,7 +810,8 @@ class ActivoDisponibilidadAPIView(APIView):
         }
         for franja in franjas:
             data = FranjaHorariaSerializer(franja).data
-            data['is_reservado'] = franja.id in franjas_ocupadas_ids
+            data['is_reservado'] = franja.id in franjas_ocupadas_map
+            data['reservado_por'] = franjas_ocupadas_map.get(franja.id, None)
             if franja.turno in disponibilidad_por_turno:
                 disponibilidad_por_turno[franja.turno].append(data)
 

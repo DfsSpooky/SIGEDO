@@ -36,8 +36,13 @@
         justify-content: space-between;
         padding: 0 1rem;
         border-radius: 0.375rem;
-        transition: background-color 0.2s;
+        transition: all 0.2s ease-in-out;
         cursor: pointer;
+        user-select: none; /* Prevents text selection */
+    }
+    .timeline-slot.available:hover {
+        background-color: #dbeafe; /* blue-100 */
+        transform: scale(1.02);
     }
     .timeline-slot .time-text {
         font-weight: 500;
@@ -176,8 +181,9 @@ document.addEventListener('DOMContentLoaded', function() {
         tipoActivo: null,
         activo: null,
         fecha: '',
-        franjaInicio: null,
-        franjaFin: null,
+        franjaInicio: null, // Will store {id, hora_inicio, hora_fin}
+        franjaFin: null,    // Will store {id, hora_inicio, hora_fin}
+        disponibilidad: {}, // To cache the timeline data
     };
 
     // --- DOM ELEMENTS ---
@@ -228,6 +234,7 @@ document.addEventListener('DOMContentLoaded', function() {
             `).join('') : '<p class="text-sm text-base-content/60">No hay equipos de este tipo.</p>';
         },
         timeline: (disponibilidad) => {
+            state.disponibilidad = disponibilidad; // Cache the data
             let html = '';
             const turnos = {'MANANA': 'Mañana', 'TARDE': 'Tarde', 'NOCHE': 'Noche'};
 
@@ -237,10 +244,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     html += `<div class="timeline-shift-header">${nombreTurno}</div>`;
                     html += franjas.map(f => {
                         const time = f.hora_inicio.slice(0, 5);
+                        const tooltip = f.is_reservado ? `title="Reservado por ${f.reservado_por || 'desconocido'}"` : '';
                         return `
-                        <div class="timeline-slot ${f.is_reservado ? 'reserved' : 'available'}" data-id="${f.id}" data-time="${time}">
+                        <div class="timeline-slot ${f.is_reservado ? 'reserved' : 'available'}"
+                             data-id="${f.id}"
+                             data-hora-inicio="${f.hora_inicio}"
+                             data-hora-fin="${f.hora_fin}"
+                             ${tooltip}>
                             <span class="time-text">${time}</span>
-                            ${f.is_reservado ? '<span>Reservado</span>' : ''}
+                            ${f.is_reservado ? '<span><i class="fas fa-lock text-xs"></i></span>' : ''}
                         </div>
                     `}).join('');
                 }
@@ -250,11 +262,11 @@ document.addEventListener('DOMContentLoaded', function() {
         summary: () => {
             document.getElementById('summary-activo').textContent = state.activo.nombre;
             document.getElementById('summary-fecha').textContent = new Date(state.fecha + 'T00:00:00').toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
-            const horaFinDate = new Date(`1970-01-01T${state.franjaFin.time}`);
-            horaFinDate.setMinutes(horaFinDate.getMinutes() + 30); // Asumiendo franjas de 30 min para mostrar fin
-            const horaFinStr = horaFinDate.toTimeString().slice(0,5);
 
-            document.getElementById('summary-horario').textContent = `${state.franjaInicio.time} - ${horaFinStr}`;
+            const horaInicioStr = state.franjaInicio.hora_inicio.slice(0, 5);
+            const horaFinStr = state.franjaFin.hora_fin.slice(0, 5);
+
+            document.getElementById('summary-horario').textContent = `${horaInicioStr} - ${horaFinStr}`;
         }
     };
 
@@ -312,30 +324,35 @@ document.addEventListener('DOMContentLoaded', function() {
         const slot = e.target.closest('.timeline-slot.available');
         if (!slot) return;
 
+        const clickedFranja = {
+            id: slot.dataset.id,
+            hora_inicio: slot.dataset.horaInicio,
+            hora_fin: slot.dataset.horaFin
+        };
+
         if (!state.franjaInicio || state.franjaFin) {
-            // Start new selection or reset
-            state.franjaInicio = { id: slot.dataset.id, time: slot.dataset.time };
+            state.franjaInicio = clickedFranja;
             state.franjaFin = null;
-            timelineInstructions.textContent = `Hora de inicio: ${state.franjaInicio.time}. Ahora, selecciona la hora de fin.`;
+            timelineInstructions.textContent = `Hora de inicio: ${clickedFranja.hora_inicio.slice(0,5)}. Ahora, selecciona la hora de fin.`;
         } else {
-            // End selection
+            let tempFranjaFin = clickedFranja;
+
+            if (state.franjaInicio.hora_inicio > tempFranjaFin.hora_inicio) {
+                [state.franjaInicio, tempFranjaFin] = [tempFranjaFin, state.franjaInicio];
+            }
+            state.franjaFin = tempFranjaFin;
+
             const allSlots = Array.from(timelineSlots.querySelectorAll('.timeline-slot'));
             const startIndex = allSlots.findIndex(s => s.dataset.id === state.franjaInicio.id);
-            const endIndex = allSlots.findIndex(s => s.dataset.id === slot.dataset.id);
+            const endIndex = allSlots.findIndex(s => s.dataset.id === state.franjaFin.id);
 
-            if (startIndex > endIndex) { // Swap if selected backwards
-                [state.franjaInicio, state.franjaFin] = [{ id: slot.dataset.id, time: slot.dataset.time }, state.franjaInicio];
-            } else {
-                state.franjaFin = { id: slot.dataset.id, time: slot.dataset.time };
-            }
-
-            const rangeSlots = allSlots.slice(Math.min(startIndex, endIndex), Math.max(startIndex, endIndex) + 1);
+            const rangeSlots = allSlots.slice(startIndex, endIndex + 1);
             if(rangeSlots.some(s => s.classList.contains('reserved'))) {
                 alert('El rango seleccionado incluye un horario no disponible. Por favor, elige un nuevo rango.');
                 state.franjaInicio = null; state.franjaFin = null;
                 timelineInstructions.textContent = `Selección inválida. Vuelve a seleccionar la hora de inicio.`;
             } else {
-                 timelineInstructions.textContent = `Rango seleccionado: ${state.franjaInicio.time} - ${state.franjaFin.time}.`;
+                 timelineInstructions.textContent = `Rango seleccionado: ${state.franjaInicio.hora_inicio.slice(0,5)} - ${state.franjaFin.hora_fin.slice(0,5)}.`;
             }
         }
 
