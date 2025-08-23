@@ -1,10 +1,71 @@
-{% extends 'base.html' %}
+{% extends 'registration/login_base.html' %}
+{% load static %}
 {% block title %}Iniciar Sesión{% endblock %}
+
 {% block content %}
-    <h1 class="text-2xl font-bold mb-4">Iniciar Sesión</h1>
-    <form method="post" class="space-y-4 max-w-md">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Iniciar Sesión</button>
-    </form>
+<div class="flex items-stretch min-h-screen bg-base-200">
+    <!-- Left Panel: Branding & Welcome -->
+    <div class="w-1/2 lg:w-5/12 hidden md:flex flex-col justify-center items-center text-white p-12 relative overflow-hidden" style="background: linear-gradient(135deg, #4f46e5 0%, #8b5cf6 100%);">
+        <div class="absolute top-0 left-0 w-full h-full bg-cover opacity-10" style="background-image: url('{% static 'bg-pattern.svg' %}');"></div>
+        <div class="z-10 text-center">
+            {% if configuracion.logo %}
+                <img src="{{ configuracion.logo.url }}" alt="Logo Institución" class="w-28 h-28 mx-auto mb-6 object-contain bg-white/20 p-2 rounded-full shadow-lg">
+            {% endif %}
+            <h1 class="text-4xl font-bold tracking-tight">{{ configuracion.nombre_institucion|default:"Gestión Docente" }}</h1>
+            <p class="text-lg opacity-80 mt-4 max-w-md">
+                Una plataforma unificada para la gestión académica y el seguimiento de la asistencia docente.
+            </p>
+        </div>
+        <div class="absolute bottom-6 text-sm opacity-60">
+            &copy; {% now "Y" %} {{ configuracion.nombre_institucion }}. Todos los derechos reservados.
+        </div>
+    </div>
+
+    <!-- Right Panel: Login Form -->
+    <div class="w-full md:w-1/2 lg:w-7/12 flex justify-center items-center p-6 lg:p-12">
+        <div class="w-full max-w-md">
+            <div class="card bg-base-100 shadow-2xl">
+                <div class="card-body p-8 lg:p-12">
+                    <h2 class="card-title text-3xl font-bold mb-2">Bienvenido de Nuevo</h2>
+                    <p class="text-base-content/60 mb-8">Por favor, inicia sesión para continuar.</p>
+
+                    <form method="post" class="space-y-6">
+                        {% csrf_token %}
+
+                        <div class="form-control">
+                            <label for="{{ form.username.id_for_label }}" class="label">
+                                <span class="label-text">Usuario o DNI</span>
+                            </label>
+                            <input type="text" id="{{ form.username.id_for_label }}" name="{{ form.username.name }}"
+                                   placeholder="Ingresa tu usuario"
+                                   class="input input-bordered input-lg w-full">
+                        </div>
+
+                        <div class="form-control">
+                            <label for="{{ form.password.id_for_label }}" class="label">
+                                <span class="label-text">Contraseña</span>
+                            </label>
+                            <input type="password" id="{{ form.password.id_for_label }}" name="{{ form.password.name }}"
+                                   placeholder="Ingresa tu contraseña"
+                                   class="input input-bordered input-lg w-full">
+                        </div>
+
+                        {% if form.errors %}
+                        <div role="alert" class="alert alert-error text-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            <span>Credenciales incorrectas. Por favor, verifica tus datos.</span>
+                        </div>
+                        {% endif %}
+
+                        <div class="pt-4">
+                            <button type="submit" class="btn btn-primary btn-lg w-full">
+                                Iniciar Sesión
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
