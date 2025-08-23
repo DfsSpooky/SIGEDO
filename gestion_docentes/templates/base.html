@@ -1,8 +1,8 @@
 {% load static %} <!DOCTYPE html>
-<html lang="es" data-theme="dark"> <head>
+<html lang="es" data-theme="winter"> <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Gestión Docente{% endblock %} - Sistema de Gestión</title>
+    <title>{% block title %}Dashboard{% endblock %} | {{ configuracion.nombre_institucion|default:"Sistema de Gestión" }}</title>
     
     <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.2/dist/full.min.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.tailwindcss.com"></script>
@@ -55,7 +55,7 @@
                     </label>
                 </div>
                 <div class="flex-1">
-                    <a class="btn btn-ghost text-xl">Gestión Docente</a>
+                    <a class="btn btn-ghost text-xl">{{ configuracion.nombre_dashboard|default:"Gestión Docente" }}</a>
                 </div>
             </div>
 
@@ -69,12 +69,31 @@
                     </div>
                 </div>
                 <div class="flex-none gap-4">
-                    <label class="swap swap-rotate btn btn-ghost btn-circle">
-                        <input type="checkbox" id="theme-toggle" />
-                        <i class="fas fa-sun swap-on fill-current w-5 h-5 transition-transform duration-300 ease-in-out"></i>
-                        <i class="fas fa-moon swap-off fill-current w-5 h-5 transition-transform duration-300 ease-in-out"></i>
-                    </label>
-                    
+                    <!-- Notification Dropdown -->
+                    <div class="dropdown dropdown-end">
+                        <label tabindex="0" class="btn btn-ghost btn-circle">
+                            <div class="indicator">
+                                <i class="fas fa-bell text-xl"></i>
+                                <span id="notification-badge" class="badge badge-sm badge-primary indicator-item" style="display: none;">0</span>
+                            </div>
+                        </label>
+                        <div tabindex="0" id="notification-dropdown" class="dropdown-content card card-compact w-80 lg:w-96 p-2 shadow bg-base-100 text-base-content">
+                            <div class="card-body">
+                                <h3 class="card-title">Notificaciones</h3>
+                                <div id="notification-list" class="max-h-96 overflow-y-auto space-y-2 mt-2">
+                                    <!-- Notifications will be inserted here by JavaScript -->
+                                    <div id="no-notifications-placeholder" class="text-center py-8">
+                                        <i class="fas fa-bell-slash fa-2x text-base-content/30"></i>
+                                        <p class="mt-2 text-sm">No tienes notificaciones nuevas.</p>
+                                    </div>
+                                </div>
+                                <div class="card-actions mt-4">
+                                    <a href="{% url 'ver_notificaciones' %}" class="btn btn-primary btn-block btn-sm">Ver Todas</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="dropdown dropdown-end">
                         <label tabindex="0" class="btn btn-ghost btn-circle avatar">
                             <div class="w-10 rounded-full ring-2 ring-offset-2 ring-offset-base-100 ring-transparent hover:ring-primary transition-shadow duration-300">
@@ -147,21 +166,35 @@
             <ul class="menu p-4 w-72 min-h-full bg-base-100 text-base-content">
                 <li class="text-2xl font-bold p-4 mb-4">
                     <a href="{% url 'dashboard' %}" class="hover:text-primary transition-colors duration-300">
-                        <i class="fas fa-university text-primary"></i>
-                        Gestión Docente
+                        {% if configuracion.logo %}
+                            <img src="{{ configuracion.logo.url }}" alt="Logo" class="h-8 w-8 mr-2 object-contain">
+                        {% else %}
+                            <i class="fas fa-university text-primary"></i>
+                        {% endif %}
+                        {{ configuracion.nombre_dashboard|default:"Gestión Docente" }}
                     </a>
                 </li>
                 
                 <li class="menu-title"><span class="opacity-60">Principal</span></li>
                 <li><a href="{% url 'dashboard' %}" class="group transition-all duration-300"><i class="fas fa-tachometer-alt fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Dashboard</a></li>
+                <li><a href="{% url 'ver_anuncios' %}" class="group transition-all duration-300"><i class="fas fa-bullhorn fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Anuncios</a></li>
                 <li><a href="{% url 'perfil' %}" class="group transition-all duration-300"><i class="fas fa-user-circle fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Mi Perfil</a></li>
                 <li><a href="{% url 'lista_documentos' %}" class="group transition-all duration-300"><i class="fas fa-file-alt fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Mis Documentos</a></li>
+                <li><a href="{% url 'lista_justificaciones' %}" class="group transition-all duration-300"><i class="fas fa-calendar-check fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Mis Justificaciones</a></li>
+                <li><a href="{% url 'reservas:disponibilidad' %}" class="group transition-all duration-300"><i class="fas fa-bookmark fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Reserva de Equipos</a></li>
 
                 {% if user.is_staff %}
                 <li class="menu-title"><span class="opacity-60 pt-4">Administración</span></li>
+                {% if perms.core.view_planificador %}
                 <li><a href="{% url 'planificador_horarios' %}" class="group transition-all duration-300"><i class="fas fa-calendar-alt fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Planificador</a></li>
+                {% endif %}
                 <li><a href="{% url 'lista_credenciales' %}" class="group transition-all duration-300"><i class="fas fa-id-card fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Credenciales</a></li>
+                {% if perms.core.view_reporte %}
                 <li><a href="{% url 'reporte_asistencia' %}" class="group transition-all duration-300"><i class="fas fa-chart-bar fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Reportes</a></li>
+                {% endif %}
+                {% if perms.core.change_justificacion %}
+                <li><a href="{% url 'lista_justificaciones' %}" class="group transition-all duration-300"><i class="fas fa-check-double fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Gestionar Justificaciones</a></li>
+                {% endif %}
                 <li><a href="/admin" target="_blank" class="group transition-all duration-300"><i class="fas fa-cogs fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Panel de Admin</a></li>
                 {% endif %}
 
@@ -172,18 +205,151 @@
         </div>
     </div>
 
-    <script>
-        const themeToggle = document.getElementById('theme-toggle');
-        const html = document.documentElement;
-        const currentTheme = localStorage.getItem('theme') || 'dark';
-        html.setAttribute('data-theme', currentTheme);
-        themeToggle.checked = currentTheme === 'light';
-        themeToggle.addEventListener('change', function() {
-            const newTheme = this.checked ? 'light' : 'dark';
-            html.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
-        });
-    </script>
     {% block extra_js %}{% endblock %}
+
+    {% if user.is_authenticated %}
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const notificationBadge = document.getElementById('notification-badge');
+        const notificationList = document.getElementById('notification-list');
+        const noNotificationsPlaceholder = document.getElementById('no-notifications-placeholder');
+
+        let unreadCount = 0;
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+        const csrftoken = getCookie('csrftoken');
+
+        function updateBadge() {
+            if (unreadCount > 0) {
+                notificationBadge.textContent = unreadCount;
+                notificationBadge.style.display = 'inline-flex';
+            } else {
+                notificationBadge.style.display = 'none';
+            }
+        }
+
+        function addNotification(notification, prepend = false) {
+            if (noNotificationsPlaceholder) {
+                noNotificationsPlaceholder.style.display = 'none';
+            }
+
+            const notificationElement = document.createElement('div');
+            notificationElement.id = `notification-${notification.id}`;
+            notificationElement.classList.add('p-2', 'rounded-lg', 'hover:bg-base-200', 'transition-colors', 'duration-200', 'border-b', 'border-base-200/50');
+
+            notificationElement.innerHTML = `
+                <a href="${notification.url}" data-id="${notification.id}" class="notification-link flex items-start gap-3">
+                    <div class="mt-1">
+                        <span class="unread-dot w-2.5 h-2.5 rounded-full ${notification.leido ? 'bg-transparent' : 'bg-primary'} block"></span>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-sm">${notification.mensaje}</p>
+                        <p class="text-xs text-base-content/60 mt-1">${new Date(notification.fecha_creacion).toLocaleString()}</p>
+                    </div>
+                </a>
+            `;
+
+            if (prepend) {
+                notificationList.prepend(notificationElement);
+            } else {
+                notificationList.appendChild(notificationElement);
+            }
+
+            notificationElement.querySelector('.notification-link').addEventListener('click', function(e) {
+                markAsRead(notification.id);
+            });
+        }
+
+        function markAsRead(notificationId) {
+            const notificationElement = document.getElementById(`notification-${notificationId}`);
+            const unreadDot = notificationElement ? notificationElement.querySelector('.unread-dot') : null;
+
+            if (unreadDot && unreadDot.classList.contains('bg-primary')) {
+                fetch(`/api/notificaciones/${notificationId}/marcar-leida/`, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrftoken, 'Content-Type': 'application/json' },
+                }).then(response => {
+                    if (response.ok) {
+                        unreadDot.classList.remove('bg-primary');
+                        unreadDot.classList.add('bg-transparent');
+                        unreadCount = Math.max(0, unreadCount - 1);
+                        updateBadge();
+                    }
+                });
+            }
+        }
+
+        function markAllAsRead() {
+            fetch(`/api/notificaciones/marcar-todas-leidas/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrftoken, 'Content-Type': 'application/json' },
+            }).then(response => {
+                if (response.ok) {
+                    document.querySelectorAll('.unread-dot.bg-primary').forEach(dot => {
+                        dot.classList.remove('bg-primary');
+                        dot.classList.add('bg-transparent');
+                    });
+                    unreadCount = 0;
+                    updateBadge();
+                }
+            });
+        }
+
+        const markAllButton = document.createElement('button');
+        markAllButton.className = 'btn btn-ghost btn-xs mt-2';
+        markAllButton.textContent = 'Marcar todas como leídas';
+        markAllButton.addEventListener('click', markAllAsRead);
+        notificationList.parentElement.insertBefore(markAllButton, notificationList.nextSibling);
+
+
+        function connect() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsPath = `${protocol}//${window.location.host}/ws/notifications/`;
+            const notificationSocket = new WebSocket(wsPath);
+
+            notificationSocket.onopen = function(e) { console.log("Notification WebSocket connected."); };
+            notificationSocket.onclose = function(e) {
+                console.error('Notification WebSocket closed. Reconnecting in 5s...');
+                setTimeout(connect, 5000);
+            };
+            notificationSocket.onmessage = function(e) {
+                const data = JSON.parse(e.data);
+                if (data.type === 'send_notification') {
+                    addNotification(data.message, true);
+                    if (!data.message.leido) {
+                        unreadCount++;
+                        updateBadge();
+                    }
+                }
+            };
+        }
+
+        fetch("{% url 'api:notificaciones_json' %}")
+            .then(response => response.json())
+            .then(data => {
+                if (data.notifications && data.notifications.length > 0) {
+                    data.notifications.forEach(n => addNotification(n));
+                }
+                unreadCount = data.unread_count || 0;
+                updateBadge();
+            });
+
+        connect();
+    });
+    </script>
+    {% endif %}
 </body>
 </html>
