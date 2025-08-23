@@ -79,11 +79,16 @@
             <div class="mt-4 md:mt-0">
                 <form method="get" action="{% url 'reservas:disponibilidad' %}" class="flex items-center space-x-3">
                     <label for="fecha" class="font-semibold text-gray-700">Fecha:</label>
-                    <input type="date" id="fecha" name="fecha" value="{{ fecha_seleccionada_str }}" class="border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50">
+                    <input type="date" id="fecha" name="fecha" value="{{ fecha_seleccionada_str }}"
+                           min="{{ fecha_inicio_semana }}" max="{{ fecha_fin_semana }}"
+                           class="border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50">
                     <button type="submit" class="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
                         Buscar
                     </button>
                 </form>
+                <div id="date-warning" class="text-red-600 font-semibold text-sm mt-2" style="display: none;">
+                    Solo puedes reservar en días que tienes clases programadas.
+                </div>
             </div>
         </div>
     </div>
@@ -161,54 +166,34 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // --- LÓGICA DE SELECCIÓN DE FRANJAS HORARIAS (SIN CAMBIOS) ---
     const grid = document.getElementById('equipment-grid');
-
-    let selection = {
-        card: null,
-        startFranjaId: null,
-        endFranjaId: null,
-        startFranjaTime: null,
-    };
+    let selection = { card: null, startFranjaId: null, endFranjaId: null, startFranjaTime: null };
 
     function clearSelection() {
         if (selection.card) {
-            selection.card.querySelectorAll('.slot-chip.available').forEach(btn => {
-                btn.classList.remove('selected', 'in-range');
-            });
+            selection.card.querySelectorAll('.slot-chip.available').forEach(btn => btn.classList.remove('selected', 'in-range'));
             const confirmationArea = selection.card.querySelector('.confirmation-area');
             const confirmButton = selection.card.querySelector('.confirm-button');
             const confirmationText = selection.card.querySelector('.confirmation-text');
-
             confirmationArea.classList.add('hidden');
             confirmButton.disabled = true;
             confirmationText.textContent = 'Seleccione un rango de horas.';
         }
-
-        selection = {
-            card: null,
-            startFranjaId: null,
-            endFranjaId: null,
-            startFranjaTime: null,
-        };
+        selection = { card: null, startFranjaId: null, endFranjaId: null, startFranjaTime: null };
     }
 
     function updateUI() {
         if (!selection.card) return;
-
         const availableSlots = Array.from(selection.card.querySelectorAll('.slot-chip.available'));
         availableSlots.forEach(btn => btn.classList.remove('selected', 'in-range'));
-
         const startIndex = availableSlots.findIndex(btn => btn.dataset.franjaId === selection.startFranjaId);
         if (startIndex === -1) return;
-
         availableSlots[startIndex].classList.add('selected');
-
         if (selection.endFranjaId) {
             const endIndex = availableSlots.findIndex(btn => btn.dataset.franjaId === selection.endFranjaId);
             if (endIndex === -1) return;
-
             const [minIdx, maxIdx] = [Math.min(startIndex, endIndex), Math.max(startIndex, endIndex)];
-
             for (let i = minIdx; i <= maxIdx; i++) {
                 availableSlots[i].classList.add('in-range');
             }
@@ -218,50 +203,34 @@ document.addEventListener('DOMContentLoaded', function() {
 
     grid.addEventListener('click', function(e) {
         const target = e.target;
-
         if (target.matches('.cancel-selection-button')) {
             clearSelection();
             return;
         }
-
-        if (!target.matches('.slot-chip.available')) {
-            return;
-        }
-
+        if (!target.matches('.slot-chip.available')) return;
         const clickedCard = target.closest('.equipment-card');
         if (!clickedCard) return;
-
-        if (selection.card && selection.card !== clickedCard) {
-            clearSelection();
-        }
-
+        if (selection.card && selection.card !== clickedCard) clearSelection();
         selection.card = clickedCard;
         const confirmationArea = selection.card.querySelector('.confirmation-area');
         const confirmButton = selection.card.querySelector('.confirm-button');
         const confirmationText = selection.card.querySelector('.confirmation-text');
         const formFranjaIdInicio = selection.card.querySelector('.form-franja-id-inicio');
         const formFranjaIdFin = selection.card.querySelector('.form-franja-id-fin');
-
         confirmationArea.classList.remove('hidden');
-
         const clickedFranjaId = target.dataset.franjaId;
         const clickedFranjaTime = target.dataset.franjaTime;
         const clickedFranjaEndTime = target.dataset.franjaEndTime;
 
         if (!selection.startFranjaId) {
-            // This is the first click, setting the start time
             selection.startFranjaId = clickedFranjaId;
             selection.startFranjaTime = clickedFranjaTime;
             confirmationText.textContent = `Inicio: ${clickedFranjaTime.substring(0,5)}. Seleccione la hora de fin.`;
         } else {
-            // This is the second click, setting the end time
             const allSlotsInCard = Array.from(selection.card.querySelectorAll('.slot-chip'));
             const startIndex = allSlotsInCard.findIndex(chip => chip.dataset.franjaId === selection.startFranjaId);
             const endIndex = allSlotsInCard.findIndex(chip => chip.dataset.franjaId === clickedFranjaId);
-
             const [minIdx, maxIdx] = [Math.min(startIndex, endIndex), Math.max(startIndex, endIndex)];
-
-            // Check for disabled slots within the selected range
             let hasConflict = false;
             for (let i = minIdx; i <= maxIdx; i++) {
                 if (allSlotsInCard[i].classList.contains('disabled')) {
@@ -269,47 +238,58 @@ document.addEventListener('DOMContentLoaded', function() {
                     break;
                 }
             }
-
             if (hasConflict) {
                 alert('El rango seleccionado incluye horarios que ya están reservados. Por favor, elija otro rango.');
                 clearSelection();
                 return;
             }
-
             let finalStartId, finalEndId, finalStartTime, finalEndTimeForDisplay;
-
-            // Determine the correct start and end slots regardless of click order
             if (new Date('1970-01-01T' + clickedFranjaTime) < new Date('1970-01-01T' + selection.startFranjaTime)) {
                 finalStartId = clickedFranjaId;
                 finalEndId = selection.startFranjaId;
                 finalStartTime = clickedFranjaTime;
-
-                // Find the original start button to get its end time for the display
                 const startButton = selection.card.querySelector(`.slot-chip[data-franja-id='${selection.startFranjaId}']`);
                 finalEndTimeForDisplay = startButton.dataset.franjaEndTime;
             } else {
                 finalStartId = selection.startFranjaId;
                 finalEndId = clickedFranjaId;
                 finalStartTime = selection.startFranjaTime;
-                finalEndTimeForDisplay = clickedFranjaEndTime; // Use the end time from the currently clicked button
+                finalEndTimeForDisplay = clickedFranjaEndTime;
             }
-
-            // Update selection state
             selection.startFranjaId = finalStartId;
             selection.endFranjaId = finalEndId;
             selection.startFranjaTime = finalStartTime;
-
-            // Update hidden form fields
             formFranjaIdInicio.value = finalStartId;
             formFranjaIdFin.value = finalEndId;
             confirmButton.disabled = false;
-
-            // Update confirmation text with the correct end time
             confirmationText.textContent = `Reservar de ${finalStartTime.substring(0,5)} a ${finalEndTimeForDisplay.substring(0,5)}.`;
         }
-
         updateUI();
     });
+
+    // --- NUEVA LÓGICA PARA VALIDACIÓN DE FECHA ---
+    const fechaInput = document.getElementById('fecha');
+    const dateWarning = document.getElementById('date-warning');
+    // Usamos un bloque try-catch por si el JSON es inválido o no existe
+    let fechasValidas = [];
+    try {
+        fechasValidas = JSON.parse('{{ fechas_validas_json|escapejs }}');
+    } catch (e) {
+        console.error("No se pudieron cargar las fechas válidas:", e);
+    }
+
+    function checkDateValidity() {
+        const selectedDate = fechaInput.value;
+        if (fechasValidas.length > 0 && !fechasValidas.includes(selectedDate)) {
+            dateWarning.style.display = 'block';
+        } else {
+            dateWarning.style.display = 'none';
+        }
+    }
+
+    // Comprobar la validez de la fecha al cargar la página y cada vez que cambia
+    fechaInput.addEventListener('change', checkDateValidity);
+    checkDateValidity(); // Ejecutar al inicio
 });
 </script>
 {% endblock %}
