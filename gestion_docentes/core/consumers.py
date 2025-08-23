@@ -24,8 +24,12 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         )
 
     async def send_notification(self, event):
-        message = event['message']
-        await self.send(text_data=json.dumps(message))
+        # El frontend espera un payload con una clave 'type' y 'message'.
+        # Reconstruimos el payload aquí para que coincida con las expectativas del cliente.
+        await self.send(text_data=json.dumps({
+            'type': 'send_notification',
+            'message': event['message']
+        }))
 
 
 class KioskConsumer(AsyncWebsocketConsumer):
