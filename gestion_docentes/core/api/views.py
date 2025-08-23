@@ -721,3 +721,133 @@ def marcar_todas_como_leidas(request):
     """
     Notificacion.objects.filter(destinatario=request.user, leido=False).update(leido=True)
     return JsonResponse({'status': 'success'})
+
+
+# ========= VISTAS DE API PARA RESERVAS =========
+
+from rest_framework import generics
+from ..models import TipoActivo, Activo, Reserva, FranjaHoraria
+from .serializers import (
+    TipoActivoSerializer, ActivoSerializer,
+    FranjaHorariaSerializer, ReservaCreateSerializer
+)
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import serializers
+
+class TipoActivoListAPIView(generics.ListAPIView):
+    """
+    API view para listar todos los tipos de activos.
+    """
+    queryset = TipoActivo.objects.all().order_by('nombre')
+    serializer_class = TipoActivoSerializer
+    permission_classes = [IsAuthenticated]
+
+class ActivoListAPIView(generics.ListAPIView):
+    """
+    API view para listar activos, opcionalmente filtrados por tipo.
+    """
+    serializer_class = ActivoSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = Activo.objects.filter(estado__in=['DISPONIBLE', 'ASIGNADO']).order_by('nombre')
+        tipo_id = self.request.query_params.get('tipo_id')
+        if tipo_id:
+            queryset = queryset.filter(tipo_id=tipo_id)
+        return queryset
+
+class ActivoDisponibilidadAPIView(APIView):
+    """
+    API view para obtener la disponibilidad de un activo en una fecha específica.
+    Devuelve todas las franjas horarias del día, marcando las que ya están reservadas.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        activo_id = request.query_params.get('activo_id')
+        fecha_str = request.query_params.get('fecha')
+
+        if not activo_id or not fecha_str:
+            return Response(
+                {'error': 'Los parámetros "activo_id" y "fecha" son requeridos.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            fecha = timezone.datetime.strptime(fecha_str, '%Y-%m-%d').date()
+            activo = Activo.objects.get(pk=activo_id)
+        except (ValueError, Activo.DoesNotExist):
+            return Response(
+                {'error': 'Fecha inválida o activo no encontrado.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        franjas = FranjaHoraria.objects.all().order_by('hora_inicio')
+        reservas_activas = Reserva.objects.filter(
+            activo=activo,
+            fecha_reserva=fecha,
+            estado__in=['RESERVADO', 'EN_USO']
+        ).select_related('franja_horaria_inicio', 'franja_horaria_fin')
+
+        # Crear un set con los IDs de las franjas ocupadas para una búsqueda rápida
+        franjas_ocupadas_ids = set()
+        franjas_list = list(franjas)
+        for reserva in reservas_activas:
+            try:
+                start_index = franjas_list.index(reserva.franja_horaria_inicio)
+                end_index = franjas_list.index(reserva.franja_horaria_fin)
+                for i in range(start_index, end_index + 1):
+                    franjas_ocupadas_ids.add(franjas_list[i].id)
+            except ValueError:
+                continue
+
+        # Serializar todas las franjas y añadir el campo 'is_reservado'
+        disponibilidad = []
+        for franja in franjas:
+            data = FranjaHorariaSerializer(franja).data
+            data['is_reservado'] = franja.id in franjas_ocupadas_ids
+            disponibilidad.append(data)
+
+        return Response(disponibilidad)
+
+
+class ReservaCreateAPIView(generics.CreateAPIView):
+    """
+    API view para crear una nueva reserva.
+    """
+    serializer_class = ReservaCreateSerializer
+    permission_classes = [IsAuthenticated]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        validated_data = serializer.validated_data
+        activo = get_object_or_404(Activo, pk=validated_data['activo_id'])
+        franja_inicio = get_object_or_404(FranjaHoraria, pk=validated_data['franja_inicio_id'])
+        franja_fin = get_object_or_404(FranjaHoraria, pk=validated_data['franja_fin_id'])
+        fecha = validated_data['fecha']
+        docente = self.request.user
+
+        # Comprobar conflictos (lógica similar a la vista original)
+        conflictos = Reserva.objects.filter(
+            activo=activo,
+            fecha_reserva=fecha,
+            estado__in=['RESERVADO', 'EN_USO'],
+            franja_horaria_inicio__hora_inicio__lt=franja_fin.hora_fin,
+            franja_horaria_fin__hora_fin__gt=franja_inicio.hora_inicio
+        ).exists()
+
+        if conflictos:
+            raise serializers.ValidationError('El rango de horas seleccionado se solapa con una reserva existente para este equipo.')
+
+        Reserva.objects.create(
+            activo=activo,
+            docente=docente,
+            fecha_reserva=fecha,
+            franja_horaria_inicio=franja_inicio,
+            franja_horaria_fin=franja_fin
+        )
+
+        headers = self.get_success_headers(serializer.data)
+        return Response({'status': 'success', 'message': 'Reserva creada con éxito.'}, status=status.HTTP_201_CREATED, headers=headers)

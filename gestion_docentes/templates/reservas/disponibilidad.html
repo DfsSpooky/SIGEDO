@@ -1,116 +1,154 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Disponibilidad de Equipos{% endblock %}
+{% block title %}Nueva Reserva de Equipo{% endblock %}
 
 {% block extra_css %}
 <style>
-    .slot-chip {
-        transition: all 0.2s ease-in-out;
+    /* Estilos para la línea de tiempo de disponibilidad */
+    .timeline-container {
+        position: relative;
+        background-color: #f9fafb; /* gray-50 */
+        border-radius: 0.5rem;
+        padding: 1rem;
+        border: 1px solid #e5e7eb; /* gray-200 */
+    }
+    .timeline-slots {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+    .timeline-slot {
+        height: 2.5rem;
+        border-left: 3px solid transparent;
+        padding-left: 1rem;
+        display: flex;
+        align-items: center;
+        transition: background-color 0.2s;
         cursor: pointer;
+        position: relative;
     }
-    .slot-chip.available:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    .timeline-slot.available:hover {
+        background-color: #dbeafe; /* blue-100 */
     }
-    .slot-chip.selected {
+    .timeline-slot.reserved {
+        background-color: #fee2e2; /* red-100 */
+        color: #b91c1c; /* red-700 */
+        cursor: not-allowed;
+        text-decoration: line-through;
+    }
+    .timeline-slot.selected {
         background-color: #2563eb; /* blue-600 */
         color: white;
-        font-weight: 600;
-        box-shadow: 0 2px 6px rgba(37, 99, 235, 0.4);
+        border-color: #1d4ed8; /* blue-700 */
     }
-    .slot-chip.in-range {
+    .timeline-slot.in-range {
         background-color: #60a5fa; /* blue-400 */
         color: white;
-        border-color: #3b82f6; /* blue-500 */
     }
-    .slot-chip.disabled {
-        background-color: #fca5a5; /* red-300 */
-        color: #991b1b; /* red-900 */
-        cursor: not-allowed;
-        opacity: 0.8;
+    .timeline-hour-marker {
+        position: absolute;
+        left: -3.5rem;
+        top: -0.75rem;
+        font-size: 0.75rem;
+        color: #6b7280; /* gray-500 */
+    }
+    .step-content {
+        min-height: 300px; /* Evita saltos de layout */
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-8">
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-        <div>
-            <h1 class="text-3xl font-bold text-gray-800">Disponibilidad de Equipos</h1>
-            <p class="mt-1 text-gray-600">Selecciona una fecha y luego elige un equipo para ver y seleccionar las horas disponibles.</p>
-        </div>
-        <!-- Date Filter Form -->
-        <div class="mt-4 md:mt-0">
-            <form method="get" action="{% url 'reservas:disponibilidad' %}" class="flex items-center space-x-3 bg-white p-3 rounded-lg shadow-sm">
-                <label for="fecha" class="font-semibold text-gray-700">Fecha:</label>
-                <input type="date" id="fecha" name="fecha" value="{{ fecha_seleccionada_str }}" class="border-gray-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                <button type="submit" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700">
-                    Buscar
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <!-- Equipment Cards Grid -->
-    <div id="equipment-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {% for item in grid %}
-        <div class="bg-white rounded-2xl shadow-lg overflow-hidden equipment-card" data-activo-id="{{ item.activo.id }}">
-            <div class="p-6">
-                <h2 class="text-xl font-bold text-gray-900">{{ item.activo.nombre }}</h2>
-                <p class="text-sm text-gray-500">{{ item.activo.tipo.nombre }}</p>
+<div class="max-w-4xl mx-auto">
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <div class="text-center mb-8">
+                <h1 class="text-4xl font-bold">Nueva Reserva</h1>
+                <p class="text-base-content/70 mt-2">Sigue los pasos para reservar un equipo.</p>
             </div>
-            <div class="px-6 pb-6">
-                {% for turno_nombre, franjas_turno in turnos.items %}
-                    {% if franjas_turno %}
-                    <div class="mb-4">
-                        <h3 class="font-semibold text-gray-700 mb-3">{{ turno_nombre }}</h3>
-                        <div class="flex flex-wrap gap-x-2 gap-y-3">
-                            {% for slot in item.franjas %}
-                                {% if slot.franja.turno == turno_nombre %}
-                                    {% if slot.reservado %}
-                                        <div class="slot-chip disabled px-3 py-1.5 text-sm font-medium rounded-full" title="No disponible">
-                                            {{ slot.franja.hora_inicio|time:"H:i" }}
-                                        </div>
-                                    {% else %}
-                                        <button class="slot-chip available bg-gray-100 text-gray-800 px-3 py-1.5 text-sm font-medium rounded-full hover:bg-blue-100"
-                                                data-franja-id="{{ slot.franja.id }}"
-                                                data-franja-time="{{ slot.franja.hora_inicio|time:'H:i:s' }}">
-                                            {{ slot.franja.hora_inicio|time:"H:i" }}
-                                        </button>
-                                    {% endif %}
-                                {% endif %}
-                            {% endfor %}
+
+            <!-- Indicador de Pasos -->
+            <ul class="steps w-full mb-10" id="steps-indicator">
+                <li class="step step-primary" data-step="1">Tipo de Equipo</li>
+                <li class="step" data-step="2">Equipo y Fecha</li>
+                <li class="step" data-step="3">Horario</li>
+                <li class="step" data-step="4">Confirmar</li>
+            </ul>
+
+            <!-- Contenedor de Pasos -->
+            <div id="steps-container">
+                <!-- Paso 1: Seleccionar Tipo de Activo -->
+                <div id="step-1" class="step-content">
+                    <h3 class="text-xl font-semibold text-center mb-4">¿Qué tipo de equipo necesitas?</h3>
+                    <div id="tipo-activo-list" class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <!-- Los tipos de activo se cargarán aquí con JS -->
+                        <div class="text-center p-4"><span class="loading loading-spinner loading-lg"></span></div>
+                    </div>
+                </div>
+
+                <!-- Paso 2: Seleccionar Activo y Fecha -->
+                <div id="step-2" class="step-content hidden">
+                    <h3 class="text-xl font-semibold text-center mb-4">Elige el equipo específico y la fecha</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                            <label for="activo-list" class="label">Equipo disponible:</label>
+                            <div id="activo-list" class="flex flex-col gap-2">
+                                <!-- Los activos se cargarán aquí con JS -->
+                                <div class="text-center p-4"><span class="loading loading-spinner"></span></div>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="fecha-reserva" class="label">Fecha de la reserva:</label>
+                            <input type="date" id="fecha-reserva" name="fecha" class="input input-bordered w-full">
                         </div>
                     </div>
-                    {% endif %}
-                {% endfor %}
-            </div>
-            <!-- Confirmation Area per Card -->
-            <div class="confirmation-area bg-gray-50 p-4 border-t border-gray-200 hidden">
-                <p class="confirmation-text text-center font-semibold text-blue-800 mb-3 p-2 bg-blue-100 border border-blue-200 rounded-lg">Seleccione un rango de horas.</p>
-                <form class="reserva-form" method="post" action="{% url 'reservas:disponibilidad' %}">
-                    {% csrf_token %}
-                    <input type="hidden" name="activo_id" value="{{ item.activo.id }}" class="form-activo-id">
-                    <input type="hidden" name="franja_id_inicio" class="form-franja-id-inicio">
-                    <input type="hidden" name="franja_id_fin" class="form-franja-id-fin">
-                    <input type="hidden" name="fecha" value="{{ fecha_seleccionada_str }}">
-                    <div class="flex items-center space-x-3">
-                        <button type="submit" class="confirm-button w-full px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 disabled:bg-gray-400" disabled>
-                            Confirmar Reserva
-                        </button>
-                        <button type="button" class="cancel-selection-button flex-shrink-0 px-4 py-2 bg-gray-200 text-gray-800 font-semibold rounded-md hover:bg-gray-300">
-                            Cancelar
-                        </button>
+                </div>
+
+                <!-- Paso 3: Seleccionar Horario -->
+                <div id="step-3" class="step-content hidden">
+                    <h3 class="text-xl font-semibold text-center mb-4">Selecciona un rango horario</h3>
+                    <p class="text-center text-sm text-base-content/60 mb-4">Haz clic en la hora de inicio y luego en la de fin.</p>
+                    <div id="timeline-container" class="timeline-container">
+                        <div id="timeline-slots" class="timeline-slots">
+                            <!-- Las franjas horarias se cargarán aquí con JS -->
+                            <div class="text-center p-4"><span class="loading loading-spinner loading-lg"></span></div>
+                        </div>
                     </div>
-                </form>
+                </div>
+
+                <!-- Paso 4: Confirmación -->
+                <div id="step-4" class="step-content hidden">
+                    <h3 class="text-xl font-semibold text-center mb-6">Confirma tu reserva</h3>
+                    <div id="reserva-summary" class="card bg-base-200">
+                        <div class="card-body">
+                            <h4 class="card-title">Resumen de la Reserva</h4>
+                            <p><strong>Equipo:</strong> <span id="summary-activo"></span></p>
+                            <p><strong>Fecha:</strong> <span id="summary-fecha"></span></p>
+                            <p><strong>Horario:</strong> <span id="summary-horario"></span></p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-        {% empty %}
-        <div class="col-span-full text-center py-12">
-            <p class="text-gray-500">No hay equipos disponibles para reservar en esta fecha.</p>
+
+        <!-- Navegación de Pasos -->
+        <div class="bg-base-200/50 px-8 py-4">
+            <div class="flex justify-between">
+                <button id="prev-btn" class="btn btn-ghost" disabled>
+                    <i class="fas fa-arrow-left mr-2"></i> Anterior
+                </button>
+                <button id="next-btn" class="btn btn-primary" disabled>
+                    Siguiente <i class="fas fa-arrow-right ml-2"></i>
+                </button>
+                <button id="submit-btn" class="btn btn-success hidden">
+                    <i class="fas fa-check mr-2"></i> Confirmar Reserva
+                </button>
+            </div>
         </div>
-        {% endfor %}
     </div>
 </div>
 {% endblock %}
@@ -118,144 +156,238 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const grid = document.getElementById('equipment-grid');
-
-    let selection = {
-        card: null,
-        startFranjaId: null,
-        endFranjaId: null,
-        startFranjaTime: null,
+    // --- STATE MANAGEMENT ---
+    const state = {
+        currentStep: 1,
+        tipoActivo: null,
+        activo: null,
+        fecha: '',
+        franjaInicio: null,
+        franjaFin: null,
     };
 
-    function clearSelection() {
-        if (selection.card) {
-            selection.card.querySelectorAll('.slot-chip.available').forEach(btn => {
-                btn.classList.remove('selected', 'in-range');
-            });
-            const confirmationArea = selection.card.querySelector('.confirmation-area');
-            const confirmButton = selection.card.querySelector('.confirm-button');
-            const confirmationText = selection.card.querySelector('.confirmation-text');
+    // --- DOM ELEMENTS ---
+    const steps = {
+        1: document.getElementById('step-1'),
+        2: document.getElementById('step-2'),
+        3: document.getElementById('step-3'),
+        4: document.getElementById('step-4'),
+    };
+    const stepIndicators = document.querySelectorAll('#steps-indicator .step');
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const submitBtn = document.getElementById('submit-btn');
+    const tipoActivoList = document.getElementById('tipo-activo-list');
+    const activoList = document.getElementById('activo-list');
+    const fechaInput = document.getElementById('fecha-reserva');
+    const timelineSlots = document.getElementById('timeline-slots');
 
-            confirmationArea.classList.add('hidden');
-            confirmButton.disabled = true;
-            confirmationText.textContent = 'Seleccione un rango de horas.';
+    // --- API HELPERS ---
+    const api = {
+        getTiposActivo: () => fetch("{% url 'api:lista_tipos_activo' %}").then(res => res.json()),
+        getActivos: (tipoId) => fetch(`{% url 'api:lista_activos' %}?tipo_id=${tipoId}`).then(res => res.json()),
+        getDisponibilidad: (activoId, fecha) => fetch(`{% url 'api:disponibilidad_activo' %}?activo_id=${activoId}&fecha=${fecha}`).then(res => res.json()),
+        createReserva: (data) => fetch("{% url 'api:crear_reserva' %}", {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+            body: JSON.stringify(data)
+        }).then(res => res.json()),
+    };
+
+    // --- RENDER FUNCTIONS ---
+    const render = {
+        tiposActivo: (tipos) => {
+            tipoActivoList.innerHTML = tipos.map(tipo => `
+                <div class="card bg-base-200 hover:bg-primary hover:text-primary-content transition-all cursor-pointer" data-id="${tipo.id}">
+                    <div class="card-body items-center text-center">
+                        <h2 class="card-title">${tipo.nombre}</h2>
+                    </div>
+                </div>
+            `).join('');
+        },
+        activos: (activos) => {
+            activoList.innerHTML = activos.length ? activos.map(activo => `
+                <div class="p-2 border rounded-lg hover:bg-base-200 cursor-pointer" data-id="${activo.id}" data-nombre="${activo.nombre}">
+                    ${activo.nombre}
+                </div>
+            `).join('') : '<p class="text-sm text-base-content/60">No hay equipos de este tipo.</p>';
+        },
+        timeline: (franjas) => {
+            timelineSlots.innerHTML = franjas.map(f => {
+                const time = f.hora_inicio.slice(0, 5);
+                const isHourMarker = f.hora_inicio.endsWith(':00:00');
+                return `
+                <div class="timeline-slot ${f.is_reservado ? 'reserved' : 'available'}" data-id="${f.id}" data-time="${time}" title="${f.is_reservado ? 'No disponible' : time}">
+                    ${isHourMarker ? `<span class="timeline-hour-marker">${time}</span>` : ''}
+                    <span class="slot-text">${f.is_reservado ? 'Reservado' : ''}</span>
+                </div>
+            `}).join('');
+        },
+        summary: () => {
+            document.getElementById('summary-activo').textContent = state.activo.nombre;
+            document.getElementById('summary-fecha').textContent = new Date(state.fecha + 'T00:00:00').toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+            document.getElementById('summary-horario').textContent = `${state.franjaInicio.time} - ${state.franjaFin.time}`;
         }
+    };
 
-        selection = {
-            card: null,
-            startFranjaId: null,
-            endFranjaId: null,
-            startFranjaTime: null,
-        };
+    // --- UI & STEP LOGIC ---
+    function updateButtons() {
+        prevBtn.disabled = state.currentStep === 1;
+        nextBtn.classList.toggle('hidden', state.currentStep === 4);
+        submitBtn.classList.toggle('hidden', state.currentStep !== 4);
+
+        let nextEnabled = false;
+        if (state.currentStep === 1 && state.tipoActivo) nextEnabled = true;
+        if (state.currentStep === 2 && state.activo && state.fecha) nextEnabled = true;
+        if (state.currentStep === 3 && state.franjaInicio && state.franjaFin) nextEnabled = true;
+        nextBtn.disabled = !nextEnabled;
     }
 
-    function updateUI() {
-        if (!selection.card) return;
+    function goToStep(step) {
+        state.currentStep = step;
+        Object.values(steps).forEach(el => el.classList.add('hidden'));
+        steps[step].classList.remove('hidden');
 
-        const availableSlots = Array.from(selection.card.querySelectorAll('.slot-chip.available'));
-        availableSlots.forEach(btn => btn.classList.remove('selected', 'in-range'));
-
-        const startIndex = availableSlots.findIndex(btn => btn.dataset.franjaId === selection.startFranjaId);
-        if (startIndex === -1) return;
-
-        availableSlots[startIndex].classList.add('selected');
-
-        if (selection.endFranjaId) {
-            const endIndex = availableSlots.findIndex(btn => btn.dataset.franjaId === selection.endFranjaId);
-            if (endIndex === -1) return;
-
-            const [minIdx, maxIdx] = [Math.min(startIndex, endIndex), Math.max(startIndex, endIndex)];
-
-            for (let i = minIdx; i <= maxIdx; i++) {
-                availableSlots[i].classList.add('in-range');
-            }
-            availableSlots[endIndex].classList.add('selected');
-        }
+        stepIndicators.forEach((indicator, i) => {
+            indicator.classList.remove('step-primary');
+            if (i < step) indicator.classList.add('step-primary');
+            if (i + 1 === step) indicator.classList.add('step-primary');
+        });
+        updateButtons();
     }
 
-    grid.addEventListener('click', function(e) {
-        const target = e.target;
-
-        if (target.matches('.cancel-selection-button')) {
-            clearSelection();
-            return;
-        }
-
-        if (!target.matches('.slot-chip.available')) {
-            return;
-        }
-
-        const clickedCard = target.closest('.equipment-card');
-        if (!clickedCard) return;
-
-        if (selection.card && selection.card !== clickedCard) {
-            clearSelection();
-        }
-
-        selection.card = clickedCard;
-        const confirmationArea = selection.card.querySelector('.confirmation-area');
-        const confirmButton = selection.card.querySelector('.confirm-button');
-        const confirmationText = selection.card.querySelector('.confirmation-text');
-        const formFranjaIdInicio = selection.card.querySelector('.form-franja-id-inicio');
-        const formFranjaIdFin = selection.card.querySelector('.form-franja-id-fin');
-
-        confirmationArea.classList.remove('hidden');
-
-        const clickedFranjaId = target.dataset.franjaId;
-        const clickedFranjaTime = target.dataset.franjaTime;
-
-        if (!selection.startFranjaId) {
-            selection.startFranjaId = clickedFranjaId;
-            selection.startFranjaTime = clickedFranjaTime;
-            confirmationText.textContent = `Inicio: ${clickedFranjaTime.substring(0,5)}. Seleccione la hora de fin.`;
-        } else {
-            const allSlotsInCard = Array.from(selection.card.querySelectorAll('.slot-chip'));
-            const startIndex = allSlotsInCard.findIndex(chip => chip.dataset.franjaId === selection.startFranjaId);
-            const endIndex = allSlotsInCard.findIndex(chip => chip.dataset.franjaId === clickedFranjaId);
-
-            const [minIdx, maxIdx] = [Math.min(startIndex, endIndex), Math.max(startIndex, endIndex)];
-
-            let hasConflict = false;
-            for (let i = minIdx; i <= maxIdx; i++) {
-                if (allSlotsInCard[i].classList.contains('disabled')) {
-                    hasConflict = true;
-                    break;
-                }
-            }
-
-            if (hasConflict) {
-                alert('El rango seleccionado incluye horarios que ya están reservados. Por favor, elija otro rango.');
-                clearSelection();
-                return;
-            }
-
-            let finalStartId, finalEndId, finalStartTime, finalEndTime;
-
-            if (new Date('1970-01-01T' + clickedFranjaTime) < new Date('1970-01-01T' + selection.startFranjaTime)) {
-                finalStartId = clickedFranjaId;
-                finalEndId = selection.startFranjaId;
-                finalStartTime = clickedFranjaTime;
-                finalEndTime = selection.startFranjaTime;
-            } else {
-                finalStartId = selection.startFranjaId;
-                finalEndId = clickedFranjaId;
-                finalStartTime = selection.startFranjaTime;
-                finalEndTime = clickedFranjaTime;
-            }
-
-            selection.startFranjaId = finalStartId;
-            selection.endFranjaId = finalEndId;
-            selection.startFranjaTime = finalStartTime;
-
-            formFranjaIdInicio.value = finalStartId;
-            formFranjaIdFin.value = finalEndId;
-            confirmButton.disabled = false;
-
-            confirmationText.textContent = `Reservar de ${finalStartTime.substring(0,5)} a ${finalEndTime.substring(0,5)}.`;
-        }
-
-        updateUI();
+    // --- EVENT HANDLERS ---
+    tipoActivoList.addEventListener('click', e => {
+        const card = e.target.closest('.card');
+        if (!card) return;
+        state.tipoActivo = { id: card.dataset.id, nombre: card.querySelector('.card-title').textContent };
+        document.querySelectorAll('#tipo-activo-list .card').forEach(c => c.classList.remove('bg-primary', 'text-primary-content'));
+        card.classList.add('bg-primary', 'text-primary-content');
+        updateButtons();
     });
+
+    activoList.addEventListener('click', e => {
+        const item = e.target.closest('[data-id]');
+        if (!item) return;
+        state.activo = { id: item.dataset.id, nombre: item.dataset.nombre };
+        document.querySelectorAll('#activo-list [data-id]').forEach(i => i.classList.remove('bg-primary', 'text-primary-content'));
+        item.classList.add('bg-primary', 'text-primary-content');
+        updateButtons();
+    });
+
+    fechaInput.addEventListener('change', () => {
+        state.fecha = fechaInput.value;
+        updateButtons();
+    });
+
+    timelineSlots.addEventListener('click', e => {
+        const slot = e.target.closest('.timeline-slot.available');
+        if (!slot) return;
+
+        if (!state.franjaInicio || state.franjaFin) {
+            // Start new selection or reset
+            state.franjaInicio = { id: slot.dataset.id, time: slot.dataset.time };
+            state.franjaFin = null;
+        } else {
+            // End selection
+            const allSlots = Array.from(timelineSlots.querySelectorAll('.timeline-slot'));
+            const startIndex = allSlots.findIndex(s => s.dataset.id === state.franjaInicio.id);
+            const endIndex = allSlots.findIndex(s => s.dataset.id === slot.dataset.id);
+
+            if (startIndex > endIndex) { // Swap if selected backwards
+                [state.franjaInicio, state.franjaFin] = [{ id: slot.dataset.id, time: slot.dataset.time }, state.franjaInicio];
+            } else {
+                state.franjaFin = { id: slot.dataset.id, time: slot.dataset.time };
+            }
+
+            // Check for conflicts in range
+            const rangeSlots = allSlots.slice(Math.min(startIndex, endIndex), Math.max(startIndex, endIndex) + 1);
+            if(rangeSlots.some(s => s.classList.contains('reserved'))) {
+                alert('El rango seleccionado incluye un horario no disponible.');
+                state.franjaInicio = null;
+                state.franjaFin = null;
+            }
+        }
+
+        // Update UI
+        timelineSlots.querySelectorAll('.timeline-slot').forEach(s => s.classList.remove('selected', 'in-range'));
+        if (state.franjaInicio) {
+            const startSlot = timelineSlots.querySelector(`[data-id='${state.franjaInicio.id}']`);
+            if (startSlot) startSlot.classList.add('selected');
+        }
+        if (state.franjaFin) {
+            const endSlot = timelineSlots.querySelector(`[data-id='${state.franjaFin.id}']`);
+            if (endSlot) endSlot.classList.add('selected');
+            const allSlots = Array.from(timelineSlots.querySelectorAll('.timeline-slot'));
+            const startIndex = allSlots.findIndex(s => s.dataset.id === state.franjaInicio.id);
+            const endIndex = allSlots.findIndex(s => s.dataset.id === state.franjaFin.id);
+            allSlots.slice(startIndex, endIndex + 1).forEach(s => s.classList.add('in-range'));
+        }
+        updateButtons();
+    });
+
+    nextBtn.addEventListener('click', async () => {
+        if (state.currentStep === 1) {
+            goToStep(2);
+            activoList.innerHTML = '<div class="text-center p-4"><span class="loading loading-spinner"></span></div>';
+            const activos = await api.getActivos(state.tipoActivo.id);
+            render.activos(activos);
+        } else if (state.currentStep === 2) {
+            goToStep(3);
+            timelineSlots.innerHTML = '<div class="text-center p-4"><span class="loading loading-spinner loading-lg"></span></div>';
+            const disponibilidad = await api.getDisponibilidad(state.activo.id, state.fecha);
+            render.timeline(disponibilidad);
+        } else if (state.currentStep === 3) {
+            goToStep(4);
+            render.summary();
+        }
+    });
+
+    prevBtn.addEventListener('click', () => {
+        goToStep(state.currentStep - 1);
+    });
+
+    submitBtn.addEventListener('click', async () => {
+        submitBtn.classList.add('btn-disabled', 'loading');
+        try {
+            const data = {
+                activo_id: state.activo.id,
+                fecha: state.fecha,
+                franja_inicio_id: state.franjaInicio.id,
+                franja_fin_id: state.franjaFin.id,
+            };
+            const result = await api.createReserva(data);
+            if (result.status === 'success') {
+                steps[4].innerHTML = `
+                    <div class="text-center py-10">
+                        <i class="fas fa-check-circle text-success text-5xl mb-4"></i>
+                        <h3 class="text-2xl font-bold">¡Reserva Confirmada!</h3>
+                        <p>Tu reserva para <strong>${state.activo.nombre}</strong> ha sido creada con éxito.</p>
+                        <a href="{% url 'reservas:mis_reservas' %}" class="btn btn-primary mt-6">Ver Mis Reservas</a>
+                    </div>
+                `;
+                prevBtn.classList.add('hidden');
+                submitBtn.classList.add('hidden');
+            } else {
+                // DRF validation errors are often in an object.
+                const errorMessage = typeof result === 'object' ? Object.values(result).flat().join(' ') : 'Ocurrió un error.';
+                alert(`Error al crear la reserva: ${errorMessage}`);
+            }
+        } catch (err) {
+            alert('Error de conexión al crear la reserva.');
+        } finally {
+            submitBtn.classList.remove('btn-disabled', 'loading');
+        }
+    });
+
+    // --- INITIALIZATION ---
+    async function init() {
+        fechaInput.min = new Date().toISOString().split("T")[0];
+        const tipos = await api.getTiposActivo();
+        render.tiposActivo(tipos);
+    }
+
+    init();
 });
 </script>
 {% endblock %}

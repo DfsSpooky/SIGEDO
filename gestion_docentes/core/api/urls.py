@@ -26,4 +26,10 @@ urlpatterns = [
     path('notificaciones/json/', views.notificaciones_json, name='notificaciones_json'),
     path('notificaciones/<int:notificacion_id>/marcar-leida/', views.marcar_notificacion_como_leida, name='marcar_notificacion_leida'),
     path('notificaciones/marcar-todas-leidas/', views.marcar_todas_como_leidas, name='marcar_todas_leidas'),
+
+    # --- URLs para la API de Reservas ---
+    path('reservas/tipos-activo/', views.TipoActivoListAPIView.as_view(), name='lista_tipos_activo'),
+    path('reservas/activos/', views.ActivoListAPIView.as_view(), name='lista_activos'),
+    path('reservas/disponibilidad/', views.ActivoDisponibilidadAPIView.as_view(), name='disponibilidad_activo'),
+    path('reservas/crear/', views.ReservaCreateAPIView.as_view(), name='crear_reserva'),
 ]

@@ -72,3 +72,54 @@ class RegistrarAsistenciaRfidSerializer(serializers.Serializer):
     Serializer para validar el UID de RFID.
     """
     uid = serializers.CharField(max_length=100)
+
+
+# ========= SERIALIZERS PARA RESERVAS =========
+
+from ..models import TipoActivo, Activo, FranjaHoraria, Reserva
+
+class TipoActivoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TipoActivo
+        fields = ['id', 'nombre']
+
+class ActivoSerializer(serializers.ModelSerializer):
+    tipo = TipoActivoSerializer(read_only=True)
+
+    class Meta:
+        model = Activo
+        fields = ['id', 'nombre', 'descripcion', 'codigo_patrimonial', 'tipo', 'estado']
+
+class FranjaHorariaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FranjaHoraria
+        fields = ['id', 'hora_inicio', 'hora_fin', 'turno']
+
+class ReservaSerializer(serializers.ModelSerializer):
+    franja_horaria_inicio = FranjaHorariaSerializer(read_only=True)
+    franja_horaria_fin = FranjaHorariaSerializer(read_only=True)
+
+    class Meta:
+        model = Reserva
+        fields = ['id', 'estado', 'fecha_reserva', 'franja_horaria_inicio', 'franja_horaria_fin']
+
+class ReservaCreateSerializer(serializers.Serializer):
+    activo_id = serializers.IntegerField()
+    fecha = serializers.DateField()
+    franja_inicio_id = serializers.IntegerField()
+    franja_fin_id = serializers.IntegerField()
+
+    def validate(self, data):
+        """
+        Comprueba que la franja de fin no sea anterior a la de inicio.
+        """
+        try:
+            franja_inicio = FranjaHoraria.objects.get(pk=data['franja_inicio_id'])
+            franja_fin = FranjaHoraria.objects.get(pk=data['franja_fin_id'])
+        except FranjaHoraria.DoesNotExist:
+            raise serializers.ValidationError("Una de las franjas horarias no existe.")
+
+        if franja_inicio.hora_inicio >= franja_fin.hora_inicio:
+            raise serializers.ValidationError("La hora de fin debe ser posterior a la hora de inicio.")
+
+        return data
