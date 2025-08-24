@@ -296,6 +296,7 @@ UNFOLD = {
                         "title": "Documentos",
                         "icon": "folder",
                         "link": reverse_lazy("admin:core_documento_changelist"),
+                        "badge": "core.badge_callbacks.documentos_badge_callback",
                     },
                     {
                         "title": "Tipos de Documento",
@@ -306,6 +307,7 @@ UNFOLD = {
                         "title": "Justificaciones",
                         "icon": "assignment_turned_in",
                         "link": reverse_lazy("admin:core_justificacion_changelist"),
+                        "badge": "core.badge_callbacks.justificaciones_badge_callback",
                     },
                     {
                         "title": "Tipos de Justificación",
@@ -332,6 +334,7 @@ UNFOLD = {
                         "title": "Solicitudes de Intercambio",
                         "icon": "swap_horiz",
                         "link": reverse_lazy("admin:core_solicitudintercambio_changelist"),
+                        "badge": "core.badge_callbacks.solicitudes_intercambio_badge_callback",
                     },
                 ],
             },
@@ -348,6 +351,7 @@ UNFOLD = {
                         "title": "Notificaciones",
                         "icon": "notifications",
                         "link": reverse_lazy("admin:core_notificacion_changelist"),
+                        "badge": "core.badge_callbacks.notificaciones_badge_callback",
                     },
                 ],
             },

@@ -77,8 +77,8 @@ class CredentialEncryptionTest(TestCase):
         response_content = response.content.decode('utf-8')
 
         # Regex to find the URL for the specific docente we created
-        # It looks for the link within the div for our test user
-        pattern = r'<h2 class="card-title text-lg">Test User<\/h2>.*?<a href="\/credenciales\/(.*?)\/"'
+        # It looks for the link within the table row for our test user by finding their DNI
+        pattern = r'12345678.*?<a href="\/credenciales\/(.*?)\/"'
         match = re.search(pattern, response_content, re.DOTALL)
 
         self.assertIsNotNone(match, "Could not find the credential link for the test user in the response.")

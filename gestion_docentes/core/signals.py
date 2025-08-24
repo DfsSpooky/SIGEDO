@@ -6,7 +6,7 @@ from django.urls import reverse
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from functools import partial
-from .models import Documento, Notificacion, SolicitudIntercambio, Curso, Anuncio, Docente
+from .models import Documento, Notificacion, SolicitudIntercambio, Curso, Anuncio, Docente, VersionDocumento, Justificacion
 
 logger = logging.getLogger(__name__)
 
@@ -119,3 +119,50 @@ def crear_notificacion_anuncio(sender, instance, created, **kwargs):
             )
             payload = {'type': 'send.notification', 'message': { 'id': notificacion.id, 'mensaje': notificacion.mensaje, 'url': notificacion.url, 'leido': notificacion.leido, 'fecha_creacion': notificacion.fecha_creacion.isoformat() }}
             transaction.on_commit(partial(do_broadcast, docente.id, payload))
+
+@receiver(post_save, sender=VersionDocumento)
+def notificar_admin_nuevo_documento(sender, instance, created, **kwargs):
+    if created:
+        admins = Docente.objects.filter(is_staff=True)
+        message = f"Nuevo documento/versión de '{instance.documento.docente.first_name}'"
+        url = reverse('admin:core_documento_change', args=[instance.documento.pk])
+
+        for admin in admins:
+            notificacion = Notificacion.objects.create(
+                destinatario=admin,
+                mensaje=message,
+                url=url
+            )
+            payload = {'type': 'send.notification', 'message': { 'id': notificacion.id, 'mensaje': notificacion.mensaje, 'url': notificacion.url, 'leido': notificacion.leido, 'fecha_creacion': notificacion.fecha_creacion.isoformat() }}
+            transaction.on_commit(partial(do_broadcast, admin.id, payload))
+
+@receiver(post_save, sender=Justificacion)
+def notificar_admin_nueva_justificacion(sender, instance, created, **kwargs):
+    if created:
+        admins = Docente.objects.filter(is_staff=True)
+        message = f"Nueva justificación de '{instance.docente.first_name}' pendiente de revisión"
+        url = reverse('admin:core_justificacion_change', args=[instance.pk])
+
+        for admin in admins:
+            notificacion = Notificacion.objects.create(
+                destinatario=admin,
+                mensaje=message,
+                url=url
+            )
+            payload = {'type': 'send.notification', 'message': { 'id': notificacion.id, 'mensaje': notificacion.mensaje, 'url': notificacion.url, 'leido': notificacion.leido, 'fecha_creacion': notificacion.fecha_creacion.isoformat() }}
+            transaction.on_commit(partial(do_broadcast, admin.id, payload))
+
+@receiver(post_save, sender=SolicitudIntercambio)
+def notificar_nueva_solicitud_intercambio(sender, instance, created, **kwargs):
+    if created:
+        destinatario = instance.docente_destino
+        message = f"'{instance.docente_solicitante.first_name}' te envió una solicitud de intercambio"
+        url = reverse('admin:core_solicitudintercambio_change', args=[instance.pk])
+
+        notificacion = Notificacion.objects.create(
+            destinatario=destinatario,
+            mensaje=message,
+            url=url
+        )
+        payload = {'type': 'send.notification', 'message': { 'id': notificacion.id, 'mensaje': notificacion.mensaje, 'url': notificacion.url, 'leido': notificacion.leido, 'fecha_creacion': notificacion.fecha_creacion.isoformat() }}
+        transaction.on_commit(partial(do_broadcast, destinatario.id, payload))
