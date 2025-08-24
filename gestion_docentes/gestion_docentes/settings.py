@@ -200,6 +200,7 @@ UNFOLD = {
         lambda request: static("js/admin_custom.js"),
     ],
     "SIDEBAR": {
+        "show_search": False,
         "navigation": [
             {
                 "title": "Principal",
