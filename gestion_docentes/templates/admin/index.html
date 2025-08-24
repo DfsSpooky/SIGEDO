@@ -19,11 +19,16 @@
     <div class="my-8">
         <h2 class="text-2xl font-semibold mb-4">Acciones Rápidas</h2>
         <div class="flex flex-wrap gap-4">
-            {% component "unfold/components/button.html" with title="Nuevo Docente" href=request|url_admin:"core_docente_add" icon="person_add" class="bg-primary text-white" %}
+            {% url 'admin:core_docente_add' as add_docente_url %}
+            {% component "unfold/components/button.html" with title="Nuevo Docente" href=add_docente_url icon="person_add" class="bg-primary text-white" %}
             {% endcomponent %}
-            {% component "unfold/components/button.html" with title="Nuevo Curso" href=request|url_admin:"core_curso_add" icon="add_box" class="bg-secondary text-white" %}
+
+            {% url 'admin:core_curso_add' as add_curso_url %}
+            {% component "unfold/components/button.html" with title="Nuevo Curso" href=add_curso_url icon="add_box" class="bg-secondary text-white" %}
             {% endcomponent %}
-            {% component "unfold/components/button.html" with title="Nuevo Anuncio" href=request|url_admin:"core_anuncio_add" icon="campaign" class="bg-accent text-white" %}
+
+            {% url 'admin:core_anuncio_add' as add_anuncio_url %}
+            {% component "unfold/components/button.html" with title="Nuevo Anuncio" href=add_anuncio_url icon="campaign" class="bg-accent text-white" %}
             {% endcomponent %}
         </div>
     </div>
