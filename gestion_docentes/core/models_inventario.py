@@ -89,6 +89,30 @@ class Reserva(models.Model):
         else:
             return f"Reserva de {self.activo.nombre} para {self.docente.username} el {self.fecha_reserva}"
 
+    def save(self, *args, **kwargs):
+        # Importar Notificacion aquí para evitar importaciones circulares a nivel de módulo
+        from core.models import Notificacion
+        from django.urls import reverse
+
+        is_new = self._state.adding
+        if not is_new:
+            try:
+                old_instance = Reserva.objects.get(pk=self.pk)
+                # Comprobar si el estado ha cambiado a FINALIZADO
+                if old_instance.estado != 'FINALIZADO' and self.estado == 'FINALIZADO':
+                    # Crear notificación para el docente
+                    mensaje = f"El equipo '{self.activo.nombre}' ha sido devuelto. Tu reserva para el curso '{self.curso.nombre}' ha finalizado."
+                    Notificacion.objects.create(
+                        destinatario=self.docente,
+                        mensaje=mensaje,
+                        url=reverse('reservas:mis_reservas')
+                    )
+            except Reserva.DoesNotExist:
+                pass # El objeto es nuevo, no hay nada que comparar
+
+        super().save(*args, **kwargs)
+
+
     class Meta:
         verbose_name = "Reserva de Activo"
         verbose_name_plural = "Reservas de Activos"

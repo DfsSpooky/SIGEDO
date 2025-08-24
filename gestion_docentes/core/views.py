@@ -971,7 +971,14 @@ class MisReservasView(LoginRequiredMixin, ListView):
     paginate_by = 10
 
     def get_queryset(self):
-        return Reserva.objects.filter(docente=self.request.user).order_by('-fecha_reserva', '-franja_horaria_inicio__hora_inicio')
+        return Reserva.objects.filter(docente=self.request.user).select_related(
+            'activo', 'activo__tipo', 'curso', 'franja_horaria_inicio', 'franja_horaria_fin'
+        ).order_by('-fecha_reserva', '-franja_horaria_inicio__hora_inicio')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['today'] = timezone.now().date()
+        return context
 
 @login_required
 def cancelar_reserva(request, pk):
