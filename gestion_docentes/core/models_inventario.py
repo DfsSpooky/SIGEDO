@@ -66,8 +66,12 @@ class Reserva(models.Model):
 
     activo = models.ForeignKey(Activo, on_delete=models.CASCADE, related_name='reservas')
     docente = models.ForeignKey('core.Docente', on_delete=models.CASCADE, related_name='reservas')
-    franja_horaria_inicio = models.ForeignKey('core.FranjaHoraria', on_delete=models.PROTECT, related_name='reservas_inicio')
+    curso = models.ForeignKey('core.Curso', on_delete=models.SET_NULL, null=True, blank=True, related_name='reservas_equipos', help_text="Curso asociado a la reserva (opcional)")
+
+    # Las franjas horarias ahora pueden ser opcionales si la reserva está ligada a un curso
+    franja_horaria_inicio = models.ForeignKey('core.FranjaHoraria', on_delete=models.PROTECT, related_name='reservas_inicio', null=True, blank=True)
     franja_horaria_fin = models.ForeignKey('core.FranjaHoraria', on_delete=models.PROTECT, related_name='reservas_fin', null=True, blank=True)
+
     fecha_reserva = models.DateField()
     estado = models.CharField(max_length=30, choices=ESTADO_CHOICES, default='RESERVADO')
 
@@ -76,9 +80,14 @@ class Reserva(models.Model):
     fecha_finalizacion = models.DateTimeField(null=True, blank=True, help_text="Momento en que se devuelve el equipo.")
 
     def __str__(self):
-        if self.franja_horaria_fin:
+        if self.curso:
+            return f"Reserva de {self.activo.nombre} para el curso '{self.curso.nombre}' el {self.fecha_reserva}"
+        elif self.franja_horaria_inicio and self.franja_horaria_fin:
             return f"Reserva de {self.activo.nombre} para {self.docente.username} el {self.fecha_reserva} de {self.franja_horaria_inicio.hora_inicio} a {self.franja_horaria_fin.hora_fin}"
-        return f"Reserva de {self.activo.nombre} para {self.docente.username} el {self.fecha_reserva} a las {self.franja_horaria_inicio.hora_inicio}"
+        elif self.franja_horaria_inicio:
+            return f"Reserva de {self.activo.nombre} para {self.docente.username} el {self.fecha_reserva} a las {self.franja_horaria_inicio.hora_inicio}"
+        else:
+            return f"Reserva de {self.activo.nombre} para {self.docente.username} el {self.fecha_reserva}"
 
     class Meta:
         verbose_name = "Reserva de Activo"

@@ -831,92 +831,71 @@ class DisponibilidadEquiposView(LoginRequiredMixin, TemplateView):
         docente = self.request.user
         today = timezone.now().date()
 
-        # --- Lógica para determinar la semana de reserva ---
-        # Si es domingo, la semana de reserva es la próxima semana. Si no, es la semana actual.
-        if today.weekday() == 6: # 6 es Domingo
+        # --- 1. Lógica de la semana de reserva (sin cambios) ---
+        if today.weekday() == 6: # Domingo
             start_of_week = today + timedelta(days=1)
         else:
             start_of_week = today - timedelta(days=today.weekday())
         end_of_week = start_of_week + timedelta(days=6)
 
-        # --- Lógica para obtener los días de clase del docente ---
-        semestre_activo = Semestre.objects.filter(estado='ACTIVO').first()
-        dias_clase_docente = []
-        if semestre_activo:
-            # Obtenemos los números de día de la semana (0=Lunes, 4=Viernes)
-            dias_clase_numeros = Curso.objects.filter(
-                docente=docente,
-                semestre=semestre_activo,
-                dia_semana__isnull=False
-            ).values_list('dia_semana', flat=True).distinct()
-            dias_clase_docente = list(dias_clase_numeros)
-
-        # --- Determinar fechas válidas para la reserva ---
-        fechas_validas = []
-        delta = timedelta(days=1)
-        current_date = start_of_week
-        while current_date <= end_of_week:
-            # Es una fecha válida si está en la semana y el docente tiene clase ese día
-            if current_date.weekday() in dias_clase_docente:
-                fechas_validas.append(current_date.strftime('%Y-%m-%d'))
-            current_date += delta
-
-        # --- Procesamiento de la fecha seleccionada ---
+        # --- 2. Procesamiento de la fecha seleccionada ---
         fecha_str = self.request.GET.get('fecha', today.strftime('%Y-%m-%d'))
         try:
             fecha_seleccionada = timezone.datetime.strptime(fecha_str, '%Y-%m-%d').date()
-            # Validar que la fecha seleccionada no esté fuera del rango permitido
             if not (start_of_week <= fecha_seleccionada <= end_of_week):
-                # Si está fuera de rango, usar la primera fecha válida como predeterminada
-                fecha_seleccionada = timezone.datetime.strptime(fechas_validas[0], '%Y-%m-%d').date() if fechas_validas else today
-        except (ValueError, IndexError):
+                fecha_seleccionada = today
+        except ValueError:
             fecha_seleccionada = today
 
-        # --- Construcción de la parrilla de disponibilidad (sin cambios) ---
-        franjas_qs = FranjaHoraria.objects.all().order_by('hora_inicio')
-        franjas_list = list(franjas_qs)
-        activos = Activo.objects.filter(estado__in=['DISPONIBLE', 'ASIGNADO'])
-        reservas_activas = Reserva.objects.filter(
-            fecha_reserva=fecha_seleccionada,
-            estado__in=['RESERVADO', 'EN_USO']
-        ).select_related('franja_horaria_inicio', 'franja_horaria_fin')
+        # --- 3. Obtener cursos del docente para la fecha seleccionada ---
+        semestre_activo = Semestre.objects.filter(estado='ACTIVO').first()
+        cursos_del_dia = []
+        if semestre_activo:
+            cursos_del_dia = Curso.objects.filter(
+                docente=docente,
+                semestre=semestre_activo,
+                dia_semana=fecha_seleccionada.weekday()
+            ).order_by('horario_inicio')
 
-        reservas_grid = defaultdict(bool)
-        for reserva in reservas_activas:
-            if not reserva.franja_horaria_fin or reserva.franja_horaria_inicio == reserva.franja_horaria_fin:
-                reservas_grid[(reserva.activo_id, reserva.franja_horaria_inicio_id)] = True
+        # --- 4. Determinar disponibilidad de activos para cada curso ---
+        activos_disponibles = list(Activo.objects.filter(estado__in=['DISPONIBLE', 'ASIGNADO']))
+
+        # Obtener todas las franjas horarias de una vez
+        franjas_horarias = list(FranjaHoraria.objects.order_by('hora_inicio'))
+
+        cursos_con_disponibilidad = []
+        for curso in cursos_del_dia:
+            if not curso.horario_inicio or not curso.horario_fin:
                 continue
-            try:
-                start_index = franjas_list.index(reserva.franja_horaria_inicio)
-                end_index = franjas_list.index(reserva.franja_horaria_fin)
-                for i in range(start_index, end_index + 1):
-                    reservas_grid[(reserva.activo_id, franjas_list[i].id)] = True
-            except ValueError:
-                continue
 
-        grid = []
-        for activo in activos:
-            row = {'activo': activo, 'franjas': []}
-            for franja in franjas_list:
-                esta_reservado = reservas_grid[(activo.id, franja.id)]
-                row['franjas'].append({'franja': franja, 'reservado': esta_reservado})
-            grid.append(row)
+            # Encontrar las franjas horarias que se solapan con el curso
+            franjas_del_curso_ids = [
+                f.id for f in franjas_horarias
+                if f.hora_inicio < curso.horario_fin and f.hora_fin > curso.horario_inicio
+            ]
 
-        # --- Pasar todo al contexto ---
-        context['grid'] = grid
-        context['franjas'] = franjas_list
-        context['fecha_seleccionada'] = fecha_seleccionada
+            # Encontrar activos que tienen reservas en esas franjas en esa fecha
+            activos_ocupados_ids = Reserva.objects.filter(
+                fecha_reserva=fecha_seleccionada,
+                estado__in=['RESERVADO', 'EN_USO'],
+                franja_horaria_inicio_id__in=franjas_del_curso_ids
+            ).values_list('activo_id', flat=True)
+
+            # Filtrar la lista de activos disponibles
+            disponibles_para_curso = [
+                activo for activo in activos_disponibles if activo.id not in activos_ocupados_ids
+            ]
+
+            cursos_con_disponibilidad.append({
+                'curso': curso,
+                'activos_disponibles': disponibles_para_curso
+            })
+
+        # --- 5. Pasar todo al contexto ---
         context['fecha_seleccionada_str'] = fecha_seleccionada.strftime('%Y-%m-%d')
-        context['turnos'] = {
-            'MANANA': [f for f in franjas_list if f.turno == 'MANANA'],
-            'TARDE': [f for f in franjas_list if f.turno == 'TARDE'],
-            'NOCHE': [f for f in franjas_list if f.turno == 'NOCHE'],
-        }
-        # --- Nuevos datos para el template ---
         context['fecha_inicio_semana'] = start_of_week.strftime('%Y-%m-%d')
         context['fecha_fin_semana'] = end_of_week.strftime('%Y-%m-%d')
-        context['fechas_validas_json'] = json.dumps(fechas_validas)
-        context['dias_clase_docente'] = dias_clase_docente # Lista de enteros (0-6)
+        context['cursos_con_disponibilidad'] = cursos_con_disponibilidad
 
         return context
 
@@ -927,50 +906,38 @@ class DisponibilidadEquiposView(LoginRequiredMixin, TemplateView):
             redirect_url += f'?fecha={fecha_str}'
 
         try:
+            curso_id = request.POST.get('curso_id')
             activo_id = request.POST.get('activo_id')
-            franja_id_inicio = request.POST.get('franja_id_inicio')
-            franja_id_fin = request.POST.get('franja_id_fin')
             docente = request.user
-            today = timezone.now().date()
 
-            if not all([activo_id, franja_id_inicio, franja_id_fin, fecha_str]):
-                messages.error(request, 'Información incompleta. Por favor, seleccione un activo y un rango de horas.')
+            if not all([curso_id, activo_id, fecha_str]):
+                messages.error(request, 'Información incompleta para procesar la reserva.')
                 return HttpResponseRedirect(redirect_url)
 
+            # --- Validaciones ---
+            curso = get_object_or_404(Curso, pk=curso_id, docente=docente)
+            activo = get_object_or_404(Activo, pk=activo_id)
             fecha = timezone.datetime.strptime(fecha_str, '%Y-%m-%d').date()
 
-            # --- Validación de la semana de reserva ---
-            if today.weekday() == 6: # Domingo
-                start_of_week = today + timedelta(days=1)
-            else:
-                start_of_week = today - timedelta(days=today.weekday())
-            end_of_week = start_of_week + timedelta(days=6)
-
-            if not (start_of_week <= fecha <= end_of_week):
-                messages.error(request, f'Solo puede realizar reservas para la semana del {start_of_week.strftime("%d/%m")} al {end_of_week.strftime("%d/%m")}.')
+            if curso.dia_semana != fecha.weekday():
+                messages.error(request, 'La fecha de la reserva no coincide con el día del curso.')
                 return HttpResponseRedirect(redirect_url)
 
-            # --- Validación de día de clase ---
-            semestre_activo = Semestre.objects.filter(estado='ACTIVO').first()
-            if semestre_activo:
-                tiene_clase_ese_dia = Curso.objects.filter(
-                    docente=docente,
-                    semestre=semestre_activo,
-                    dia_semana=fecha.weekday()
-                ).exists()
-                if not tiene_clase_ese_dia:
-                    messages.error(request, 'Solo puede reservar equipos en los días que tiene clases programadas.')
-                    return HttpResponseRedirect(redirect_url)
+            if not curso.horario_inicio or not curso.horario_fin:
+                 messages.error(request, 'El curso seleccionado no tiene un horario definido.')
+                 return HttpResponseRedirect(redirect_url)
 
-            activo = get_object_or_404(Activo, pk=activo_id)
-            franja_inicio = get_object_or_404(FranjaHoraria, pk=franja_id_inicio)
-            franja_fin = get_object_or_404(FranjaHoraria, pk=franja_id_fin)
-
-            if franja_inicio.hora_inicio >= franja_fin.hora_inicio:
-                messages.error(request, 'La hora de inicio debe ser anterior a la hora de fin de la reserva.')
+            # --- Mapeo de Horario de Curso a Franjas Horarias ---
+            franjas_horarias = list(FranjaHoraria.objects.order_by('hora_inicio'))
+            try:
+                franja_inicio = next(f for f in franjas_horarias if f.hora_inicio >= curso.horario_inicio)
+                # Para la franja fin, buscamos la que contiene la hora de fin del curso
+                franja_fin = next(f for f in reversed(franjas_horarias) if f.hora_fin <= curso.horario_fin)
+            except StopIteration:
+                messages.error(request, 'No se encontraron franjas horarias que coincidan con el horario del curso.')
                 return HttpResponseRedirect(redirect_url)
 
-            # Comprobar conflictos de solapamiento
+            # --- Comprobar conflictos (doble chequeo) ---
             conflictos = Reserva.objects.filter(
                 activo=activo,
                 fecha_reserva=fecha,
@@ -980,18 +947,19 @@ class DisponibilidadEquiposView(LoginRequiredMixin, TemplateView):
             ).exists()
 
             if conflictos:
-                messages.error(request, 'El rango seleccionado se solapa con otra reserva existente.')
+                messages.error(request, 'El equipo ya no está disponible para el horario de este curso.')
             else:
                 Reserva.objects.create(
                     activo=activo,
-                    franja_horaria_inicio=franja_inicio,
-                    franja_horaria_fin=franja_fin,
+                    docente=docente,
+                    curso=curso,
                     fecha_reserva=fecha,
-                    docente=docente
+                    franja_horaria_inicio=franja_inicio,
+                    franja_horaria_fin=franja_fin
                 )
-                messages.success(request, f'Equipo "{activo.nombre}" reservado con éxito para el {fecha} de {franja_inicio.hora_inicio.strftime("%H:%M")} a {franja_fin.hora_fin.strftime("%H:%M")}.')
+                messages.success(request, f'Equipo "{activo.nombre}" reservado para el curso "{curso.nombre}" con éxito.')
 
-        except (ValueError, Activo.DoesNotExist, FranjaHoraria.DoesNotExist) as e:
+        except (ValueError, Activo.DoesNotExist, Curso.DoesNotExist) as e:
             messages.error(request, f'Ocurrió un error al procesar la reserva: {e}')
 
         return HttpResponseRedirect(redirect_url)

@@ -1,66 +1,24 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Disponibilidad de Equipos{% endblock %}
+{% block title %}Reserva de Equipos por Curso{% endblock %}
 
 {% block extra_css %}
 <style>
-    :root {
-        --brand-color: #4f46e5; /* indigo-600 */
-        --brand-color-light: #c7d2fe; /* indigo-200 */
-        --brand-color-dark: #3730a3; /* indigo-800 */
-        --success-color: #16a34a; /* green-600 */
-        --danger-color: #dc2626; /* red-600 */
-        --light-gray: #f3f4f6; /* gray-100 */
-        --medium-gray: #d1d5db; /* gray-300 */
-        --dark-gray: #4b5563; /* gray-600 */
+    .course-card {
+        transition: all 0.3s ease;
+        border-left: 5px solid transparent;
     }
-
-    body {
-        background-color: var(--light-gray);
+    .course-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.08), 0 4px 8px rgba(0,0,0,0.04);
+        border-left-color: #4f46e5; /* indigo-600 */
     }
-
-    .slot-chip {
+    .reserve-button {
         transition: all 0.2s ease-in-out;
-        cursor: pointer;
-        border: 1px solid transparent;
     }
-    .slot-chip.available {
-        background-color: #e5e7eb; /* gray-200 */
-        color: #374151; /* gray-700 */
-    }
-    .slot-chip.available:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        background-color: var(--brand-color-light);
-        color: var(--brand-color-dark);
-        border-color: var(--brand-color);
-    }
-    .slot-chip.selected {
-        background: linear-gradient(45deg, var(--brand-color), var(--brand-color-dark));
-        color: white;
-        font-weight: 600;
-        box-shadow: 0 4px 10px rgba(79, 70, 229, 0.4);
+    .reserve-button:hover {
         transform: scale(1.05);
-    }
-    .slot-chip.in-range {
-        background-color: #a5b4fc; /* indigo-300 */
-        color: var(--brand-color-dark);
-        border-color: var(--brand-color);
-    }
-    .slot-chip.disabled {
-        background-color: #fee2e2; /* red-100 */
-        color: #9ca3af; /* gray-400 */
-        cursor: not-allowed;
-        text-decoration: line-through;
-        opacity: 0.7;
-    }
-    .equipment-card {
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-    }
-    .equipment-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.06);
     }
 </style>
 {% endblock %}
@@ -68,96 +26,82 @@
 {% block content %}
 <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-    <!-- Header -->
+    <!-- Header & Date Filter -->
     <div class="bg-white rounded-xl shadow-md p-6 mb-8">
         <div class="flex flex-col md:flex-row md:items-center md:justify-between">
             <div>
-                <h1 class="text-3xl font-bold text-gray-800">Disponibilidad de Equipos</h1>
-                <p class="mt-1 text-gray-600">Seleccione una fecha y elija un equipo para reservar.</p>
+                <h1 class="text-3xl font-bold text-gray-800">Reserva de Equipos por Curso</h1>
+                <p class="mt-1 text-gray-600">Seleccione una fecha para ver sus cursos y reservar equipos.</p>
             </div>
-            <!-- Date Filter Form -->
             <div class="mt-4 md:mt-0">
                 <form method="get" action="{% url 'reservas:disponibilidad' %}" class="flex items-center space-x-3">
                     <label for="fecha" class="font-semibold text-gray-700">Fecha:</label>
-                    <input type="date" id="fecha" name="fecha" value="{{ fecha_seleccionada_str }}"
-                           min="{{ fecha_inicio_semana }}" max="{{ fecha_fin_semana }}"
+                    <input type="date" id="fecha" name="fecha"
+                           value="{{ fecha_seleccionada_str }}"
+                           min="{{ fecha_inicio_semana }}"
+                           max="{{ fecha_fin_semana }}"
                            class="border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50">
                     <button type="submit" class="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
-                        Buscar
+                        Ver Cursos
                     </button>
                 </form>
-                <div id="date-warning" class="text-red-600 font-semibold text-sm mt-2" style="display: none;">
-                    Solo puedes reservar en días que tienes clases programadas.
-                </div>
             </div>
         </div>
     </div>
 
-    <!-- Equipment Cards Grid -->
-    <div id="equipment-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {% for item in grid %}
-        <div class="bg-white rounded-2xl shadow-lg overflow-hidden equipment-card" data-activo-id="{{ item.activo.id }}">
-            <div class="p-6 border-b border-gray-200">
-                <h2 class="text-2xl font-bold text-gray-900">{{ item.activo.nombre }}</h2>
-                <p class="text-sm font-medium text-indigo-600 bg-indigo-100 rounded-full px-3 py-1 inline-block mt-2">{{ item.activo.tipo.nombre }}</p>
-            </div>
+    <!-- Course List -->
+    <div class="space-y-6">
+        {% for item in cursos_con_disponibilidad %}
+            <div class="bg-white rounded-2xl shadow-lg overflow-hidden course-card">
+                <!-- Course Header -->
+                <div class="p-6 border-b border-gray-200">
+                    <h2 class="text-2xl font-bold text-gray-900">{{ item.curso.nombre }}</h2>
+                    <p class="text-lg font-semibold text-indigo-700 mt-1">
+                        Horario: {{ item.curso.horario_inicio|time:"H:i" }} - {{ item.curso.horario_fin|time:"H:i" }}
+                    </p>
+                    <p class="text-sm text-gray-500 mt-2">
+                        {{ item.curso.carrera.nombre }} - {{ item.curso.especialidad.nombre }}
+                    </p>
+                </div>
 
-            <div class="px-6 py-4">
-                {% for turno_nombre, franjas_turno in turnos.items %}
-                    {% if franjas_turno %}
-                    <div class="mb-5">
-                        <h3 class="font-semibold text-gray-800 mb-3 border-b pb-2">{{ turno_nombre|capfirst }}</h3>
-                        <div class="flex flex-wrap gap-2">
-                            {% for slot in item.franjas %}
-                                {% if slot.franja.turno == turno_nombre %}
-                                    {% if slot.reservado %}
-                                        <div class="slot-chip disabled px-3 py-1.5 text-sm font-medium rounded-full" title="No disponible">
-                                            {{ slot.franja.hora_inicio|time:"H:i" }}
-                                        </div>
-                                    {% else %}
-                                        <button class="slot-chip available px-3 py-1.5 text-sm font-medium rounded-full"
-                                                data-franja-id="{{ slot.franja.id }}"
-                                                data-franja-time="{{ slot.franja.hora_inicio|time:'H:i:s' }}"
-                                                data-franja-end-time="{{ slot.franja.hora_fin|time:'H:i:s' }}">
-                                            {{ slot.franja.hora_inicio|time:"H:i" }}
+                <!-- Available Equipment List -->
+                <div class="p-6">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4">Equipos Disponibles</h3>
+                    {% if item.activos_disponibles %}
+                        <ul class="space-y-4">
+                            {% for activo in item.activos_disponibles %}
+                                <li class="flex items-center justify-between bg-gray-50 p-4 rounded-lg">
+                                    <div>
+                                        <p class="font-bold text-gray-800">{{ activo.nombre }}</p>
+                                        <p class="text-sm text-gray-600">{{ activo.tipo.nombre }}</p>
+                                    </div>
+                                    <form method="post" action="{% url 'reservas:disponibilidad' %}">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="curso_id" value="{{ item.curso.id }}">
+                                        <input type="hidden" name="activo_id" value="{{ activo.id }}">
+                                        <input type="hidden" name="fecha" value="{{ fecha_seleccionada_str }}">
+                                        <button type="submit" class="reserve-button px-4 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700">
+                                            Reservar
                                         </button>
-                                    {% endif %}
-                                {% endif %}
+                                    </form>
+                                </li>
                             {% endfor %}
+                        </ul>
+                    {% else %}
+                        <div class="text-center py-8 px-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <p class="font-medium text-yellow-800">No hay equipos disponibles para este curso en este horario.</p>
                         </div>
-                    </div>
                     {% endif %}
-                {% endfor %}
+                </div>
             </div>
-
-            <!-- Confirmation Area per Card -->
-            <div class="confirmation-area bg-gray-50 p-5 border-t border-gray-200 hidden">
-                <p class="confirmation-text text-center font-semibold text-indigo-800 mb-4 p-3 bg-indigo-100 border border-indigo-200 rounded-lg">Seleccione un rango de horas.</p>
-                <form class="reserva-form" method="post" action="{% url 'reservas:disponibilidad' %}">
-                    {% csrf_token %}
-                    <input type="hidden" name="activo_id" value="{{ item.activo.id }}" class="form-activo-id">
-                    <input type="hidden" name="franja_id_inicio" class="form-franja-id-inicio">
-                    <input type="hidden" name="franja_id_fin" class="form-franja-id-fin">
-                    <input type="hidden" name="fecha" value="{{ fecha_seleccionada_str }}">
-                    <div class="grid grid-cols-2 gap-3">
-                        <button type="submit" class="confirm-button col-span-2 w-full px-4 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-transform transform hover:scale-105" disabled>
-                            Confirmar Reserva
-                        </button>
-                        <button type="button" class="cancel-selection-button col-span-2 w-full px-4 py-2 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300">
-                            Cancelar
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
         {% empty %}
-        <div class="col-span-full text-center py-16 bg-white rounded-xl shadow-md">
-            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-              <path vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <h3 class="mt-2 text-sm font-medium text-gray-900">No hay equipos disponibles</h3>
-            <p class="mt-1 text-sm text-gray-500">Intente seleccionar otra fecha.</p>
-        </div>
+            <div class="text-center py-16 bg-white rounded-xl shadow-md">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <h3 class="mt-2 text-lg font-medium text-gray-900">No tiene cursos programados</h3>
+                <p class="mt-1 text-sm text-gray-500">No se encontraron cursos para usted en la fecha seleccionada. Por favor, elija otra fecha.</p>
+            </div>
         {% endfor %}
     </div>
 </div>
@@ -166,130 +110,16 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // --- LÓGICA DE SELECCIÓN DE FRANJAS HORARIAS (SIN CAMBIOS) ---
-    const grid = document.getElementById('equipment-grid');
-    let selection = { card: null, startFranjaId: null, endFranjaId: null, startFranjaTime: null };
+    // No specific JavaScript needed for this new design, as it relies on standard form submissions.
+    // The date picker will automatically trigger a page reload on selection if the user clicks the button.
+    // We can add a listener to auto-submit the form on date change for better UX.
 
-    function clearSelection() {
-        if (selection.card) {
-            selection.card.querySelectorAll('.slot-chip.available').forEach(btn => btn.classList.remove('selected', 'in-range'));
-            const confirmationArea = selection.card.querySelector('.confirmation-area');
-            const confirmButton = selection.card.querySelector('.confirm-button');
-            const confirmationText = selection.card.querySelector('.confirmation-text');
-            confirmationArea.classList.add('hidden');
-            confirmButton.disabled = true;
-            confirmationText.textContent = 'Seleccione un rango de horas.';
-        }
-        selection = { card: null, startFranjaId: null, endFranjaId: null, startFranjaTime: null };
-    }
-
-    function updateUI() {
-        if (!selection.card) return;
-        const availableSlots = Array.from(selection.card.querySelectorAll('.slot-chip.available'));
-        availableSlots.forEach(btn => btn.classList.remove('selected', 'in-range'));
-        const startIndex = availableSlots.findIndex(btn => btn.dataset.franjaId === selection.startFranjaId);
-        if (startIndex === -1) return;
-        availableSlots[startIndex].classList.add('selected');
-        if (selection.endFranjaId) {
-            const endIndex = availableSlots.findIndex(btn => btn.dataset.franjaId === selection.endFranjaId);
-            if (endIndex === -1) return;
-            const [minIdx, maxIdx] = [Math.min(startIndex, endIndex), Math.max(startIndex, endIndex)];
-            for (let i = minIdx; i <= maxIdx; i++) {
-                availableSlots[i].classList.add('in-range');
-            }
-            availableSlots[endIndex].classList.add('selected');
-        }
-    }
-
-    grid.addEventListener('click', function(e) {
-        const target = e.target;
-        if (target.matches('.cancel-selection-button')) {
-            clearSelection();
-            return;
-        }
-        if (!target.matches('.slot-chip.available')) return;
-        const clickedCard = target.closest('.equipment-card');
-        if (!clickedCard) return;
-        if (selection.card && selection.card !== clickedCard) clearSelection();
-        selection.card = clickedCard;
-        const confirmationArea = selection.card.querySelector('.confirmation-area');
-        const confirmButton = selection.card.querySelector('.confirm-button');
-        const confirmationText = selection.card.querySelector('.confirmation-text');
-        const formFranjaIdInicio = selection.card.querySelector('.form-franja-id-inicio');
-        const formFranjaIdFin = selection.card.querySelector('.form-franja-id-fin');
-        confirmationArea.classList.remove('hidden');
-        const clickedFranjaId = target.dataset.franjaId;
-        const clickedFranjaTime = target.dataset.franjaTime;
-        const clickedFranjaEndTime = target.dataset.franjaEndTime;
-
-        if (!selection.startFranjaId) {
-            selection.startFranjaId = clickedFranjaId;
-            selection.startFranjaTime = clickedFranjaTime;
-            confirmationText.textContent = `Inicio: ${clickedFranjaTime.substring(0,5)}. Seleccione la hora de fin.`;
-        } else {
-            const allSlotsInCard = Array.from(selection.card.querySelectorAll('.slot-chip'));
-            const startIndex = allSlotsInCard.findIndex(chip => chip.dataset.franjaId === selection.startFranjaId);
-            const endIndex = allSlotsInCard.findIndex(chip => chip.dataset.franjaId === clickedFranjaId);
-            const [minIdx, maxIdx] = [Math.min(startIndex, endIndex), Math.max(startIndex, endIndex)];
-            let hasConflict = false;
-            for (let i = minIdx; i <= maxIdx; i++) {
-                if (allSlotsInCard[i].classList.contains('disabled')) {
-                    hasConflict = true;
-                    break;
-                }
-            }
-            if (hasConflict) {
-                alert('El rango seleccionado incluye horarios que ya están reservados. Por favor, elija otro rango.');
-                clearSelection();
-                return;
-            }
-            let finalStartId, finalEndId, finalStartTime, finalEndTimeForDisplay;
-            if (new Date('1970-01-01T' + clickedFranjaTime) < new Date('1970-01-01T' + selection.startFranjaTime)) {
-                finalStartId = clickedFranjaId;
-                finalEndId = selection.startFranjaId;
-                finalStartTime = clickedFranjaTime;
-                const startButton = selection.card.querySelector(`.slot-chip[data-franja-id='${selection.startFranjaId}']`);
-                finalEndTimeForDisplay = startButton.dataset.franjaEndTime;
-            } else {
-                finalStartId = selection.startFranjaId;
-                finalEndId = clickedFranjaId;
-                finalStartTime = selection.startFranjaTime;
-                finalEndTimeForDisplay = clickedFranjaEndTime;
-            }
-            selection.startFranjaId = finalStartId;
-            selection.endFranjaId = finalEndId;
-            selection.startFranjaTime = finalStartTime;
-            formFranjaIdInicio.value = finalStartId;
-            formFranjaIdFin.value = finalEndId;
-            confirmButton.disabled = false;
-            confirmationText.textContent = `Reservar de ${finalStartTime.substring(0,5)} a ${finalEndTimeForDisplay.substring(0,5)}.`;
-        }
-        updateUI();
-    });
-
-    // --- NUEVA LÓGICA PARA VALIDACIÓN DE FECHA ---
     const fechaInput = document.getElementById('fecha');
-    const dateWarning = document.getElementById('date-warning');
-    // Usamos un bloque try-catch por si el JSON es inválido o no existe
-    let fechasValidas = [];
-    try {
-        fechasValidas = JSON.parse('{{ fechas_validas_json|escapejs }}');
-    } catch (e) {
-        console.error("No se pudieron cargar las fechas válidas:", e);
+    if (fechaInput) {
+        fechaInput.addEventListener('change', function() {
+            this.form.submit();
+        });
     }
-
-    function checkDateValidity() {
-        const selectedDate = fechaInput.value;
-        if (fechasValidas.length > 0 && !fechasValidas.includes(selectedDate)) {
-            dateWarning.style.display = 'block';
-        } else {
-            dateWarning.style.display = 'none';
-        }
-    }
-
-    // Comprobar la validez de la fecha al cargar la página y cada vez que cambia
-    fechaInput.addEventListener('change', checkDateValidity);
-    checkDateValidity(); // Ejecutar al inicio
 });
 </script>
 {% endblock %}
