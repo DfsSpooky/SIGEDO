@@ -27,6 +27,7 @@ class DocenteAdmin(UserAdmin, ModelAdmin):
         'disponibilidad', 'display_is_staff', 'display_is_active', 'acciones'
     ]
     list_display_links = None
+    search_as_command = True
     
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
@@ -91,6 +92,7 @@ class EspecialidadAdmin(ModelAdmin):
     list_display_links = None
     list_filter = ('grupo',)
     search_fields = ('nombre',)
+    search_as_command = True
     @admin.display(description="Acciones")
     def acciones(self, obj):
         change_url = reverse(f'admin:{obj._meta.app_label}_{obj._meta.model_name}_change', args=[obj.pk])
@@ -101,6 +103,7 @@ class CarreraAdmin(ModelAdmin):
     list_display = ('nombre', 'acciones')
     list_display_links = None
     search_fields = ('nombre',)
+    search_as_command = True
     @admin.display(description="Acciones")
     def acciones(self, obj):
         change_url = reverse(f'admin:{obj._meta.app_label}_{obj._meta.model_name}_change', args=[obj.pk])
@@ -111,6 +114,7 @@ class TipoDocumentoAdmin(ModelAdmin):
     list_display = ('nombre', 'acciones')
     list_display_links = None
     search_fields = ('nombre',)
+    search_as_command = True
     @admin.display(description="Acciones")
     def acciones(self, obj):
         change_url = reverse(f'admin:{obj._meta.app_label}_{obj._meta.model_name}_change', args=[obj.pk])
@@ -123,6 +127,7 @@ class SemestreAdmin(ModelAdmin):
     list_filter = ('estado', 'tipo')
     ordering = ('-fecha_inicio',)
     search_fields = ('nombre',)
+    search_as_command = True
 
     @admin.display(description="Estado", ordering='estado')
     def display_estado(self, obj):
@@ -141,6 +146,7 @@ class CursoAdmin(ModelAdmin):
     list_display_links = None
     list_filter = ('semestre', 'tipo_curso', 'especialidad', 'semestre_cursado', 'carrera')
     search_fields = ('nombre', 'docente__first_name', 'docente__last_name')
+    search_as_command = True
     ordering = ('semestre', 'semestre_cursado', 'nombre')
     autocomplete_fields = ['docente', 'carrera', 'especialidad', 'semestre']
     fieldsets = (
@@ -172,6 +178,7 @@ class FranjaHorariaAdmin(ModelAdmin):
     list_filter = ('turno',)
     ordering = ('hora_inicio',)
     search_fields = ('turno', 'hora_inicio')
+    search_as_command = True
     @admin.display(description="Acciones")
     def acciones(self, obj):
         change_url = reverse(f'admin:{obj._meta.app_label}_{obj._meta.model_name}_change', args=[obj.pk])
@@ -189,6 +196,7 @@ class DocumentoAdmin(ModelAdmin):
     list_display_links = None
     list_filter = ('estado', 'tipo_documento', 'docente')
     search_fields = ('titulo', 'docente__first_name', 'docente__last_name')
+    search_as_command = True
     readonly_fields = ('fecha_subida',)
     inlines = [VersionDocumentoInline]
     autocomplete_fields = ['docente', 'tipo_documento']
@@ -212,6 +220,7 @@ class DocumentoAdmin(ModelAdmin):
 class VersionDocumentoAdmin(ModelAdmin):
     list_display = ('__str__', 'fecha_version')
     search_fields = ('documento__titulo',)
+    search_as_command = True
 
 @admin.register(ConfiguracionInstitucion)
 class ConfiguracionInstitucionAdmin(ModelAdmin):
@@ -233,6 +242,7 @@ class NotificacionAdmin(ModelAdmin):
     list_display_links = None
     list_filter = ('leido', 'fecha_creacion')
     search_fields = ('destinatario__username', 'mensaje')
+    search_as_command = True
     @admin.display(description="Acciones")
     def acciones(self, obj):
         change_url = reverse(f'admin:{obj._meta.app_label}_{obj._meta.model_name}_change', args=[obj.pk])
@@ -243,6 +253,7 @@ class AnuncioAdmin(ModelAdmin):
     list_display = ('titulo', 'autor', 'fecha_publicacion', 'acciones')
     list_display_links = None
     search_fields = ('titulo', 'contenido')
+    search_as_command = True
     list_filter = ('autor', 'fecha_publicacion')
     formfield_overrides = {models.TextField: {"widget": WysiwygWidget},}
     fieldsets = ((None, {'fields': ('titulo', 'contenido')}),)
@@ -259,6 +270,7 @@ class TipoJustificacionAdmin(ModelAdmin):
     list_display = ('nombre', 'acciones')
     list_display_links = None
     search_fields = ('nombre',)
+    search_as_command = True
     @admin.display(description="Acciones")
     def acciones(self, obj):
         change_url = reverse(f'admin:{obj._meta.app_label}_{obj._meta.model_name}_change', args=[obj.pk])
@@ -270,6 +282,7 @@ class JustificacionAdmin(ModelAdmin):
     list_display_links = None
     list_filter = ('estado', 'tipo', 'fecha_inicio')
     search_fields = ('docente__first_name', 'docente__last_name', 'motivo')
+    search_as_command = True
     ordering = ('-fecha_creacion',)
     readonly_fields = ('fecha_creacion', 'fecha_revision', 'revisado_por')
     autocomplete_fields = ['docente', 'tipo', 'revisado_por']
@@ -297,6 +310,7 @@ class TipoActivoAdmin(ModelAdmin):
     list_display = ('nombre', 'acciones')
     list_display_links = None
     search_fields = ('nombre',)
+    search_as_command = True
     @admin.display(description="Acciones")
     def acciones(self, obj):
         change_url = reverse(f'admin:{obj._meta.app_label}_{obj._meta.model_name}_change', args=[obj.pk])
@@ -308,6 +322,7 @@ class ActivoAdmin(ModelAdmin):
     list_display_links = None
     list_filter = ('estado', 'tipo')
     search_fields = ('nombre', 'codigo_patrimonial', 'asignado_a__first_name', 'asignado_a__last_name', 'asignado_a__username')
+    search_as_command = True
     autocomplete_fields = ('asignado_a', 'tipo')
     @admin.display(description="Acciones")
     def acciones(self, obj):
@@ -320,6 +335,7 @@ class ReservaAdmin(ModelAdmin):
     list_display_links = None
     list_filter = ('estado', 'fecha_reserva')
     search_fields = ('activo__nombre', 'docente__username', 'docente__first_name')
+    search_as_command = True
     autocomplete_fields = ('activo', 'docente', 'franja_horaria_inicio', 'franja_horaria_fin')
     readonly_fields = ('fecha_creacion', 'fecha_confirmacion', 'fecha_finalizacion')
     list_per_page = 20
@@ -334,6 +350,7 @@ class AsistenciaAdmin(ModelAdmin):
     list_display_links = None
     list_filter = ('fecha', 'curso__semestre', 'docente')
     search_fields = ('docente__first_name', 'docente__last_name', 'curso__nombre')
+    search_as_command = True
     readonly_fields = ('hora_entrada', 'hora_salida', 'hora_salida_permitida', 'foto_entrada', 'foto_salida')
     autocomplete_fields = ['docente', 'curso']
     @admin.display(description="Acciones")
@@ -347,6 +364,7 @@ class SolicitudIntercambioAdmin(ModelAdmin):
     list_display_links = None
     list_filter = ('estado',)
     search_fields = ('docente_solicitante__first_name', 'docente_destino__first_name')
+    search_as_command = True
     autocomplete_fields = ['docente_solicitante', 'curso_solicitante', 'docente_destino', 'curso_destino']
     @admin.display(description="Estado", ordering='estado')
     def display_estado(self, obj):
