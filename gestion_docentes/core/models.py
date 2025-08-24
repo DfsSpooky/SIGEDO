@@ -62,7 +62,7 @@ class Docente(AbstractUser):
     DISPONIBILIDAD_CHOICES = [('COMPLETO', 'Tiempo Completo (Mañana y Tarde)'), ('MANANA', 'Solo Mañana'), ('TARDE', 'Solo Tarde')]
     dni = models.CharField(max_length=8, unique=True, db_index=True)
     especialidades = models.ManyToManyField(Especialidad, related_name="docentes")
-    disponibilidad = models.CharField(max_length=20, choices=DISPONIBILIDAD_CHOICES, default='COMPLETO')
+    disponibilidad = models.CharField(max_length=20, choices=DISPONIBILIDAD_CHOICES, default='COMPLETO', help_text="Define la disponibilidad del docente para la asignación de horarios.")
     id_qr = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     rfid_uid = models.CharField(max_length=100, unique=True, null=True, blank=True, help_text="UID de la tarjeta RFID asignada al docente")
     foto = models.ImageField(upload_to='fotos_docentes/', null=True, blank=True, default='fotos_docentes/placeholder.png')
@@ -86,7 +86,7 @@ class Curso(models.Model):
     TIPO_CURSO_CHOICES = [('ESPECIALIDAD', 'Especialidad'), ('GENERAL', 'General')]
     SEMESTRE_CURSADO_CHOICES = [(1, 'Semestre I'), (2, 'Semestre II'), (3, 'Semestre III'), (4, 'Semestre IV'), (5, 'Semestre V'), (6, 'Semestre VI'), (7, 'Semestre VII'), (8, 'Semestre VIII'), (9, 'Semestre IX'), (10, 'Semestre X')]
     nombre = models.CharField(max_length=100)
-    tipo_curso = models.CharField(max_length=20, choices=TIPO_CURSO_CHOICES, default='ESPECIALIDAD')
+    tipo_curso = models.CharField(max_length=20, choices=TIPO_CURSO_CHOICES, default='ESPECIALIDAD', help_text="Indica si el curso es de especialidad o de estudios generales.")
     docente = models.ForeignKey(Docente, on_delete=models.SET_NULL, null=True, blank=True)
     carrera = models.ForeignKey(Carrera, on_delete=models.CASCADE)
     especialidad = models.ForeignKey(Especialidad, on_delete=models.SET_NULL, null=True, related_name='cursos')
@@ -128,7 +128,7 @@ class Documento(models.Model):
     fecha_subida = models.DateTimeField(auto_now_add=True)
     fecha_vencimiento = models.DateField(null=True, blank=True, help_text="Opcional: Dejar en blanco si el documento no vence.")
     estado = models.CharField(max_length=20, choices=ESTADOS_DOCUMENTO, default='RECIBIDO')
-    observaciones = models.TextField(blank=True, help_text="Notas internas para la administración.")
+    observaciones = models.TextField(blank=True, help_text="Notas internas para la administración. No son visibles para el docente.")
 
     def __str__(self): 
         return self.titulo
@@ -304,7 +304,7 @@ class Justificacion(models.Model):
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_revision = models.DateTimeField(null=True, blank=True)
     revisado_por = models.ForeignKey(Docente, on_delete=models.SET_NULL, null=True, blank=True, related_name='justificaciones_revisadas', limit_choices_to={'is_staff': True})
-    observaciones_revision = models.TextField(blank=True, help_text="Notas internas del administrador que revisa la solicitud.")
+    observaciones_revision = models.TextField(blank=True, help_text="Notas internas del administrador que revisa la solicitud. Visibles solo para otros administradores.")
 
     def __str__(self):
         return f"Justificación de {self.docente} ({self.fecha_inicio} al {self.fecha_fin}) - {self.get_estado_display()}"
