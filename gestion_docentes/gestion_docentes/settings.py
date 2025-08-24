@@ -50,6 +50,7 @@ USE_X_FORWARDED_HOST = True
 INSTALLED_APPS = [
     'daphne',
     'channels',
+    'core',
     'unfold',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -57,7 +58,6 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'core',
     'tailwind',
     
 ]
