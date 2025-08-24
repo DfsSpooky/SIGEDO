@@ -3,67 +3,76 @@
 {% block breadcrumb %}Dashboard{% endblock %}
 
 {% block content %}
-<div class="mb-6">
-    <h1 class="text-2xl md:text-3xl font-semibold text-base-content">Bienvenido, {{ user.first_name }}</h1>
-    <p class="text-base-content/70">Aquí tienes un resumen de tu actividad y próximos eventos.</p>
+<div class="mb-8 flex items-center justify-between">
+    <div>
+        <h1 class="text-3xl md:text-4xl font-bold text-base-content">Bienvenido, {{ user.first_name }}</h1>
+        <p class="text-base-content/70 mt-1">Aquí tienes un resumen de tu actividad y próximos eventos.</p>
+    </div>
+    {% if configuracion.logo %}
+        <img src="{{ configuracion.logo.url }}" alt="Logo" class="h-16 w-16 object-contain">
+    {% endif %}
 </div>
 
+<!-- Stat Cards -->
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-    <div class="card bg-base-100 shadow-lg">
+    <div class="card bg-base-100 shadow-md border border-base-300/20">
         <div class="card-body">
             <div class="flex items-center gap-4">
-                <div class="bg-primary/10 text-primary p-3 rounded-full">
+                <div class="bg-primary/10 text-primary p-4 rounded-2xl">
                     <i class="fas fa-chalkboard-teacher text-2xl"></i>
                 </div>
                 <div>
-                    <p class="text-base-content/70">Cursos Programados Hoy</p>
-                    <p class="text-2xl font-bold">{{ cursos_hoy_count }}</p>
+                    <p class="text-base-content/70 text-sm">Cursos Hoy</p>
+                    <p class="text-3xl font-bold">{{ cursos_hoy_count }}</p>
                 </div>
             </div>
         </div>
     </div>
-    <div class="card bg-base-100 shadow-lg">
+    <div class="card bg-base-100 shadow-md border border-base-300/20">
         <div class="card-body">
             <div class="flex items-center gap-4">
-                <div class="bg-success/10 text-success p-3 rounded-full">
+                <div class="bg-success/10 text-success p-4 rounded-2xl">
                     <i class="fas fa-user-check text-2xl"></i>
                 </div>
                 <div>
-                    <p class="text-base-content/70">Asistencias Marcadas</p>
-                    <p class="text-2xl font-bold">{{ asistencias_count }}</p>
+                    <p class="text-base-content/70 text-sm">Asistencias Marcadas</p>
+                    <p class="text-3xl font-bold">{{ asistencias_count }}</p>
                 </div>
             </div>
         </div>
     </div>
-    <div class="card {% if documentos_observados_count > 0 %}bg-warning/10{% else %}bg-base-100{% endif %} shadow-lg">
+    <div class="card {% if documentos_observados_count > 0 %}bg-warning/10 border-warning/30{% else %}bg-base-100 border-base-300/20{% endif %} shadow-md border">
         <div class="card-body">
             <div class="flex items-center gap-4">
-                <div class="{% if documentos_observados_count > 0 %}text-warning{% else %}text-base-content/70{% endif %} p-3 rounded-full">
+                <div class="{% if documentos_observados_count > 0 %}text-warning{% else %}bg-warning/10 text-warning{% endif %} p-4 rounded-2xl">
                     <i class="fas fa-file-circle-exclamation text-2xl"></i>
                 </div>
                 <div>
-                    <p class="text-base-content/70">Documentos Observados</p>
-                    <p class="text-2xl font-bold">{{ documentos_observados_count }}</p>
+                    <p class="text-base-content/70 text-sm">Documentos Observados</p>
+                    <p class="text-3xl font-bold">{{ documentos_observados_count }}</p>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Main Content Grid -->
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
     
     <div class="lg:col-span-2 space-y-8">
         
-        <div class="card bg-primary text-primary-content shadow-xl">
+        <!-- Next Class -->
+        <div class="card bg-base-100 shadow-lg border border-base-300/20">
             <div class="card-body">
-                <h2 class="card-title text-xl"><i class="fas fa-hourglass-half mr-2"></i> Próxima Clase Hoy</h2>
+                <h2 class="card-title text-xl"><i class="fas fa-hourglass-half mr-2 text-primary"></i> Próxima Clase Hoy</h2>
                 {% if proximo_curso %}
-                    <p class="text-3xl font-bold mt-2">{{ proximo_curso.nombre }}</p>
-                    <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                    <p class="text-4xl font-bold mt-2 text-base-content">{{ proximo_curso.nombre }}</p>
+                    <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-base-content/80">
                         <p><i class="fas fa-clock fa-fw mr-2 opacity-70"></i> <strong>Hora:</strong> {{ proximo_curso.horario_inicio|time:"h:i A" }} - {{ proximo_curso.horario_fin|time:"h:i A" }}</p>
                         <p><i class="fas fa-book fa-fw mr-2 opacity-70"></i> <strong>Carrera:</strong> {{ proximo_curso.carrera.nombre }}</p>
                     </div>
                 {% else %}
-                    <div class="text-center py-8">
+                    <div class="text-center py-12">
                         <i class="fas fa-coffee fa-3x opacity-50"></i>
                         <p class="mt-4 text-lg">No tienes más clases programadas para hoy.</p>
                     </div>
@@ -71,17 +80,18 @@
             </div>
         </div>
 
-        <div class="card bg-base-100 shadow-xl">
+        <!-- Recent Activity -->
+        <div class="card bg-base-100 shadow-lg border border-base-300/20">
             <div class="card-body">
                 <h2 class="card-title text-xl mb-4">Actividad Reciente</h2>
                 <ul class="space-y-4">
                     {% for item in actividad_reciente %}
-                    <li class="flex items-center gap-4">
+                    <li class="flex items-center gap-4 p-2 rounded-lg hover:bg-base-200/50">
                         <div class="bg-base-200 p-3 rounded-full">
                             <i class="fas {% if item.tipo == 'asistencia' %}fa-user-check text-success{% else %}fa-file-alt text-info{% endif %}"></i>
                         </div>
                         <div class="flex-grow">
-                            <p>{{ item.texto }}</p>
+                            <p class="font-medium">{{ item.texto }}</p>
                             <p class="text-xs text-base-content/60">{{ item.fecha|timesince }} atrás</p>
                         </div>
                     </li>
@@ -92,18 +102,20 @@
             </div>
         </div>
     </div>
+
+    <!-- Sidebar Column -->
     <div class="lg:col-span-1 space-y-8">
-        <div class="card bg-base-100 shadow-xl">
+        <div class="card bg-base-100 shadow-lg border border-base-300/20">
             <div class="card-body">
                 <h2 class="card-title text-xl mb-4">Accesos Rápidos</h2>
                 <div class="space-y-2">
                     <a href="{% url 'perfil' %}" class="btn btn-ghost justify-start w-full"><i class="fas fa-user-circle fa-fw mr-2"></i> Mi Perfil</a>
-                    <a href="{% url 'lista_documentos' %}" class="btn btn-ghost justify-start w-full"><i class="fas fa-folder-open fa-fw mr-2"></i> Mi Carpeta Pedagógica</a>
-                    <a href="{% url 'asistencia' %}" class="btn btn-ghost justify-start w-full"><i class="fas fa-fingerprint fa-fw mr-2"></i> Registrar Asistencia</a>
+                    <a href="{% url 'lista_documentos' %}" class="btn btn-ghost justify-start w-full"><i class="fas fa-folder-open fa-fw mr-2"></i> Mis Documentos</a>
+                    <a href="{% url 'asistencia' %}" class="btn btn-ghost justify-start w-full"><i class="fas fa-fingerprint fa-fw mr-2"></i> Ver Estado de Asistencia</a>
                 </div>
             </div>
         </div>
-        <div class="card bg-base-100 shadow-xl">
+        <div class="card bg-base-100 shadow-lg border border-base-300/20">
             <div class="card-body">
                 <h2 class="card-title text-xl mb-4">Mis Horarios</h2>
                 {% if carreras %}
@@ -118,5 +130,5 @@
             </div>
         </div>
     </div>
-    </div>
+</div>
 {% endblock %}
