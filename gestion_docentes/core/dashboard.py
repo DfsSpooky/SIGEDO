@@ -18,24 +18,28 @@ def dashboard_callback(request, context):
             "title": "Docentes Activos",
             "metric": docentes_activos,
             "icon": "group",
+            "color": "primary",
             "link": reverse("admin:core_personaldocente_changelist"),
         },
         {
             "title": "Cursos del Semestre",
             "metric": cursos_semestre_actual,
             "icon": "book",
+            "color": "success",
             "link": reverse("admin:core_curso_changelist"),
         },
         {
             "title": "Documentos Pendientes",
             "metric": documentos_pendientes,
             "icon": "folder_open",
+            "color": "warning",
             "link": reverse("admin:core_documento_changelist") + "?estado__exact=RECIBIDO",
         },
         {
             "title": "Justificaciones Pendientes",
             "metric": justificaciones_pendientes,
             "icon": "assignment_late",
+            "color": "danger",
             "link": reverse("admin:core_justificacion_changelist") + "?estado__exact=PENDIENTE",
         },
     ]
