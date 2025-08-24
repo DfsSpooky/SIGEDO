@@ -11,9 +11,29 @@
         <p class="text-gray-500">Resumen del estado del sistema para el semestre: <strong>{{ semestre_nombre }}</strong></p>
     </div>
 
-    <!-- Tracker component for KPIs -->
-    {% component "unfold/components/tracker.html" with data=tracker_data class="grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" %}
-    {% endcomponent %}
+    <!-- KPIs -->
+    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+        {% for kpi in tracker_data %}
+            <a href="{{ kpi.link }}" class="block p-6 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        {% with kpi.color as color %}
+                            {% if color == 'primary' %}<div class="bg-blue-100 text-blue-600 p-3 rounded-full">{% endif %}
+                            {% if color == 'success' %}<div class="bg-green-100 text-green-600 p-3 rounded-full">{% endif %}
+                            {% if color == 'warning' %}<div class="bg-yellow-100 text-yellow-600 p-3 rounded-full">{% endif %}
+                            {% if color == 'danger' %}<div class="bg-red-100 text-red-600 p-3 rounded-full">{% endif %}
+                                {% render_icon kpi.icon "w-6 h-6" %}
+                            </div>
+                        {% endwith %}
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-500 truncate">{{ kpi.title }}</p>
+                        <p class="text-2xl font-bold text-gray-900">{{ kpi.metric }}</p>
+                    </div>
+                </div>
+            </a>
+        {% endfor %}
+    </div>
 
     <!-- Quick Actions -->
     <div class="my-8">
