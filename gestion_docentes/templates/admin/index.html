@@ -1,0 +1,129 @@
+{% extends "unfold/layouts/base.html" %}
+{% load i18n unfold %}
+
+{% block title %}{% trans "Dashboard" %} | {{ site_title }}{% endblock %}
+
+{% block content %}
+<div class="p-6">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold">{% trans "Dashboard Principal" %}</h1>
+        <p class="text-gray-500">Resumen del estado del sistema para el semestre: <strong>{{ semestre_nombre }}</strong></p>
+    </div>
+
+    <!-- KPIs -->
+    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+        {% for kpi in tracker_data %}
+            <a href="{{ kpi.link }}" class="block p-6 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        {% with kpi.color as color %}
+                            {% if color == 'primary' %}<div class="bg-blue-100 text-blue-600 p-3 rounded-full">{% endif %}
+                            {% if color == 'success' %}<div class="bg-green-100 text-green-600 p-3 rounded-full">{% endif %}
+                            {% if color == 'warning' %}<div class="bg-yellow-100 text-yellow-600 p-3 rounded-full">{% endif %}
+                            {% if color == 'danger' %}<div class="bg-red-100 text-red-600 p-3 rounded-full">{% endif %}
+                                {% component "unfold/components/icon.html" with name=kpi.icon class="w-6 h-6" %}{% endcomponent %}
+                            </div>
+                        {% endwith %}
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-500 truncate">{{ kpi.title }}</p>
+                        <p class="text-2xl font-bold text-gray-900">{{ kpi.metric }}</p>
+                    </div>
+                </div>
+            </a>
+        {% endfor %}
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="my-8">
+        <h2 class="text-2xl font-semibold mb-4">Acciones Rápidas</h2>
+        <div class="flex flex-wrap gap-4">
+            {% url 'admin:core_docente_add' as add_docente_url %}
+            {% component "unfold/components/button.html" with title="Nuevo Docente" href=add_docente_url icon="person_add" class="bg-primary text-white" %}
+            {% endcomponent %}
+
+            {% url 'admin:core_curso_add' as add_curso_url %}
+            {% component "unfold/components/button.html" with title="Nuevo Curso" href=add_curso_url icon="add_box" class="bg-secondary text-white" %}
+            {% endcomponent %}
+
+            {% url 'admin:core_anuncio_add' as add_anuncio_url %}
+            {% component "unfold/components/button.html" with title="Nuevo Anuncio" href=add_anuncio_url icon="campaign" class="bg-accent text-white" %}
+            {% endcomponent %}
+        </div>
+    </div>
+
+    <!-- Tables for recent activity -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Recent Documents Card -->
+        {% component "unfold/components/card.html" with title="Últimos Documentos Pendientes" %}
+            <div class="overflow-x-auto">
+                <table class="table w-full">
+                    <thead>
+                        <tr>
+                            <th>Título</th>
+                            <th>Docente</th>
+                            <th>Fecha</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for doc in ultimos_documentos %}
+                        <tr>
+                            <td>{{ doc.titulo }}</td>
+                            <td>{{ doc.docente.get_full_name }}</td>
+                            <td>{{ doc.fecha_subida|date:"d/m/Y" }}</td>
+                            <td>
+                                <a href="{% url 'admin:core_documento_change' doc.pk %}" class="btn btn-xs btn-outline">Revisar</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center py-8 text-gray-500">
+                                <i class="fas fa-check-circle fa-2x mb-2"></i>
+                                <p>No hay documentos pendientes.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endcomponent %}
+
+        <!-- Recent Justifications Card -->
+        {% component "unfold/components/card.html" with title="Últimas Justificaciones Pendientes" %}
+            <div class="overflow-x-auto">
+                <table class="table w-full">
+                    <thead>
+                        <tr>
+                            <th>Docente</th>
+                            <th>Tipo</th>
+                            <th>Fechas</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for just in ultimas_justificaciones %}
+                        <tr>
+                            <td>{{ just.docente.get_full_name }}</td>
+                            <td>{{ just.tipo.nombre }}</td>
+                            <td>{{ just.fecha_inicio|date:"d/m" }} - {{ just.fecha_fin|date:"d/m/Y" }}</td>
+                            <td>
+                                <a href="{% url 'admin:core_justificacion_change' just.pk %}" class="btn btn-xs btn-outline">Revisar</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center py-8 text-gray-500">
+                                <i class="fas fa-check-circle fa-2x mb-2"></i>
+                                <p>No hay justificaciones pendientes.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endcomponent %}
+    </div>
+</div>
+{% endblock %}

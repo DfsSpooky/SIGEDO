@@ -1,6 +1,6 @@
-from django.urls import path
-from . import views
-from django.contrib.auth.views import LoginView
+from django.urls import path, include
+from . import views, urls_inventario, urls_reservas
+from django.contrib.auth import views as auth_views
 from .utils import exports
 
 urlpatterns = [
@@ -15,35 +15,49 @@ urlpatterns = [
     path('intercambio/<int:curso_id>/', views.solicitar_intercambio, name='solicitar_intercambio'),
     path('solicitudes/', views.ver_solicitudes, name='ver_solicitudes'),
     path('solicitudes/<int:solicitud_id>/responder/', views.responder_solicitud, name='responder_solicitud'),
-    path('accounts/login/', LoginView.as_view(template_name='registration/login.html', redirect_authenticated_user=True), name='login'),
     
+    # --- Justificaciones ---
+    path('justificaciones/', views.lista_justificaciones, name='lista_justificaciones'),
+    path('justificaciones/solicitar/', views.solicitar_justificacion, name='solicitar_justificacion'),
+
+    # --- Inventario ---
+    path('inventario/', include(urls_inventario)),
+
+    # --- Reservas de Equipos ---
+    path('reservas/', include(urls_reservas)),
+
+    # --- Custom Login/Logout Views ---
+    path('accounts/login/', views.custom_login_view, name='login'),
+    # Django's built-in logout view is fine, as settings.py handles the redirect
+    path('accounts/logout/', auth_views.LogoutView.as_view(), name='logout'),
+
     # --- URLS PARA EL KIOSCO ---
-    
     # Esta ruta mostrará la página del kiosco
     path('kiosco/', views.kiosco_page, name='kiosco_page'),
-    
-    # APIs que usará el JavaScript del kiosco
-    path('api/get-teacher-info/', views.get_teacher_info, name='api_get_teacher_info'),
-    path('api/mark-attendance/', views.mark_attendance_kiosk, name='api_mark_attendance'),
 
-        # --- INICIO DE URLS PARA CREDENCIALES ---
+    # --- URLs de la API (ahora en su propio módulo) ---
+    # Se agrupan todas las URLs de la API bajo el prefijo /api/
+    path('api/', include('core.api.urls', namespace='api')),
+    
+    # Las URLs de la API que antes estaban aquí han sido movidas a core/api/urls.py
+
+    # --- INICIO DE URLS PARA CREDENCIALES ---
     path('credenciales/', views.lista_docentes_credenciales, name='lista_credenciales'),
-    path('credenciales/<int:docente_id>/', views.generar_credencial_docente, name='generar_credencial'),
+    path('credenciales/<str:encrypted_id>/', views.generar_credencial_docente, name='generar_credencial'),
+    path('credenciales/<int:docente_id>/rotate-qr/', views.rotate_qr_code, name='rotate_qr_code'),
     # --- FIN DE URLS PARA CREDENCIALES ---
     path('reportes/asistencia/', views.reporte_asistencia, name='reporte_asistencia'),
 
     path('planificador/', views.planificador_horarios, name='planificador_horarios'),
-    path('api/asignar-horario/', views.api_asignar_horario, name='api_asignar_horario'),
-    path('api/desasignar-horario/', views.api_desasignar_horario, name='api_desasignar_horario'),
-    path('api/get-teacher-conflicts/', views.api_get_teacher_conflicts, name='api_get_teacher_conflicts'),
-    path('api/auto-asignar/', views.api_auto_asignar, name='api_auto_asignar'),
-    path('api/get-cursos-no-asignados/', views.api_get_cursos_no_asignados, name='api_get_cursos_no_asignados'),
 
     path('horarios/ver/', views.vista_publica_horarios, name='vista_publica_horarios'),
 
     path('reporte-asistencia/', views.reporte_asistencia, name='reporte_asistencia'),
+    path('reportes/analiticas/', views.analytics_dashboard, name='analytics_dashboard'),
     # Las URLs de exportación ahora apuntan al nuevo módulo
     path('reporte-asistencia/excel/', exports.exportar_reporte_excel, name='exportar_excel'),
     path('reporte-asistencia/pdf/', exports.exportar_reporte_pdf, name='exportar_pdf'),
-    path('reporte-asistencia/detalle/<int:docente_id>/', views.detalle_asistencia_docente_ajax, name='detalle_asistencia_docente_ajax'),
+    path('notificaciones/', views.ver_notificaciones, name='ver_notificaciones'),
+    path('anuncios/', views.ver_anuncios, name='ver_anuncios'),
+    path('docente/<int:docente_id>/ficha/', views.generar_ficha_docente, name='generar_ficha_docente'),
 ]

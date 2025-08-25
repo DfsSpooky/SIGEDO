@@ -3,6 +3,8 @@ from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 import uuid
+from datetime import date
+from PIL import Image
 
 class Grupo(models.Model):
     nombre = models.CharField(max_length=100, help_text="Ej: Grupo A, Grupo B, Grupo C")
@@ -60,16 +62,31 @@ class Docente(AbstractUser):
     DISPONIBILIDAD_CHOICES = [('COMPLETO', 'Tiempo Completo (Mañana y Tarde)'), ('MANANA', 'Solo Mañana'), ('TARDE', 'Solo Tarde')]
     dni = models.CharField(max_length=8, unique=True, db_index=True)
     especialidades = models.ManyToManyField(Especialidad, related_name="docentes")
-    disponibilidad = models.CharField(max_length=20, choices=DISPONIBILIDAD_CHOICES, default='COMPLETO')
+    disponibilidad = models.CharField(max_length=20, choices=DISPONIBILIDAD_CHOICES, default='COMPLETO', help_text="Define la disponibilidad del docente para la asignación de horarios.")
     id_qr = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    rfid_uid = models.CharField(max_length=100, unique=True, null=True, blank=True, help_text="UID de la tarjeta RFID asignada al docente")
     foto = models.ImageField(upload_to='fotos_docentes/', null=True, blank=True, default='fotos_docentes/placeholder.png')
+
     def __str__(self): return f"{self.first_name} {self.last_name}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.foto:
+            try:
+                img = Image.open(self.foto.path)
+                if img.height > 300 or img.width > 300:
+                    output_size = (300, 300)
+                    img.thumbnail(output_size)
+                    img.save(self.foto.path, format='PNG', quality=85)
+            except Exception as e:
+                # Log the error, but don't prevent the model from saving
+                print(f"Error al redimensionar la imagen para {self.username}: {e}")
 
 class Curso(models.Model):
     TIPO_CURSO_CHOICES = [('ESPECIALIDAD', 'Especialidad'), ('GENERAL', 'General')]
     SEMESTRE_CURSADO_CHOICES = [(1, 'Semestre I'), (2, 'Semestre II'), (3, 'Semestre III'), (4, 'Semestre IV'), (5, 'Semestre V'), (6, 'Semestre VI'), (7, 'Semestre VII'), (8, 'Semestre VIII'), (9, 'Semestre IX'), (10, 'Semestre X')]
     nombre = models.CharField(max_length=100)
-    tipo_curso = models.CharField(max_length=20, choices=TIPO_CURSO_CHOICES, default='ESPECIALIDAD')
+    tipo_curso = models.CharField(max_length=20, choices=TIPO_CURSO_CHOICES, default='ESPECIALIDAD', help_text="Indica si el curso es de especialidad o de estudios generales.")
     docente = models.ForeignKey(Docente, on_delete=models.SET_NULL, null=True, blank=True)
     carrera = models.ForeignKey(Carrera, on_delete=models.CASCADE)
     especialidad = models.ForeignKey(Especialidad, on_delete=models.SET_NULL, null=True, related_name='cursos')
@@ -78,8 +95,23 @@ class Curso(models.Model):
     horario_inicio = models.TimeField(null=True, blank=True)
     horario_fin = models.TimeField(null=True, blank=True)
     dia = models.CharField(max_length=20, choices=[('Lunes', 'Lunes'), ('Martes', 'Martes'), ('Miércoles', 'Miércoles'), ('Jueves', 'Jueves'), ('Viernes', 'Viernes')], null=True, blank=True)
+    dia_semana = models.PositiveSmallIntegerField(null=True, blank=True, editable=False, db_index=True, help_text="Día de la semana como número (0=Lunes, 1=Martes...)")
     duracion_bloques = models.IntegerField(default=2, help_text="Número de bloques de 50 minutos que dura el curso.")
+
+    class Meta:
+        permissions = [
+            ("view_planificador", "Puede ver el planificador de horarios"),
+        ]
+
     def __str__(self): return f"{self.nombre} ({self.especialidad.nombre if self.especialidad else 'N/A'})"
+
+    def save(self, *args, **kwargs):
+        DIAS = {'Lunes': 0, 'Martes': 1, 'Miércoles': 2, 'Jueves': 3, 'Viernes': 4}
+        if self.dia:
+            self.dia_semana = DIAS.get(self.dia)
+        else:
+            self.dia_semana = None
+        super().save(*args, **kwargs)
 
 class Documento(models.Model):
     ESTADOS_DOCUMENTO = [
@@ -96,7 +128,7 @@ class Documento(models.Model):
     fecha_subida = models.DateTimeField(auto_now_add=True)
     fecha_vencimiento = models.DateField(null=True, blank=True, help_text="Opcional: Dejar en blanco si el documento no vence.")
     estado = models.CharField(max_length=20, choices=ESTADOS_DOCUMENTO, default='RECIBIDO')
-    observaciones = models.TextField(blank=True, help_text="Notas internas para la administración.")
+    observaciones = models.TextField(blank=True, help_text="Notas internas para la administración. No son visibles para el docente.")
 
     def __str__(self): 
         return self.titulo
@@ -128,13 +160,51 @@ class Asistencia(models.Model):
     hora_salida_permitida = models.DateTimeField(null=True, blank=True, help_text="Hora mínima a la que se puede marcar la salida.")
     foto_entrada = models.ImageField(upload_to='verificacion_cursos/entradas/%Y/%m/%d/', null=True, blank=True)
     foto_salida = models.ImageField(upload_to='verificacion_cursos/salidas/%Y/%m/%d/', null=True, blank=True)
+
+    class Meta:
+        permissions = [
+            ("view_reporte", "Puede ver reportes de asistencia"),
+        ]
+
     def __str__(self): return f"Asistencia {self.docente} - {self.curso} ({self.fecha})"
+
+    def es_tardanza(self):
+        """
+        Determina si la marca de entrada de esta asistencia se considera tardanza.
+        """
+        if not self.hora_entrada or not self.curso or not self.curso.horario_inicio:
+            return False
+
+        # Cargar la configuración de la institución para obtener el límite de tardanza
+        configuracion = ConfiguracionInstitucion.load()
+
+        # Combinar la fecha de la asistencia con la hora de inicio del curso para crear un datetime
+        # Es importante usar la fecha de la asistencia, no la fecha actual.
+        horario_inicio_dt = timezone.make_aware(
+            datetime.combine(self.fecha, self.curso.horario_inicio)
+        )
+
+        # Calcular el tiempo límite para marcar sin ser considerado tardanza
+        limite_tardanza = horario_inicio_dt + timedelta(minutes=configuracion.tiempo_limite_tardanza)
+
+        # Comparar la hora de entrada (que es un datetime) con el límite (que también es un datetime)
+        return self.hora_entrada > limite_tardanza
+
+    @property
+    def puede_marcar_salida(self):
+        """
+        Determina si ya se puede marcar la salida para esta asistencia.
+        """
+        if self.hora_entrada and not self.hora_salida:
+            if self.hora_salida_permitida and timezone.now() >= self.hora_salida_permitida:
+                return True
+        return False
 
 class AsistenciaDiaria(models.Model):
     docente = models.ForeignKey(Docente, on_delete=models.CASCADE)
-    fecha = models.DateField(auto_now_add=True)
+    fecha = models.DateField(default=date.today)
     hora_entrada = models.DateTimeField(auto_now_add=True)
-    foto_verificacion = models.ImageField(upload_to='verificacion_diaria/%Y/%m/%d/')
+    foto_verificacion = models.ImageField(upload_to='verificacion_diaria/%Y/%m/%d/', null=True, blank=True)
     def __str__(self): return f"Asistencia Diaria de {self.docente} - {self.fecha}"
 
 class SolicitudIntercambio(models.Model):
@@ -159,6 +229,8 @@ class ConfiguracionInstitucion(models.Model):
         blank=True, 
         help_text="Seleccione la facultad o carrera principal para la cual se está configurando el sistema."
     )
+    tiempo_limite_tardanza = models.PositiveIntegerField(default=10, help_text="Minutos de tolerancia para considerar una asistencia como tardanza.")
+    nombre_dashboard = models.CharField(max_length=100, default="Gestión Docente", help_text="El nombre que se mostrará en el dashboard.")
     
     class Meta:
         verbose_name = "Configuración de la Institución"; verbose_name_plural = "Configuración de la Institución"
@@ -167,7 +239,9 @@ class ConfiguracionInstitucion(models.Model):
     
     @classmethod
     def load(cls):
-        obj, created = cls.objects.get_or_create(pk=1)
+        obj = cls.objects.first()
+        if obj is None:
+            obj = cls.objects.create()
         return obj
 
 class PersonalDocente(Docente):
@@ -177,3 +251,70 @@ class PersonalDocente(Docente):
 class Administrador(Docente):
     class Meta:
         proxy = True; verbose_name = 'Administrador'; verbose_name_plural = 'Administradores'
+
+class Notificacion(models.Model):
+    destinatario = models.ForeignKey(Docente, on_delete=models.CASCADE, related_name='notificaciones')
+    mensaje = models.CharField(max_length=255)
+    leido = models.BooleanField(default=False)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    url = models.CharField(max_length=255, blank=True, help_text="URL a la que la notificación debe dirigir.")
+
+    class Meta:
+        ordering = ['-fecha_creacion']
+        verbose_name = "Notificación"
+        verbose_name_plural = "Notificaciones"
+
+    def __str__(self):
+        return f"Notificación para {self.destinatario.username}: {self.mensaje[:30]}..."
+
+class Anuncio(models.Model):
+    titulo = models.CharField(max_length=200)
+    contenido = models.TextField()
+    fecha_publicacion = models.DateTimeField(auto_now_add=True)
+    autor = models.ForeignKey(Docente, on_delete=models.SET_NULL, null=True, limit_choices_to={'is_staff': True})
+
+    class Meta:
+        ordering = ['-fecha_publicacion']
+        verbose_name = "Anuncio"
+        verbose_name_plural = "Anuncios"
+
+    def __str__(self):
+        return self.titulo
+
+class TipoJustificacion(models.Model):
+    nombre = models.CharField(max_length=100, unique=True, help_text="Ej: Licencia Médica, Comisión de Servicio, Permiso Personal")
+
+    def __str__(self):
+        return self.nombre
+
+class Justificacion(models.Model):
+    ESTADOS_APROBACION = [
+        ('PENDIENTE', 'Pendiente'),
+        ('APROBADO', 'Aprobado'),
+        ('RECHAZADO', 'Rechazado'),
+    ]
+
+    docente = models.ForeignKey(Docente, on_delete=models.CASCADE, related_name='justificaciones')
+    tipo = models.ForeignKey(TipoJustificacion, on_delete=models.PROTECT, related_name='justificaciones')
+    fecha_inicio = models.DateField()
+    fecha_fin = models.DateField()
+    motivo = models.TextField(help_text="Explique brevemente el motivo de su ausencia.")
+    documento_adjunto = models.FileField(upload_to='justificaciones/', blank=True, null=True, help_text="Opcional: Adjunte un documento que respalde su solicitud (PDF, imagen, etc.)")
+    estado = models.CharField(max_length=20, choices=ESTADOS_APROBACION, default='PENDIENTE')
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_revision = models.DateTimeField(null=True, blank=True)
+    revisado_por = models.ForeignKey(Docente, on_delete=models.SET_NULL, null=True, blank=True, related_name='justificaciones_revisadas', limit_choices_to={'is_staff': True})
+    observaciones_revision = models.TextField(blank=True, help_text="Notas internas del administrador que revisa la solicitud. Visibles solo para otros administradores.")
+
+    def __str__(self):
+        return f"Justificación de {self.docente} ({self.fecha_inicio} al {self.fecha_fin}) - {self.get_estado_display()}"
+
+    def clean(self):
+        if self.fecha_inicio > self.fecha_fin:
+            raise ValidationError("La fecha de inicio no puede ser posterior a la fecha de fin.")
+
+    class Meta:
+        ordering = ['-fecha_creacion']
+
+# Importar modelos de módulos separados para mantener el código organizado
+from .models_inventario import *
