@@ -22,7 +22,7 @@
                             {% if color == 'success' %}<div class="bg-green-100 text-green-600 p-3 rounded-full">{% endif %}
                             {% if color == 'warning' %}<div class="bg-yellow-100 text-yellow-600 p-3 rounded-full">{% endif %}
                             {% if color == 'danger' %}<div class="bg-red-100 text-red-600 p-3 rounded-full">{% endif %}
-                                {% component "unfold/components/icon.html" with name=kpi.icon class="w-6 h-6" %}
+                                {% component "unfold/components/icon.html" with name=kpi.icon class="w-6 h-6" %}{% endcomponent %}
                             </div>
                         {% endwith %}
                     </div>
