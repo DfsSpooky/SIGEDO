@@ -19,6 +19,7 @@
     </style>
 </head>
 <body class="flex items-center justify-center h-screen text-white font-sans">
+    {% csrf_token %}
 
     <div id="real-time-clock" class="fixed top-5 right-5 text-2xl font-bold bg-black/30 px-4 py-2 rounded-lg backdrop-blur-sm z-20"></div>
     <div id="kiosk-alert" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 p-4 rounded-lg shadow-lg text-white">
@@ -115,10 +116,21 @@
             requestAnimationFrame(tick);
         }
 
+        function getCsrfToken() {
+            return document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        }
+
         async function handleQRCode(qrId) {
             scanFeedback.textContent = "¡QR Detectado! Obteniendo información...";
             try {
-                const response = await fetch('/api/get-teacher-info/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ qrId: qrId }) });
+                const response = await fetch('/api/get-teacher-info/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken()
+                    },
+                    body: JSON.stringify({ qrId: qrId })
+                });
                 const data = await response.json();
                 if (!response.ok) { throw new Error(data.message || 'Error desconocido.'); }
                 displayInfoAndActions(data);
@@ -131,7 +143,14 @@
             const photoBase64 = canvasElement.toDataURL('image/jpeg', 0.7); // Comprimir a JPEG al 70% de calidad
             document.querySelectorAll('#attendance-actions button').forEach(b => { b.disabled = true; b.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...'; b.classList.add('opacity-50'); });
             try {
-                const response = await fetch('/api/mark-attendance/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ qrId, actionType, courseId, photoBase64 }) });
+                const response = await fetch('/api/mark-attendance/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken()
+                    },
+                    body: JSON.stringify({ qrId, actionType, courseId, photoBase64 })
+                });
                 const result = await response.json();
                 if (result.status === 'success') {
                     let message = `Asistencia registrada a las ${horaDeMarcacion}`;
@@ -181,7 +200,14 @@
         async function handleRFID(uid) {
             scanFeedback.textContent = "Procesando tarjeta RFID...";
             try {
-                const response = await fetch('/api/asistencia_rfid/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid: uid }) });
+                const response = await fetch('/api/asistencia_rfid/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken()
+                    },
+                    body: JSON.stringify({ uid: uid })
+                });
                 const data = await response.json();
                 if (!response.ok && response.status !== 404) { throw new Error(data.message || 'Error desconocido.'); }
                 displayInfoAndActions(data); // Reutilizamos la función de display
@@ -263,8 +289,9 @@
         }
 
         // --- LÓGICA PARA WEBSOCKETS ---
+        const socketProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const kioskSocket = new WebSocket(
-            'ws://'
+            socketProtocol + '//'
             + window.location.host
             + '/ws/kiosk/'
         );
