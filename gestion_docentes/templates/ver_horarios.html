@@ -46,20 +46,20 @@
                         <div>{{ franja.hora_fin|time:"h:i A" }}</div>
                     </td>
                     {% for dia in dias_semana %}
-                        {% with curso=horario_grid|get_item:franja.id|get_item:dia %}
-                            {% if curso != 'OCUPADO' %}
-                                <td class="p-1.5 border-b border-gray-200 align-top relative" {% if curso and curso.duracion_bloques > 1 %}rowspan="{{ curso.duracion_bloques }}"{% endif %}>
-                                    {% if curso %}
+                        {% with bloque=horario_grid|get_item:franja.id|get_item:dia %}
+                            {% if bloque != 'OCUPADO' %}
+                                <td class="p-1.5 border-b border-gray-200 align-top relative" {% if bloque and bloque.duracion_bloques > 1 %}rowspan="{{ bloque.duracion_bloques }}"{% endif %}>
+                                    {% if bloque %}
                                         <div class="h-full bg-sky-100 text-sky-900 border-l-4 border-sky-500 p-3 rounded-md text-sm shadow-sm flex flex-col justify-between">
                                             <div>
-                                                <p class="font-bold">{{ curso.nombre }}</p>
-                                                <p class="text-xs text-gray-700 mt-1">{{ curso.docente }}</p>
+                                                <p class="font-bold">{{ bloque.curso.nombre }}</p>
+                                                <p class="text-xs text-gray-700 mt-1">{{ bloque.curso.docente }}</p>
                                                 <p class="text-xs text-gray-500 mt-2">
-                                                    <span class="font-semibold">Aula:</span> {{ curso.aula|default:"Por asignar" }}
+                                                    <span class="font-semibold">Aula:</span> {{ bloque.curso.aula|default:"Por asignar" }}
                                                 </p>
                                             </div>
-                                            {% if curso.docente == user %}
-                                                <a href="{% url 'solicitar_intercambio' curso.id %}" class="text-xs font-semibold text-sky-600 hover:underline self-end mt-2">Solicitar Intercambio</a>
+                                            {% if bloque.curso.docente == user %}
+                                                <a href="{% url 'solicitar_intercambio' bloque.curso.id %}" class="text-xs font-semibold text-sky-600 hover:underline self-end mt-2">Solicitar Intercambio</a>
                                             {% endif %}
                                         </div>
                                     {% endif %}

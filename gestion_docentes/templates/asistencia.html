@@ -5,7 +5,7 @@
     {% if error %}
         <p class="text-red-500">{{ error }}</p>
     {% elif curso_actual %}
-        <p class="mb-4">Curso actual: {{ curso_actual.nombre }} ({{ curso_actual.horario_inicio|time:"H:i" }} - {{ curso_actual.horario_fin|time:"H:i" }})</p>
+        <p class="mb-4">Curso actual: {{ curso_actual.nombre }} ({{ curso_actual.bloque_actual.hora_inicio|time:"H:i" }} - {{ curso_actual.bloque_actual.hora_fin|time:"H:i" }})</p>
         
         {% if asistencia %}
             <div class="mb-4 p-4 border rounded {% if asistencia.hora_salida %}bg-green-100 border-green-300{% elif asistencia.hora_entrada %}bg-yellow-100 border-yellow-300{% endif %}">

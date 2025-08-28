@@ -68,7 +68,7 @@
                 {% if proximo_curso %}
                     <p class="text-4xl font-bold mt-2 text-base-content">{{ proximo_curso.nombre }}</p>
                     <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-base-content/80">
-                        <p><i class="fas fa-clock fa-fw mr-2 opacity-70"></i> <strong>Hora:</strong> {{ proximo_curso.horario_inicio|time:"h:i A" }} - {{ proximo_curso.horario_fin|time:"h:i A" }}</p>
+                        <p><i class="fas fa-clock fa-fw mr-2 opacity-70"></i> <strong>Hora:</strong> {{ proximo_curso.bloque_actual.hora_inicio|time:"h:i A" }} - {{ proximo_curso.bloque_actual.hora_fin|time:"h:i A" }}</p>
                         <p><i class="fas fa-book fa-fw mr-2 opacity-70"></i> <strong>Carrera:</strong> {{ proximo_curso.carrera.nombre }}</p>
                     </div>
                 {% else %}

@@ -11,7 +11,6 @@ urlpatterns = [
     path('', views.dashboard, name='dashboard'),
     path('perfil/', views.perfil, name='perfil'),
     path('horarios/<int:carrera_id>/', views.ver_horarios, name='ver_horarios'),
-    path('horarios/<int:carrera_id>/generar/', views.generar_horarios, name='generar_horarios'),
     path('intercambio/<int:curso_id>/', views.solicitar_intercambio, name='solicitar_intercambio'),
     path('solicitudes/', views.ver_solicitudes, name='ver_solicitudes'),
     path('solicitudes/<int:solicitud_id>/responder/', views.responder_solicitud, name='responder_solicitud'),
