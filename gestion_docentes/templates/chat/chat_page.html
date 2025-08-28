@@ -58,12 +58,12 @@
                 </div>
                 <form id="chat-form" class="flex items-center gap-2">
                     <div class="relative flex-grow">
-                        <input type="text" id="chat-message-input" placeholder="Escribe un mensaje..." class="input input-bordered w-full pr-12" autocomplete="off" />
-                        <button type="button" id="emoji-btn" class="btn btn-ghost btn-sm absolute inset-y-0 right-0 my-1">
+                        <input type="text" id="chat-message-input" placeholder="Conectando al chat..." class="input input-bordered w-full pr-12" autocomplete="off" disabled />
+                        <button type="button" id="emoji-btn" class="btn btn-ghost btn-sm absolute inset-y-0 right-0 my-1" disabled>
                             <i class="far fa-smile text-xl"></i>
                         </button>
                     </div>
-                    <button type="submit" class="btn btn-primary btn-square">
+                    <button type="submit" class="btn btn-primary btn-square" disabled>
                         <i class="fas fa-paper-plane"></i>
                     </button>
                 </form>
@@ -271,9 +271,20 @@ document.addEventListener('DOMContentLoaded', function() {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         chatSocket = new WebSocket(`${protocol}//${window.location.host}/ws/chat/`);
 
-        chatSocket.onopen = () => console.log("Chat WebSocket connected.");
+        chatSocket.onopen = () => {
+            console.log("Chat WebSocket connected.");
+            chatMessageInputEl.disabled = false;
+            emojiBtn.disabled = false;
+            chatFormEl.querySelector('button[type="submit"]').disabled = false;
+            chatMessageInputEl.placeholder = "Escribe un mensaje...";
+        };
+
         chatSocket.onclose = () => {
             console.error('Chat WebSocket closed. Reconnecting...');
+            chatMessageInputEl.disabled = true;
+            emojiBtn.disabled = true;
+            chatFormEl.querySelector('button[type="submit"]').disabled = true;
+            chatMessageInputEl.placeholder = "Reconectando...";
             setTimeout(connectWebSocket, 5000);
         };
         chatSocket.onmessage = (e) => {
