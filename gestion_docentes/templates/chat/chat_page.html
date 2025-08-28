@@ -118,12 +118,20 @@
 {% endblock %}
 
 {% block extra_js %}
+<script>
+    // Inyectar datos del usuario actual en el scope de JS
+    const currentUser = {
+        id: {{ request.user.id }},
+        firstName: "{{ request.user.first_name|escapejs }}",
+        photoUrl: "{% if request.user.foto and request.user.foto.url %}{{ request.user.foto.url }}{% else %}{% static 'placeholder.png' %}{% endif %}"
+    };
+</script>
 <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js"></script>
 <script>
 // TODO: Refactor this into a separate static JS file
 document.addEventListener('DOMContentLoaded', function() {
     // --- STATE ---
-    const currentUserId = {{ request.user.id }};
+    const currentUserId = currentUser.id;
     let activeConversationId = null;
     let conversations = new Map();
     let activeConversationMessages = [];
@@ -293,6 +301,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = JSON.parse(e.data);
             if (data.type === 'new_message') {
                 const message = data.message;
+
+                // If the message is from the current user, ignore it, as it was already added optimistically.
+                if (message.sender.id === currentUser.id) {
+                    // We might want to update the message ID from temporary to permanent,
+                    // but for now, we'll just ignore the echo.
+                    return;
+                }
+
                 const convo = conversations.get(message.conversation);
                 if (convo) {
                     convo.last_message = message;
@@ -350,11 +366,39 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         const content = chatMessageInputEl.value.trim();
         if (content && activeConversationId && chatSocket) {
+            // Send the message through the WebSocket
             chatSocket.send(JSON.stringify({
                 'type': 'chat.new_message',
                 'conversation_id': activeConversationId,
                 'content': content
             }));
+
+            // --- Optimistic UI Update ---
+            // Create a temporary message object to display immediately.
+            const optimisticMessage = {
+                id: Date.now(), // Temporary ID
+                conversation: activeConversationId,
+                sender: {
+                    id: currentUser.id,
+                    first_name: currentUser.firstName,
+                    foto: currentUser.photoUrl
+                },
+                content: content,
+                timestamp: new Date().toISOString()
+            };
+
+            // Add to the message list and re-render
+            activeConversationMessages.push(optimisticMessage);
+            renderMessages(activeConversationMessages);
+
+            // Update the conversation list's last message
+            const convo = conversations.get(activeConversationId);
+            if (convo) {
+                convo.last_message = optimisticMessage;
+                renderConversations();
+            }
+
+            // Clear the input field
             chatMessageInputEl.value = '';
         }
     });
