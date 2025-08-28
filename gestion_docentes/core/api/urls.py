@@ -14,7 +14,6 @@ urlpatterns = [
     path('asignar-horario/', views.api_asignar_horario, name='asignar_horario'),
     path('desasignar-horario/', views.api_desasignar_horario, name='desasignar_horario'),
     path('get-teacher-conflicts/', views.api_get_teacher_conflicts, name='get_teacher_conflicts'),
-    path('auto-asignar/', views.api_auto_asignar, name='auto_asignar'),
     path('generar-horario-automatico/', views.generar_horario_automatico, name='generar_horario_automatico'),
     path('get-cursos-no-asignados/', views.api_get_cursos_no_asignados, name='get_cursos_no_asignados'),
 

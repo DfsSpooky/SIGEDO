@@ -18,8 +18,9 @@ from django.templatetags.static import static
 # Imports relativos al estar en un subdirectorio
 from ..models import (
     Docente, Curso, Asistencia, AsistenciaDiaria, ConfiguracionInstitucion,
-    Semestre, DiaEspecial, Especialidad, FranjaHoraria, Notificacion
+    Semestre, DiaEspecial, Especialidad, FranjaHoraria, Notificacion, BloqueCurso
 )
+from django.db.models import Sum
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from ..utils.responses import success_response, error_response, not_found_response, server_error_response
@@ -44,8 +45,10 @@ class TeacherInfoView(APIView):
             return Response({'status': 'error', 'message': 'qrId no proporcionado.'}, status=status.HTTP_400_BAD_REQUEST)
 
         today = timezone.localtime(timezone.now()).date()
+        DIAS_MAP = {0: 'Lunes', 1: 'Martes', 2: 'Miércoles', 3: 'Jueves', 4: 'Viernes', 5: 'Sábado', 6: 'Domingo'}
+        dia_de_hoy_str = DIAS_MAP.get(today.weekday())
 
-        if today.weekday() in [5, 6]: # Sábado=5, Domingo=6
+        if dia_de_hoy_str in ['Sábado', 'Domingo']:
             return Response({'status': 'weekend_off', 'message': 'El kiosco no está disponible los fines de semana.'})
 
         try:
@@ -57,16 +60,16 @@ class TeacherInfoView(APIView):
         if not semestre_activo:
             return Response({'status': 'error', 'message': 'No hay un semestre académico activo.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Usamos la consulta optimizada con el campo `dia_semana`
-        dia_semana_hoy = today.weekday()
-        cursos_hoy = Curso.objects.filter(
-            docente=docente,
-            semestre=semestre_activo,
-            dia_semana=dia_semana_hoy
-        )
+        # La consulta ahora se basa en los BloqueCurso para el día de hoy
+        bloques_hoy = BloqueCurso.objects.filter(
+            curso__docente=docente,
+            curso__semestre=semestre_activo,
+            dia=dia_de_hoy_str
+        ).select_related('curso')
 
-        # Para cada curso del día, nos aseguramos de que exista un registro de asistencia
-        # Esto simplifica la lógica y asegura que siempre tengamos un objeto para serializar.
+        cursos_hoy_ids = set(b.curso.id for b in bloques_hoy)
+        cursos_hoy = Curso.objects.filter(id__in=cursos_hoy_ids)
+
         asistencias = []
         for curso in cursos_hoy:
             asistencia, _ = Asistencia.objects.get_or_create(
@@ -76,7 +79,6 @@ class TeacherInfoView(APIView):
             )
             asistencias.append(asistencia)
 
-        # Usamos los serializers para construir la respuesta
         docente_serializer = DocenteInfoSerializer(docente, context={'request': request})
         cursos_asistencia_serializer = CursoAsistenciaSerializer(asistencias, many=True)
         is_daily_marked = AsistenciaDiaria.objects.filter(docente=docente, fecha=today).exists()
@@ -156,7 +158,16 @@ class MarkAttendanceView(APIView):
                 asistencia.foto_entrada = photo_file
                 response_data['es_tardanza'] = asistencia.es_tardanza()
 
-                duracion_minima_minutos = (curso.duracion_bloques * 50) - 15
+                # TODO: La lógica de duración mínima debe ser más inteligente.
+                # Si un curso tiene múltiples bloques, ¿cuál usamos?
+                # Por ahora, usamos el primer bloque del día para ese curso.
+                DIAS_MAP = {0: 'Lunes', 1: 'Martes', 2: 'Miércoles', 3: 'Jueves', 4: 'Viernes'}
+                dia_de_hoy_str = DIAS_MAP.get(today.weekday())
+                bloque_del_dia = BloqueCurso.objects.filter(curso=curso, dia=dia_de_hoy_str).order_by('hora_inicio').first()
+
+                duracion_bloques_actual = bloque_del_dia.duracion_bloques if bloque_del_dia else 2 # Default a 2 si no se encuentra
+
+                duracion_minima_minutos = (duracion_bloques_actual * 50) - 15
                 if duracion_minima_minutos < 15: duracion_minima_minutos = 15
                 asistencia.hora_salida_permitida = now + timedelta(minutes=duracion_minima_minutos)
                 asistencia.save()
@@ -230,38 +241,86 @@ class RegistrarAsistenciaRfidView(APIView):
 @staff_member_required
 @csrf_exempt
 def api_asignar_horario(request):
-    if request.method == 'POST':
+    if request.method != 'POST':
+        return error_response('Método no permitido', status_code=405)
+
+    try:
         data = json.loads(request.body)
-        curso_id = data.get('curso_id'); franja_id_inicio = data.get('franja_id'); dia = data.get('dia')
-        try:
-            curso = Curso.objects.get(pk=curso_id); franja_inicio = FranjaHoraria.objects.get(pk=franja_id_inicio)
-            docente = curso.docente; semestre = curso.semestre
+        curso_id = data.get('curso_id')
+        franja_id_inicio = data.get('franja_id')
+        dia = data.get('dia')
+        duracion_bloques = int(data.get('duracion_bloques', 1))
 
-            todas_las_franjas = list(FranjaHoraria.objects.order_by('hora_inicio'))
-            start_index = todas_las_franjas.index(franja_inicio)
-            franjas_a_ocupar = todas_las_franjas[start_index : start_index + curso.duracion_bloques]
+        curso = Curso.objects.get(pk=curso_id)
+        franja_inicio = FranjaHoraria.objects.get(pk=franja_id_inicio)
+        docente = curso.docente
+        semestre = curso.semestre
 
-            for franja in franjas_a_ocupar:
-                if (docente.disponibilidad == 'MANANA' and franja.turno != 'MANANA') or (docente.disponibilidad == 'TARDE' and franja.turno != 'TARDE'):
-                    return error_response('Conflicto de Disponibilidad del docente.')
-                conflicto_docente = Curso.objects.filter(docente=docente, semestre=semestre, dia=dia, horario_inicio=franja.hora_inicio).exclude(pk=curso.id).first()
-                if conflicto_docente:
-                    return error_response(f'Conflicto: El docente ya dicta "{conflicto_docente.nombre}" en este horario.')
+        # Verificar que el docente existe
+        if not docente:
+            return error_response('El curso no tiene un docente asignado.')
 
-            grupo = curso.especialidad.grupo if curso.especialidad else None
-            if grupo:
-                q_conflicto = models.Q(especialidad__grupo=grupo, semestre_cursado=curso.semestre_cursado, dia=dia, horario_inicio__in=[f.hora_inicio for f in franjas_a_ocupar])
-                if curso.tipo_curso == 'ESPECIALIDAD':
-                    conflicto_grupo = Curso.objects.filter(q_conflicto, tipo_curso='GENERAL').first()
-                    if conflicto_grupo: return error_response(f'Conflicto de Grupo: El curso general "{conflicto_grupo.nombre}" ya está programado.')
-                else: # GENERAL
-                    conflicto_grupo = Curso.objects.filter(q_conflicto, tipo_curso='ESPECIALIDAD').first()
-                    if conflicto_grupo: return error_response(f'Conflicto de Grupo: El curso "{conflicto_grupo.nombre}" ({conflicto_grupo.especialidad.nombre}) ya está programado.')
+        # Verificar que la asignación no exceda las horas semanales del curso
+        horas_ya_asignadas = curso.bloques.aggregate(total=Sum('duracion_bloques'))['total'] or 0
+        if horas_ya_asignadas + duracion_bloques > curso.horas_semanales:
+            return error_response(f'El curso ya tiene {horas_ya_asignadas} de {curso.horas_semanales} horas asignadas. Este bloque excede el total.')
 
-            curso.dia = dia; curso.horario_inicio = franja_inicio.hora_inicio; curso.horario_fin = franjas_a_ocupar[-1].hora_fin; curso.save()
-            return success_response(message='Curso asignado con éxito.')
-        except Exception as e:
-            return error_response(str(e))
+        # Lógica de comprobación de conflictos
+        todas_las_franjas = list(FranjaHoraria.objects.order_by('hora_inicio'))
+        start_index = todas_las_franjas.index(franja_inicio)
+        franjas_a_ocupar = todas_las_franjas[start_index : start_index + duracion_bloques]
+
+        if len(franjas_a_ocupar) < duracion_bloques:
+            return error_response('La duración del bloque excede las franjas horarias disponibles para el día.')
+
+        horas_a_ocupar = [f.hora_inicio for f in franjas_a_ocupar]
+
+        # Conflicto de disponibilidad y de horario del docente
+        for franja in franjas_a_ocupar:
+            if (docente.disponibilidad == 'MANANA' and franja.turno != 'MANANA') or \
+               (docente.disponibilidad == 'TARDE' and franja.turno != 'TARDE'):
+                return error_response('Conflicto de Disponibilidad: El bloque choca con la disponibilidad del docente.')
+
+            if BloqueCurso.objects.filter(curso__docente=docente, curso__semestre=semestre, dia=dia, hora_inicio=franja.hora_inicio).exists():
+                conflicto = BloqueCurso.objects.get(curso__docente=docente, curso__semestre=semestre, dia=dia, hora_inicio=franja.hora_inicio)
+                return error_response(f'Conflicto de Docente: Ya dicta "{conflicto.curso.nombre}" en este horario.')
+
+        # Conflicto de grupo de estudiantes
+        grupo = curso.especialidad.grupo if curso.especialidad else None
+        if grupo:
+            q_conflicto_base = Q(curso__especialidad__grupo=grupo, curso__semestre_cursado=curso.semestre_cursado, dia=dia)
+
+            # Un curso de especialidad no puede chocar con uno general del mismo grupo/semestre
+            if curso.tipo_curso == 'ESPECIALIDAD':
+                q_conflicto = q_conflicto_base & Q(curso__tipo_curso='GENERAL', hora_inicio__in=horas_a_ocupar)
+                if BloqueCurso.objects.filter(q_conflicto).exists():
+                    conflicto = BloqueCurso.objects.filter(q_conflicto).first()
+                    return error_response(f'Conflicto de Grupo: Choca con el curso general "{conflicto.curso.nombre}".')
+
+            # Un curso general no puede chocar con uno de especialidad
+            else: # GENERAL
+                q_conflicto = q_conflicto_base & Q(curso__tipo_curso='ESPECIALIDAD', hora_inicio__in=horas_a_ocupar)
+                if BloqueCurso.objects.filter(q_conflicto).exists():
+                    conflicto = BloqueCurso.objects.filter(q_conflicto).first()
+                    return error_response(f'Conflicto de Grupo: Choca con el curso "{conflicto.curso.nombre}" de {conflicto.curso.especialidad.nombre}.')
+
+        # Crear el nuevo bloque de curso
+        BloqueCurso.objects.create(
+            curso=curso,
+            dia=dia,
+            hora_inicio=franja_inicio.hora_inicio,
+            hora_fin=franjas_a_ocupar[-1].hora_fin,
+            duracion_bloques=duracion_bloques
+        )
+
+        return success_response(message='Bloque de curso asignado con éxito.')
+    except Curso.DoesNotExist:
+        return error_response('El curso especificado no existe.', status_code=404)
+    except FranjaHoraria.DoesNotExist:
+        return error_response('La franja horaria especificada no existe.', status_code=404)
+    except Exception as e:
+        return error_response(f'Ocurrió un error inesperado: {str(e)}', status_code=500)
+
 
 @staff_member_required
 @csrf_exempt
@@ -269,15 +328,10 @@ def api_desasignar_horario(request):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            curso_id = data.get('curso_id')
-            curso = Curso.objects.get(pk=curso_id)
-
-            curso.dia = None
-            curso.horario_inicio = None
-            curso.horario_fin = None
-            curso.save()
-
-            return success_response(message='Curso devuelto a la lista de pendientes.')
+            bloque_id = data.get('bloque_id')
+            bloque = get_object_or_404(BloqueCurso, pk=bloque_id)
+            bloque.delete()
+            return success_response(message='Bloque de curso eliminado.')
         except Exception as e:
             return error_response(str(e))
 
@@ -299,48 +353,49 @@ def api_get_teacher_conflicts(request):
 
         conflictos = []
         todas_las_franjas = list(FranjaHoraria.objects.order_by('hora_inicio'))
-        cursos_asignados = Curso.objects.filter(semestre=semestre, dia__isnull=False).exclude(pk=curso_id)
+        franjas_map_id = {franja.hora_inicio: franja.id for franja in todas_las_franjas}
 
-        for curso in cursos_asignados.filter(docente=docente):
-            try:
-                franja_inicio_obj = next(f for f in todas_las_franjas if f.hora_inicio == curso.horario_inicio)
-                start_index = todas_las_franjas.index(franja_inicio_obj)
-                for i in range(curso.duracion_bloques):
-                    if (start_index + i) < len(todas_las_franjas):
-                        franja_ocupada = todas_las_franjas[start_index + i]
-                        conflictos.append({'dia': curso.dia, 'franja_id': franja_ocupada.id})
-            except (StopIteration, TypeError, AttributeError): continue
+        # Obtener todos los bloques relevantes de una sola vez
+        bloques_asignados = BloqueCurso.objects.filter(curso__semestre=semestre).select_related('curso__docente', 'curso__especialidad__grupo')
 
+        # Conflictos del propio docente
+        for bloque in bloques_asignados.filter(curso__docente=docente):
+            if bloque.curso_id == curso_a_asignar.id: continue
+            start_index = todas_las_franjas.index(next(f for f in todas_las_franjas if f.hora_inicio == bloque.hora_inicio))
+            for i in range(bloque.duracion_bloques):
+                franja_ocupada = todas_las_franjas[start_index + i]
+                conflictos.append({'dia': bloque.dia, 'franja_id': franja_ocupada.id})
+
+        # Conflictos de grupo
         if grupo_del_curso:
+            q_grupo_base = Q(curso__especialidad__grupo=grupo_del_curso, curso__semestre_cursado=semestre_cursado_a_asignar)
+
             if curso_a_asignar.tipo_curso == 'ESPECIALIDAD':
-                cursos_conflicto = cursos_asignados.filter(especialidad__grupo=grupo_del_curso, tipo_curso='GENERAL', semestre_cursado=semestre_cursado_a_asignar)
-            else: # Es GENERAL
-                cursos_conflicto = cursos_asignados.filter(especialidad__grupo=grupo_del_curso, tipo_curso='ESPECIALIDAD', semestre_cursado=semestre_cursado_a_asignar)
+                bloques_conflicto = bloques_asignados.filter(q_grupo_base & Q(curso__tipo_curso='GENERAL'))
+            else: # GENERAL
+                bloques_conflicto = bloques_asignados.filter(q_grupo_base & Q(curso__tipo_curso='ESPECIALIDAD'))
 
-            for curso in cursos_conflicto:
-                try:
-                    franja_inicio_obj = next(f for f in todas_las_franjas if f.hora_inicio == curso.horario_inicio)
-                    start_index = todas_las_franjas.index(franja_inicio_obj)
-                    for i in range(curso.duracion_bloques):
-                        if (start_index + i) < len(todas_las_franjas):
-                            franja_ocupada = todas_las_franjas[start_index + i]
-                            conflictos.append({'dia': curso.dia, 'franja_id': franja_ocupada.id})
-                except (StopIteration, TypeError, AttributeError): continue
+            for bloque in bloques_conflicto:
+                start_index = todas_las_franjas.index(next(f for f in todas_las_franjas if f.hora_inicio == bloque.hora_inicio))
+                for i in range(bloque.duracion_bloques):
+                    franja_ocupada = todas_las_franjas[start_index + i]
+                    conflictos.append({'dia': bloque.dia, 'franja_id': franja_ocupada.id})
 
+        # Indisponibilidad del docente
         if docente:
-            disponibilidad = docente.disponibilidad
-            franjas_no_disponibles = []
-            if disponibilidad == 'MANANA':
-                franjas_no_disponibles = FranjaHoraria.objects.filter(turno__in=['TARDE', 'NOCHE'])
-            elif disponibilidad == 'TARDE':
-                franjas_no_disponibles = FranjaHoraria.objects.filter(turno__in=['MANANA', 'NOCHE'])
+            franjas_no_disponibles_ids = set()
+            if docente.disponibilidad == 'MANANA':
+                franjas_no_disponibles_ids = set(FranjaHoraria.objects.filter(turno__in=['TARDE', 'NOCHE']).values_list('id', flat=True))
+            elif docente.disponibilidad == 'TARDE':
+                franjas_no_disponibles_ids = set(FranjaHoraria.objects.filter(turno__in=['MANANA', 'NOCHE']).values_list('id', flat=True))
 
-            dias_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
-            for franja in franjas_no_disponibles:
+            if franjas_no_disponibles_ids:
+                dias_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
                 for dia in dias_semana:
-                    conflictos.append({'dia': dia, 'franja_id': franja.id})
+                    for franja_id in franjas_no_disponibles_ids:
+                        conflictos.append({'dia': dia, 'franja_id': franja_id})
 
-        return success_response(data={'conflicts': conflictos})
+        return success_response(data={'conflicts': list({tuple(d.items()) for d in conflictos})}) # Eliminar duplicados
 
     except Curso.DoesNotExist:
         return not_found_response('Curso no encontrado.')
@@ -356,40 +411,60 @@ def _get_planner_data(especialidad_id, semestre_cursado):
     cursos_no_asignados_especialidad = []
 
     if especialidad_id and semestre_cursado:
-        especialidad_obj = Especialidad.objects.get(id=especialidad_id)
+        especialidad_obj = get_object_or_404(Especialidad, id=especialidad_id)
         grupo_obj = especialidad_obj.grupo
 
+        # Cursos con horas pendientes de asignar
         q_cursos_base = Q(semestre=semestre_activo, semestre_cursado=semestre_cursado)
-
-        q_no_asignados = q_cursos_base & Q(dia__isnull=True)
-        cursos_para_filtrar = Curso.objects.filter(q_no_asignados).select_related('docente', 'especialidad')
-
-        for curso in cursos_para_filtrar:
-            curso_data = {
-                'id': curso.id, 'nombre': curso.nombre, 'semestre_cursado': curso.semestre_cursado,
-                'tipo_curso': curso.tipo_curso, 'docente__first_name': curso.docente.first_name if curso.docente else '',
-                'docente__last_name': curso.docente.last_name if curso.docente else 'N/A', 'duracion_bloques': curso.duracion_bloques
-            }
-            if curso.tipo_curso == 'GENERAL' and curso.especialidad.grupo == grupo_obj:
-                cursos_no_asignados_generales.append(curso_data)
-            elif curso.especialidad_id == int(especialidad_id):
-                cursos_no_asignados_especialidad.append(curso_data)
-
-        q_cursos_asignados = q_cursos_base & Q(dia__isnull=False) & (
-            Q(especialidad_id=especialidad_id) | Q(especialidad__grupo=grupo_obj, tipo_curso='GENERAL')
+        cursos_del_semestre = Curso.objects.filter(q_cursos_base).annotate(
+            horas_asignadas=Sum('bloques__duracion_bloques')
         )
-        cursos_asignados_qs = Curso.objects.filter(q_cursos_asignados).select_related('docente', 'especialidad', 'especialidad__grupo')
+
+        for curso in cursos_del_semestre:
+            horas_asignadas = curso.horas_asignadas or 0
+            if horas_asignadas < curso.horas_semanales:
+                curso_data = {
+                    'id': curso.id,
+                    'nombre': curso.nombre,
+                    'semestre_cursado': curso.semestre_cursado,
+                    'tipo_curso': curso.tipo_curso,
+                    'docente__first_name': curso.docente.first_name if curso.docente else '',
+                    'docente__last_name': curso.docente.last_name if curso.docente else 'N/A',
+                    'horas_semanales': curso.horas_semanales,
+                    'horas_asignadas': horas_asignadas,
+                    'horas_pendientes': curso.horas_semanales - horas_asignadas,
+                }
+                if curso.tipo_curso == 'GENERAL' and curso.especialidad and curso.especialidad.grupo == grupo_obj:
+                    cursos_no_asignados_generales.append(curso_data)
+                elif curso.especialidad_id == int(especialidad_id):
+                    cursos_no_asignados_especialidad.append(curso_data)
+
+        # Bloques ya asignados en el horario
+        q_bloques_asignados = Q(curso__semestre=semestre_activo, curso__semestre_cursado=semestre_cursado) & (
+            Q(curso__especialidad_id=especialidad_id) | Q(curso__especialidad__grupo=grupo_obj, curso__tipo_curso='GENERAL')
+        )
+
+        bloques_asignados_qs = BloqueCurso.objects.filter(q_bloques_asignados).select_related(
+            'curso__docente', 'curso__especialidad__grupo'
+        )
+
         franjas_map = {franja.hora_inicio: franja.id for franja in FranjaHoraria.objects.all()}
-        for curso in cursos_asignados_qs:
+        for bloque in bloques_asignados_qs:
             cursos_asignados_json.append({
-                'id': curso.id, 'nombre': curso.nombre, 'docente__first_name': curso.docente.first_name if curso.docente else '',
-                'docente__last_name': curso.docente.last_name if curso.docente else 'N/A',
-                'especialidad__nombre': curso.especialidad.nombre if curso.especialidad else 'N/A',
-                'especialidad__id': curso.especialidad.id if curso.especialidad else None,
-                'grupo_id': curso.especialidad.grupo.id if curso.especialidad and curso.especialidad.grupo else None,
-                'dia': curso.dia, 'horario_inicio': curso.horario_inicio, 'duracion_bloques': curso.duracion_bloques,
-                'franja_id_inicio': franjas_map.get(curso.horario_inicio), 'tipo_curso': curso.tipo_curso,
-                'semestre_cursado': curso.semestre_cursado,
+                'bloque_id': bloque.id,
+                'id': bloque.curso.id,
+                'nombre': bloque.curso.nombre,
+                'docente__first_name': bloque.curso.docente.first_name if bloque.curso.docente else '',
+                'docente__last_name': bloque.curso.docente.last_name if bloque.curso.docente else 'N/A',
+                'especialidad__nombre': bloque.curso.especialidad.nombre if bloque.curso.especialidad else 'N/A',
+                'especialidad__id': bloque.curso.especialidad.id if bloque.curso.especialidad else None,
+                'grupo_id': bloque.curso.especialidad.grupo.id if bloque.curso.especialidad and bloque.curso.especialidad.grupo else None,
+                'dia': bloque.dia,
+                'hora_inicio': bloque.hora_inicio,
+                'duracion_bloques': bloque.duracion_bloques,
+                'franja_id_inicio': franjas_map.get(bloque.hora_inicio),
+                'tipo_curso': bloque.curso.tipo_curso,
+                'semestre_cursado': bloque.curso.semestre_cursado,
             })
 
     return {
@@ -400,100 +475,23 @@ def _get_planner_data(especialidad_id, semestre_cursado):
         'cursos_asignados': cursos_asignados_json
     }
 
-@staff_member_required
-@csrf_exempt
-def api_auto_asignar(request):
-    if request.method != 'POST':
-        return JsonResponse({'status': 'error', 'message': 'Método no permitido'}, status=405)
+def _check_conflicts(docente, grupo, semestre_cursado, dia, franjas_a_ocupar, horarios_ocupados):
+    """Helper function to check for teacher and group conflicts."""
+    for franja in franjas_a_ocupar:
+        # Check teacher availability
+        if (docente.disponibilidad == 'MANANA' and franja.turno != 'MANANA') or \
+           (docente.disponibilidad == 'TARDE' and franja.turno != 'TARDE'):
+            return True, 'disponibilidad'
 
-    try:
-        data = json.loads(request.body)
-        especialidad_id = data.get('especialidad_id')
-        semestre_cursado = data.get('semestre_cursado')
-        semestre_activo = Semestre.objects.filter(estado='ACTIVO').first()
-        if not semestre_activo:
-            return JsonResponse({'status': 'error', 'message': 'No hay un semestre activo.'}, status=400)
+        # Check teacher schedule conflict
+        if horarios_ocupados['docente'].get((docente.id, dia, franja.id)):
+            return True, 'docente'
 
-        especialidad_obj = Especialidad.objects.get(id=especialidad_id)
-        grupo_obj = especialidad_obj.grupo
+        # Check group schedule conflict
+        if grupo and semestre_cursado and horarios_ocupados['grupo'].get((grupo.id, semestre_cursado, dia, franja.id)):
+            return True, 'grupo'
 
-        q_cursos_por_asignar = (
-            Q(especialidad_id=especialidad_id) |
-            Q(tipo_curso='GENERAL', especialidad__grupo=grupo_obj)
-        )
-
-        cursos_por_asignar = list(Curso.objects.filter(
-            q_cursos_por_asignar,
-            semestre=semestre_activo,
-            semestre_cursado=semestre_cursado,
-            dia__isnull=True
-        ).distinct().order_by('-duracion_bloques'))
-
-        franjas_horarias = list(FranjaHoraria.objects.order_by('hora_inicio'))
-        dias_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
-
-        horarios_ocupados = {}
-        cursos_ya_asignados = Curso.objects.filter(semestre=semestre_activo, dia__isnull=False)
-        for curso in cursos_ya_asignados:
-            try:
-                franja_inicio_obj = next(f for f in franjas_horarias if f.hora_inicio == curso.horario_inicio)
-                start_index = franjas_horarias.index(franja_inicio_obj)
-                for i in range(curso.duracion_bloques):
-                    franja_ocupada = franjas_horarias[start_index + i]
-                    horarios_ocupados[(curso.dia, franja_ocupada.hora_inicio, curso.docente_id)] = True
-                    if curso.especialidad and curso.especialidad.grupo:
-                        horarios_ocupados[(curso.dia, franja_ocupada.hora_inicio, curso.especialidad.grupo_id, curso.semestre_cursado)] = True
-            except (StopIteration, IndexError):
-                continue
-
-        cursos_asignados_count = 0
-        for curso in cursos_por_asignar:
-            docente = curso.docente
-            grupo = curso.especialidad.grupo if curso.especialidad else None
-            asignado = False
-            for dia in dias_semana:
-                for i, franja_inicio in enumerate(franjas_horarias):
-                    if i + curso.duracion_bloques > len(franjas_horarias): continue
-
-                    bloque_valido = True
-                    franjas_del_curso = franjas_horarias[i : i + curso.duracion_bloques]
-
-                    for franja in franjas_del_curso:
-                        if (docente.disponibilidad == 'MANANA' and franja.turno != 'MANANA') or \
-                           (docente.disponibilidad == 'TARDE' and franja.turno != 'TARDE'):
-                            bloque_valido = False; break
-                        if horarios_ocupados.get((dia, franja.hora_inicio, docente.id)):
-                            bloque_valido = False; break
-                        if grupo and horarios_ocupados.get((dia, franja.hora_inicio, grupo.id, curso.semestre_cursado)):
-                             bloque_valido = False; break
-
-                    if bloque_valido:
-                        curso.dia = dia
-                        curso.horario_inicio = franja_inicio.hora_inicio
-                        curso.horario_fin = franjas_del_curso[-1].hora_fin
-                        curso.save()
-
-                        for franja in franjas_del_curso:
-                            horarios_ocupados[(dia, franja.hora_inicio, docente.id)] = True
-                            if grupo:
-                                horarios_ocupados[(dia, franja.hora_inicio, grupo.id, curso.semestre_cursado)] = True
-
-                        cursos_asignados_count += 1
-                        asignado = True
-                        break
-                if asignado: break
-
-        message = f"Proceso finalizado. Se asignaron {cursos_asignados_count} de {len(cursos_por_asignar) + cursos_asignados_count} cursos."
-
-        planner_data = _get_planner_data(especialidad_id, semestre_cursado)
-
-        return success_response(
-            data={'plannerData': planner_data},
-            message=message
-        )
-
-    except Exception as e:
-        return error_response(str(e), status_code=500)
+    return False, None
 
 @staff_member_required
 @csrf_exempt
@@ -504,90 +502,86 @@ def generar_horario_automatico(request):
     try:
         semestre_activo = Semestre.objects.filter(estado='ACTIVO').first()
         if not semestre_activo:
-            return JsonResponse({'status': 'error', 'message': 'No hay un semestre activo configurado para la planificación.'}, status=400)
+            return error_response('No hay un semestre activo configurado.')
 
-        Curso.objects.filter(semestre=semestre_activo).update(dia=None, horario_inicio=None, horario_fin=None)
+        # Limpiar todos los bloques existentes para el semestre activo
+        BloqueCurso.objects.filter(curso__semestre=semestre_activo).delete()
 
         cursos_por_asignar = list(Curso.objects.filter(semestre=semestre_activo, docente__isnull=False)
                                   .select_related('docente', 'especialidad__grupo')
-                                  .order_by('-duracion_bloques'))
+                                  .order_by('-horas_semanales')) # Priorizar los cursos más largos
 
         total_cursos_a_asignar = len(cursos_por_asignar)
-        cursos_sin_docente = Curso.objects.filter(semestre=semestre_activo, docente__isnull=True).count()
+        cursos_sin_docente_count = Curso.objects.filter(semestre=semestre_activo, docente__isnull=True).count()
 
         franjas_horarias = list(FranjaHoraria.objects.order_by('hora_inicio'))
         dias_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
-        random.shuffle(dias_semana)
 
-        horarios_ocupados = {
-            'docente': {},
-            'grupo': {}
-        }
-
-        cursos_asignados_count = 0
-        cursos_no_asignados = []
+        horarios_ocupados = {'docente': {}, 'grupo': {}}
+        bloques_creados = []
+        cursos_no_asignados_completamente = []
 
         for curso in cursos_por_asignar:
+            horas_pendientes = curso.horas_semanales
             docente = curso.docente
             grupo = curso.especialidad.grupo if curso.especialidad and curso.especialidad.grupo else None
-            semestre_cursado = curso.semestre_cursado
 
-            asignado = False
-            random.shuffle(dias_semana)
-            for dia in dias_semana:
-                for i in range(len(franjas_horarias) - curso.duracion_bloques + 1):
-                    franja_inicio = franjas_horarias[i]
-                    franjas_del_curso = franjas_horarias[i : i + curso.duracion_bloques]
+            # Intentar asignar en bloques grandes primero (ej. 4, 3, 2, 1 horas)
+            for tamano_bloque in sorted([1, 2, 3, 4], reverse=True):
+                if horas_pendientes < tamano_bloque:
+                    continue
 
-                    bloque_valido = True
-                    for franja in franjas_del_curso:
-                        if (docente.disponibilidad == 'MANANA' and franja.turno != 'MANANA') or \
-                           (docente.disponibilidad == 'TARDE' and franja.turno != 'TARDE'):
-                            bloque_valido = False
-                            break
-                        if horarios_ocupados['docente'].get((docente.id, dia, franja.id)):
-                            bloque_valido = False
-                            break
-                        if grupo and semestre_cursado:
-                            if horarios_ocupados['grupo'].get((grupo.id, semestre_cursado, dia, franja.id)):
-                                bloque_valido = False
-                                break
+                while horas_pendientes >= tamano_bloque:
+                    bloque_asignado = False
+                    random.shuffle(dias_semana)
+                    for dia in dias_semana:
+                        for i in range(len(franjas_horarias) - tamano_bloque + 1):
+                            franja_inicio = franjas_horarias[i]
+                            franjas_del_bloque = franjas_horarias[i : i + tamano_bloque]
 
-                    if bloque_valido:
-                        curso.dia = dia
-                        curso.horario_inicio = franja_inicio.hora_inicio
-                        curso.horario_fin = franjas_del_curso[-1].hora_fin
+                            conflicto, _ = _check_conflicts(docente, grupo, curso.semestre_cursado, dia, franjas_del_bloque, horarios_ocupados)
 
-                        for franja in franjas_del_curso:
-                            horarios_ocupados['docente'][(docente.id, dia, franja.id)] = True
-                            if grupo and semestre_cursado:
-                                horarios_ocupados['grupo'][(grupo.id, semestre_cursado, dia, franja.id)] = True
+                            if not conflicto:
+                                # Si no hay conflicto, crear el bloque
+                                nuevo_bloque = BloqueCurso(
+                                    curso=curso,
+                                    dia=dia,
+                                    hora_inicio=franja_inicio.hora_inicio,
+                                    hora_fin=franjas_del_bloque[-1].hora_fin,
+                                    duracion_bloques=tamano_bloque
+                                )
+                                bloques_creados.append(nuevo_bloque)
 
-                        asignado = True
-                        break
-                if asignado:
-                    break
+                                # Actualizar horarios ocupados
+                                for franja in franjas_del_bloque:
+                                    horarios_ocupados['docente'][(docente.id, dia, franja.id)] = True
+                                    if grupo:
+                                        horarios_ocupados['grupo'][(grupo.id, curso.semestre_cursado, dia, franja.id)] = True
 
-            if asignado:
-                cursos_asignados_count += 1
-            else:
-                cursos_no_asignados.append(curso.nombre)
+                                horas_pendientes -= tamano_bloque
+                                bloque_asignado = True
+                                break # Salir del bucle de franjas
+                        if bloque_asignado:
+                            break # Salir del bucle de días
 
-        for curso in cursos_por_asignar:
-            if curso.dia:
-                curso.save()
+            if horas_pendientes > 0:
+                cursos_no_asignados_completamente.append(f"{curso.nombre} ({horas_pendientes}h pendientes)")
 
-        message = f"Proceso completado. Se asignaron exitosamente {cursos_asignados_count} de {total_cursos_a_asignar} cursos."
-        if cursos_no_asignados:
-            message += f" No se pudieron asignar {len(cursos_no_asignados)} cursos por falta de espacio o conflictos."
-        if cursos_sin_docente > 0:
-            message += f" Además, hay {cursos_sin_docente} cursos sin docente que no se pueden planificar."
+        # Guardar todos los bloques creados en la base de datos
+        BloqueCurso.objects.bulk_create(bloques_creados)
+
+        cursos_asignados_count = total_cursos_a_asignar - len(cursos_no_asignados_completamente)
+        message = f"Proceso completado. Se asignaron total o parcialmente {cursos_asignados_count} de {total_cursos_a_asignar} cursos."
+        if cursos_no_asignados_completamente:
+            message += f" No se pudieron asignar completamente {len(cursos_no_asignados_completamente)} cursos: {', '.join(cursos_no_asignados_completamente)}."
+        if cursos_sin_docente_count > 0:
+            message += f" Además, hay {cursos_sin_docente_count} cursos sin docente que no se pudieron planificar."
 
         return success_response(message=message)
 
     except Exception as e:
-        print(f"Error en generar_horario_automatico: {e}")
-        return server_error_response(f'Ocurrió un error inesperado: {e}')
+        # Considerar logging del error
+        return server_error_response(f'Ocurrió un error inesperado durante la generación del horario: {e}')
 
 @staff_member_required
 def api_get_cursos_no_asignados(request):

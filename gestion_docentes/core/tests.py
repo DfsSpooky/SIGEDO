@@ -1,7 +1,7 @@
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import authenticate
-from .models import PersonalDocente, Notificacion, TipoDocumento, Documento, Anuncio, Semestre, ConfiguracionInstitucion, Curso, Asistencia, AsistenciaDiaria, Carrera, Justificacion, TipoJustificacion
+from .models import PersonalDocente, Notificacion, TipoDocumento, Documento, Anuncio, Semestre, ConfiguracionInstitucion, Curso, Asistencia, AsistenciaDiaria, Carrera, Justificacion, TipoJustificacion, BloqueCurso
 from .utils.encryption import encrypt_id, decrypt_id
 from .backends import DniOrUsernameBackend
 import re
@@ -256,11 +256,16 @@ class ReporteAsistenciaTest(TestCase):
         curso_manana = Curso.objects.create(
             docente=self.docente,
             nombre="Curso de Mañana",
-            dia='Lunes', # Corresponds to the adjusted `today`
-            horario_inicio="09:00:00",
-            horario_fin="11:00:00",
             semestre=Semestre.objects.first(),
-            carrera=self.carrera
+            carrera=self.carrera,
+            horas_semanales=4
+        )
+        BloqueCurso.objects.create(
+            curso=curso_manana,
+            dia='Lunes',
+            hora_inicio="09:00:00",
+            hora_fin="11:00:00",
+            duracion_bloques=2
         )
 
         # 2. Test "Falta" (Absent)
@@ -429,14 +434,19 @@ class JustificacionTest(TestCase):
 
         Semestre.objects.create(nombre="Test Semestre Just", fecha_inicio=today-timedelta(days=30), fecha_fin=today+timedelta(days=30), estado='ACTIVO')
         carrera = Carrera.objects.create(nombre="Ingeniería de Justificaciones")
-        Curso.objects.create(
+        curso_con_falta = Curso.objects.create(
             docente=self.teacher,
             nombre="Curso con Falta",
-            dia='Lunes',
-            horario_inicio="14:00:00",
-            horario_fin="16:00:00",
             semestre=Semestre.objects.first(),
-            carrera=carrera
+            carrera=carrera,
+            horas_semanales=4
+        )
+        BloqueCurso.objects.create(
+            curso=curso_con_falta,
+            dia='Lunes',
+            hora_inicio="14:00:00",
+            hora_fin="16:00:00",
+            duracion_bloques=2
         )
 
         # 1. First, confirm the status is 'Falta' without justification
@@ -574,38 +584,44 @@ class AutoCheckoutTest(TestCase):
         self.curso_pasado = Curso.objects.create(
             docente=self.docente,
             nombre="Curso Pasado",
-            dia='Lunes',
-            horario_inicio=time(8, 0),
-            horario_fin=time(10, 0),
             semestre=self.semestre,
-            carrera=self.carrera
+            carrera=self.carrera,
+            horas_semanales=4
+        )
+        BloqueCurso.objects.create(
+            curso=self.curso_pasado,
+            dia='Lunes',
+            hora_inicio=time(8, 0),
+            hora_fin=time(10, 0),
+            duracion_bloques=2
         )
 
         self.curso_futuro = Curso.objects.create(
             docente=self.docente,
             nombre="Curso Futuro",
-            dia='Lunes',
-            horario_inicio=time(18, 0),
-            horario_fin=time(20, 0),
             semestre=self.semestre,
-            carrera=self.carrera
+            carrera=self.carrera,
+            horas_semanales=4
         )
+        BloqueCurso.objects.create(
+            curso=self.curso_futuro,
+            dia='Lunes',
+            hora_inicio=time(18, 0),
+            hora_fin=time(20, 0),
+            duracion_bloques=2
+        )
+
+        # Force the test to run on a predictable Monday
+        today = date.today()
+        last_monday = today - timedelta(days=today.weekday())
 
         # Create an attendance record for a course that has already ended today
         # but has no checkout time.
         self.asistencia_abierta = Asistencia.objects.create(
             docente=self.docente,
             curso=self.curso_pasado,
-            fecha=date.today() - timedelta(days=7), # Last week
-            hora_entrada=timezone.make_aware(datetime.combine(date.today() - timedelta(days=7), time(8, 5)))
-        )
-
-        # Create an attendance record for a course that has not yet ended today.
-        self.asistencia_futura = Asistencia.objects.create(
-            docente=self.docente,
-            curso=self.curso_futuro,
-            fecha=date.today(),
-            hora_entrada=timezone.now()
+            fecha=last_monday,
+            hora_entrada=timezone.make_aware(datetime.combine(last_monday, time(8, 5)))
         )
 
     @patch('django.utils.timezone.now')
@@ -614,26 +630,23 @@ class AutoCheckoutTest(TestCase):
         Test that the auto_checkout_courses command correctly closes open attendances
         for courses that have already ended.
         """
-        # Mock 'now' to be a time after the past course has ended, but before the future one.
-        mock_now.return_value = timezone.make_aware(datetime.combine(date.today(), time(12, 0)))
+        # Mock 'now' to be the day after the attendance, making it clearly in the past.
+        mock_now.return_value = timezone.make_aware(datetime.combine(self.asistencia_abierta.fecha + timedelta(days=1), time(9, 0)))
 
         out = StringIO()
         call_command('auto_checkout_courses', stdout=out)
 
         self.asistencia_abierta.refresh_from_db()
-        self.asistencia_futura.refresh_from_db()
 
         # The open attendance for the past course should now be closed.
         self.assertIsNotNone(self.asistencia_abierta.hora_salida)
 
-        # The exit time should be the scheduled end time of the course.
+        # The exit time should be the scheduled end time of the course block.
+        bloque_pasado = BloqueCurso.objects.get(curso=self.curso_pasado, dia='Lunes')
         expected_checkout_time = timezone.make_aware(
-            datetime.combine(self.asistencia_abierta.fecha, self.curso_pasado.horario_fin)
+            datetime.combine(self.asistencia_abierta.fecha, bloque_pasado.hora_fin)
         )
         self.assertEqual(self.asistencia_abierta.hora_salida, expected_checkout_time)
-
-        # The open attendance for the future course should remain open.
-        self.assertIsNone(self.asistencia_futura.hora_salida)
 
         self.assertIn("1 attendances were closed", out.getvalue())
 

@@ -75,34 +75,42 @@ def crear_notificacion_estado_solicitud(sender, instance, **kwargs):
 
 @receiver(pre_save, sender=Curso)
 def crear_notificacion_asignacion_curso(sender, instance, **kwargs):
+    """
+    Notifica a un docente cuando se le asigna un curso.
+    La notificación es ahora genérica y no incluye detalles del horario.
+    """
+    if instance.docente is None:
+        return
+
+    is_new_assignment = False
     if instance.pk:
         try:
             old_instance = Curso.objects.get(pk=instance.pk)
-            if old_instance.docente != instance.docente and instance.docente is not None:
-                message = f"Se le ha asignado un nuevo curso: '{instance.nombre}' en el horario de {instance.dia} de {instance.horario_inicio} a {instance.horario_fin}."
-
-                notificacion = Notificacion.objects.create(
-                    destinatario=instance.docente,
-                    mensaje=message,
-                    url=reverse('ver_horarios', args=[instance.carrera.id])
-                )
-                payload = {'type': 'send.notification', 'message': { 'id': notificacion.id, 'mensaje': notificacion.mensaje, 'url': notificacion.url, 'leido': notificacion.leido, 'fecha_creacion': notificacion.fecha_creacion.isoformat() }}
-                transaction.on_commit(partial(do_broadcast, instance.docente.id, payload))
+            if old_instance.docente != instance.docente:
+                is_new_assignment = True
         except Curso.DoesNotExist:
-            pass
-    elif instance.docente is not None:
-        message = f"Se le ha asignado un nuevo curso: '{instance.nombre}'."
-        try:
-            url = reverse('ver_horarios', args=[instance.carrera.id])
-        except Exception:
-            url = "/"
+            is_new_assignment = True # Es un curso nuevo
+    else:
+        is_new_assignment = True
+
+    if is_new_assignment:
+        message = f"Se le ha asignado un nuevo curso: '{instance.nombre}'. Consulte el planificador para ver los detalles del horario."
+
+        # Usar una URL genérica como el dashboard ya que 'ver_horarios' puede estar desactualizado
+        url = reverse('dashboard')
 
         notificacion = Notificacion.objects.create(
             destinatario=instance.docente,
             mensaje=message,
             url=url
         )
-        payload = {'type': 'send.notification', 'message': { 'id': notificacion.id, 'mensaje': notificacion.mensaje, 'url': notificacion.url, 'leido': notificacion.leido, 'fecha_creacion': notificacion.fecha_creacion.isoformat() }}
+        payload = {'type': 'send.notification', 'message': {
+            'id': notificacion.id,
+            'mensaje': notificacion.mensaje,
+            'url': notificacion.url,
+            'leido': notificacion.leido,
+            'fecha_creacion': notificacion.fecha_creacion.isoformat()
+        }}
         transaction.on_commit(partial(do_broadcast, instance.docente.id, payload))
 
 

@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from ..models import Docente, Curso, Asistencia
+from ..models import Docente, Curso, Asistencia, BloqueCurso
+from django.utils import timezone
 
 class DocenteInfoSerializer(serializers.ModelSerializer):
     """
@@ -34,8 +35,22 @@ class CursoAsistenciaSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'entryMarked', 'exitMarked', 'canMarkExit', 'hora_salida_permitida_str']
 
     def get_name(self, obj):
-        # obj es una instancia de Asistencia, accedemos al curso relacionado
-        return f'{obj.curso.nombre} ({obj.curso.horario_inicio.strftime("%H:%M")} - {obj.curso.horario_fin.strftime("%H:%M")})'
+        # obj es una instancia de Asistencia.
+        curso = obj.curso
+        fecha = obj.fecha
+
+        # Mapeo de número de día de la semana a nombre del día
+        DIAS_MAP = {0: 'Lunes', 1: 'Martes', 2: 'Miércoles', 3: 'Jueves', 4: 'Viernes', 5: 'Sábado', 6: 'Domingo'}
+        dia_semana_str = DIAS_MAP.get(fecha.weekday())
+
+        # Buscar el bloque de curso para ese día
+        bloque = BloqueCurso.objects.filter(curso=curso, dia=dia_semana_str).order_by('hora_inicio').first()
+
+        if bloque:
+            return f'{curso.nombre} ({bloque.hora_inicio.strftime("%H:%M")} - {bloque.hora_fin.strftime("%H:%M")})'
+        else:
+            # Fallback si no se encuentra un bloque para ese día (caso improbable si la lógica es correcta)
+            return f'{curso.nombre} (Sin bloque asignado para hoy)'
 
     def get_entryMarked(self, obj):
         return obj.hora_entrada is not None

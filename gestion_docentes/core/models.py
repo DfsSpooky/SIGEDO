@@ -92,11 +92,7 @@ class Curso(models.Model):
     especialidad = models.ForeignKey(Especialidad, on_delete=models.SET_NULL, null=True, related_name='cursos')
     semestre = models.ForeignKey(Semestre, on_delete=models.SET_NULL, null=True, related_name='cursos')
     semestre_cursado = models.IntegerField(choices=SEMESTRE_CURSADO_CHOICES, null=True, blank=True)
-    horario_inicio = models.TimeField(null=True, blank=True)
-    horario_fin = models.TimeField(null=True, blank=True)
-    dia = models.CharField(max_length=20, choices=[('Lunes', 'Lunes'), ('Martes', 'Martes'), ('Miércoles', 'Miércoles'), ('Jueves', 'Jueves'), ('Viernes', 'Viernes')], null=True, blank=True)
-    dia_semana = models.PositiveSmallIntegerField(null=True, blank=True, editable=False, db_index=True, help_text="Día de la semana como número (0=Lunes, 1=Martes...)")
-    duracion_bloques = models.IntegerField(default=2, help_text="Número de bloques de 50 minutos que dura el curso.")
+    horas_semanales = models.IntegerField(default=2, help_text="Número total de horas pedagógicas (bloques de 50 min) que el curso requiere a la semana.")
 
     class Meta:
         permissions = [
@@ -105,13 +101,22 @@ class Curso(models.Model):
 
     def __str__(self): return f"{self.nombre} ({self.especialidad.nombre if self.especialidad else 'N/A'})"
 
-    def save(self, *args, **kwargs):
-        DIAS = {'Lunes': 0, 'Martes': 1, 'Miércoles': 2, 'Jueves': 3, 'Viernes': 4}
-        if self.dia:
-            self.dia_semana = DIAS.get(self.dia)
-        else:
-            self.dia_semana = None
-        super().save(*args, **kwargs)
+
+class BloqueCurso(models.Model):
+    curso = models.ForeignKey(Curso, on_delete=models.CASCADE, related_name='bloques')
+    dia = models.CharField(max_length=20, choices=[('Lunes', 'Lunes'), ('Martes', 'Martes'), ('Miércoles', 'Miércoles'), ('Jueves', 'Jueves'), ('Viernes', 'Viernes')])
+    hora_inicio = models.TimeField()
+    hora_fin = models.TimeField()
+    duracion_bloques = models.IntegerField(help_text="Número de bloques de 50 minutos que dura este bloque específico.")
+
+    class Meta:
+        verbose_name = "Bloque de Curso"
+        verbose_name_plural = "Bloques de Curso"
+        ordering = ['dia', 'hora_inicio']
+
+    def __str__(self):
+        return f"{self.curso.nombre} - {self.dia} ({self.hora_inicio.strftime('%H:%M')} - {self.hora_fin.strftime('%H:%M')})"
+
 
 class Documento(models.Model):
     ESTADOS_DOCUMENTO = [
@@ -172,23 +177,27 @@ class Asistencia(models.Model):
         """
         Determina si la marca de entrada de esta asistencia se considera tardanza.
         """
-        if not self.hora_entrada or not self.curso or not self.curso.horario_inicio:
-            return False
+        # TODO: Refactorizar esta lógica para que funcione con BloqueCurso en lugar de curso.horario_inicio.
+        # El concepto de "tardanza" ahora depende del bloque específico al que el docente está asistiendo.
+        # Esta función se deshabilita temporalmente para evitar errores tras el cambio de modelo.
+        return False
+        # if not self.hora_entrada or not self.curso:
+        #     return False
 
-        # Cargar la configuración de la institución para obtener el límite de tardanza
-        configuracion = ConfiguracionInstitucion.load()
+        # # Cargar la configuración de la institución para obtener el límite de tardanza
+        # configuracion = ConfiguracionInstitucion.load()
 
-        # Combinar la fecha de la asistencia con la hora de inicio del curso para crear un datetime
-        # Es importante usar la fecha de la asistencia, no la fecha actual.
-        horario_inicio_dt = timezone.make_aware(
-            datetime.combine(self.fecha, self.curso.horario_inicio)
-        )
+        # # Combinar la fecha de la asistencia con la hora de inicio del curso para crear un datetime
+        # # Es importante usar la fecha de la asistencia, no la fecha actual.
+        # horario_inicio_dt = timezone.make_aware(
+        #     datetime.combine(self.fecha, self.curso.horario_inicio)
+        # )
 
-        # Calcular el tiempo límite para marcar sin ser considerado tardanza
-        limite_tardanza = horario_inicio_dt + timedelta(minutes=configuracion.tiempo_limite_tardanza)
+        # # Calcular el tiempo límite para marcar sin ser considerado tardanza
+        # limite_tardanza = horario_inicio_dt + timedelta(minutes=configuracion.tiempo_limite_tardanza)
 
-        # Comparar la hora de entrada (que es un datetime) con el límite (que también es un datetime)
-        return self.hora_entrada > limite_tardanza
+        # # Comparar la hora de entrada (que es un datetime) con el límite (que también es un datetime)
+        # return self.hora_entrada > limite_tardanza
 
     @property
     def puede_marcar_salida(self):
