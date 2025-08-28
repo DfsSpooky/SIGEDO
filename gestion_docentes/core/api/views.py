@@ -746,7 +746,7 @@ class ChatConversationListView(generics.ListCreateAPIView):
         ).order_by('-last_message_time')
 
     def perform_create(self, serializer):
-        participant_ids = self.request.data.get('participants', [])
+        participant_ids = self.request.data.get('participant_ids', [])
         # Asegurarse de que el creador esté en la lista de participantes
         if self.request.user.id not in participant_ids:
             participant_ids.append(self.request.user.id)
