@@ -784,6 +784,16 @@ def vista_publica_horarios(request):
     }
     return render(request, 'vista_publica_horarios.html', context)
 
+
+class ChatPageView(LoginRequiredMixin, TemplateView):
+    template_name = "chat/chat_page.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['configuracion'] = ConfiguracionInstitucion.load()
+        return context
+
+
 @login_required
 def ver_notificaciones(request):
     # Get all notifications for the user

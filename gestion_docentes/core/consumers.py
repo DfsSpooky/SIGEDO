@@ -77,3 +77,81 @@ class KioskConsumer(AsyncWebsocketConsumer):
             'data': message_data
         }))
         print(f"Sent message to {self.channel_name}: {message_data}")
+
+
+from channels.db import database_sync_to_async
+from .models import ChatConversation, ChatMessage
+from .api.serializers import ChatMessageSerializer
+
+class ChatConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        self.user = self.scope["user"]
+        if not self.user.is_authenticated:
+            await self.close()
+            return
+
+        await self.accept()
+
+        self.conversation_groups = []
+        conversations = await self.get_user_conversations()
+        for conv in conversations:
+            group_name = f'chat_{conv.id}'
+            self.conversation_groups.append(group_name)
+            await self.channel_layer.group_add(group_name, self.channel_name)
+
+    async def disconnect(self, close_code):
+        for group_name in self.conversation_groups:
+            await self.channel_layer.group_discard(group_name, self.channel_name)
+
+    async def receive(self, text_data):
+        data = json.loads(text_data)
+        message_type = data.get('type')
+
+        if message_type == 'chat.new_message':
+            conversation_id = data.get('conversation_id')
+            content = data.get('content')
+
+            if not conversation_id or not content:
+                return
+
+            message = await self.create_chat_message(conversation_id, content)
+            if not message:
+                # No se pudo crear el mensaje (p. ej., usuario no es participante)
+                return
+
+            serializer = ChatMessageSerializer(message)
+
+            await self.channel_layer.group_send(
+                f'chat_{conversation_id}',
+                {
+                    'type': 'chat.broadcast_message',
+                    'message': serializer.data
+                }
+            )
+
+    async def chat_broadcast_message(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'new_message', # El cliente espera este tipo
+            'message': event['message']
+        }))
+
+    @database_sync_to_async
+    def get_user_conversations(self):
+        return list(self.user.chat_conversations.all())
+
+    @database_sync_to_async
+    def create_chat_message(self, conversation_id, content):
+        try:
+            conversation = ChatConversation.objects.get(id=conversation_id)
+            if self.user not in conversation.participants.all():
+                return None
+
+            message = ChatMessage.objects.create(
+                conversation=conversation,
+                sender=self.user,
+                content=content
+            )
+            message.read_by.add(self.user)
+            return message
+        except ChatConversation.DoesNotExist:
+            return None

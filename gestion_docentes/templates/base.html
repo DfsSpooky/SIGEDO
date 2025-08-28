@@ -58,6 +58,13 @@
                     <a class="btn btn-ghost text-xl">{{ configuracion.nombre_dashboard|default:"Gestión Docente" }}</a>
                 </div>
                 <div class="flex-none gap-2">
+                    <!-- Chat Icon -->
+                    <a href="{% url 'chat_page' %}" class="btn btn-ghost btn-circle">
+                        <div class="indicator">
+                            <i class="fas fa-comments text-xl"></i>
+                            <span class="badge badge-sm badge-secondary indicator-item" style="display: none;" id="chat-badge-mobile">0</span>
+                        </div>
+                    </a>
                     <!-- Notification Dropdown -->
                     <div class="dropdown dropdown-end">
                         <label tabindex="0" class="btn btn-ghost btn-circle">
@@ -116,6 +123,13 @@
                     </div>
                 </div>
                 <div class="flex-none gap-4">
+                    <!-- Chat Icon -->
+                    <a href="{% url 'chat_page' %}" class="btn btn-ghost btn-circle">
+                        <div class="indicator">
+                            <i class="fas fa-comments text-xl"></i>
+                            <span class="badge badge-sm badge-secondary indicator-item" style="display: none;" id="chat-badge">0</span>
+                        </div>
+                    </a>
                     <!-- Notification Dropdown -->
                     <div class="dropdown dropdown-end">
                         <label tabindex="0" class="btn btn-ghost btn-circle">
@@ -226,6 +240,7 @@
                 <li><a href="{% url 'dashboard' %}" class="group transition-all duration-300"><i class="fas fa-tachometer-alt fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Dashboard</a></li>
                 <li><a href="{% url 'ver_anuncios' %}" class="group transition-all duration-300"><i class="fas fa-bullhorn fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Anuncios</a></li>
                 <li><a href="{% url 'perfil' %}" class="group transition-all duration-300"><i class="fas fa-user-circle fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Mi Perfil</a></li>
+                <li><a href="{% url 'chat_page' %}" class="group transition-all duration-300"><i class="fas fa-comments fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Chat</a></li>
                 <li><a href="{% url 'lista_documentos' %}" class="group transition-all duration-300"><i class="fas fa-file-alt fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Mis Documentos</a></li>
                 <li><a href="{% url 'lista_justificaciones' %}" class="group transition-all duration-300"><i class="fas fa-calendar-check fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Mis Justificaciones</a></li>
                 <li><a href="{% url 'reservas:disponibilidad' %}" class="group transition-all duration-300"><i class="fas fa-bookmark fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Reserva de Equipos</a></li>
@@ -425,6 +440,71 @@
             });
 
         connect();
+    });
+    </script>
+
+    <script>
+    // Script para la notificación del badge del chat global
+    document.addEventListener('DOMContentLoaded', function() {
+        const chatBadges = {
+            desktop: document.getElementById('chat-badge'),
+            mobile: document.getElementById('chat-badge-mobile')
+        };
+
+        function updateChatBadges(count) {
+            const display = count > 0 ? 'inline-flex' : 'none';
+            const countText = count > 99 ? '99+' : count;
+            for (const key in chatBadges) {
+                const badge = chatBadges[key];
+                if (badge) {
+                    badge.textContent = countText;
+                    badge.style.display = display;
+                }
+            }
+        }
+
+        async function fetchUnreadChatCount() {
+            try {
+                const response = await fetch("{% url 'api:chat_unread_count' %}", {
+                    headers: { 'X-CSRFToken': getCookie('csrftoken') }
+                });
+                if (!response.ok) return;
+                const data = await response.json();
+                if (data.unread_count !== undefined) {
+                    updateChatBadges(data.unread_count);
+                }
+            } catch (error) {
+                console.error("Failed to fetch unread chat count:", error);
+            }
+        }
+
+        function connectGlobalChatSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsPath = `${protocol}//${window.location.host}/ws/chat/`;
+            const globalChatSocket = new WebSocket(wsPath);
+
+            globalChatSocket.onmessage = function(e) {
+                const data = JSON.parse(e.data);
+                if (data.type === 'new_message') {
+                    // Refrescar el contador de no leídos si llega un mensaje nuevo.
+                    // Esto es más simple y robusto que manejar el contador en el cliente.
+                    fetchUnreadChatCount();
+
+                    // Adicional: Si estamos en la página de chat, podríamos notificar a ese script
+                    // para que actualice su lista de conversaciones.
+                    const event = new CustomEvent('globalchatmessage');
+                    document.dispatchEvent(event);
+                }
+            };
+
+            globalChatSocket.onclose = function(e) {
+                setTimeout(connectGlobalChatSocket, 5000);
+            };
+        }
+
+        // La función getCookie ya está definida en el script de notificaciones anterior
+        fetchUnreadChatCount();
+        connectGlobalChatSocket();
     });
     </script>
     {% endif %}

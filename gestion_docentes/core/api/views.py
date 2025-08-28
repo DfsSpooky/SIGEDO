@@ -721,3 +721,104 @@ def marcar_todas_como_leidas(request):
     """
     Notificacion.objects.filter(destinatario=request.user, leido=False).update(leido=True)
     return JsonResponse({'status': 'success'})
+
+
+# --- VISTAS DE API PARA EL CHAT ---
+
+from rest_framework import generics, permissions
+from .serializers import ChatConversationSerializer, ChatMessageSerializer, UserSerializer
+from ..models import ChatConversation, ChatMessage, Docente
+from django.db.models import Max
+
+class ChatConversationListView(generics.ListCreateAPIView):
+    """
+    API View para listar y crear conversaciones de chat.
+    - GET: Devuelve las conversaciones del usuario autenticado, ordenadas por el mensaje más reciente.
+    - POST: Crea una nueva conversación. Requiere 'participants' (lista de IDs de usuario)
+      y opcionalmente 'name' para chats grupales.
+    """
+    serializer_class = ChatConversationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return self.request.user.chat_conversations.annotate(
+            last_message_time=Max('messages__timestamp')
+        ).order_by('-last_message_time')
+
+    def perform_create(self, serializer):
+        participant_ids = self.request.data.get('participants', [])
+        # Asegurarse de que el creador esté en la lista de participantes
+        if self.request.user.id not in participant_ids:
+            participant_ids.append(self.request.user.id)
+
+        participants = Docente.objects.filter(id__in=participant_ids)
+
+        is_group = self.request.data.get('is_group_chat', len(participants) > 2)
+        name = self.request.data.get('name', '')
+
+        # TODO: Para chats 1-a-1, comprobar si ya existe una conversación y devolverla en lugar de crear una nueva.
+
+        conversation = serializer.save(is_group_chat=is_group, name=name)
+        conversation.participants.set(participants)
+
+
+class ChatMessageListView(generics.ListAPIView):
+    """
+    API View para listar los mensajes de una conversación específica.
+    """
+    serializer_class = ChatMessageSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None # Opcional: considerar paginación para chats muy largos
+
+    def get_queryset(self):
+        conversation_id = self.kwargs['conversation_id']
+        conversation = get_object_or_404(ChatConversation, id=conversation_id, participants=self.request.user)
+        return conversation.messages.all().order_by('timestamp')
+
+
+class MarkConversationAsReadView(APIView):
+    """
+    Marca todos los mensajes de una conversación como leídos por el usuario actual.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, conversation_id, *args, **kwargs):
+        conversation = get_object_or_404(ChatConversation, id=conversation_id, participants=request.user)
+        messages_to_mark = conversation.messages.exclude(read_by=request.user)
+
+        if messages_to_mark.exists():
+            request.user.read_messages.add(*messages_to_mark)
+
+        return Response({'status': 'success', 'message': f'{messages_to_mark.count()} messages marked as read.'}, status=status.HTTP_200_OK)
+
+class UserSearchView(generics.ListAPIView):
+    """
+    API View para buscar usuarios por nombre de usuario, nombre o apellido.
+    """
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        query = self.request.query_params.get('q', '').strip()
+        if len(query) < 2: # No buscar si la consulta es muy corta
+            return Docente.objects.none()
+
+        return Docente.objects.filter(
+            Q(username__icontains=query) |
+            Q(first_name__icontains=query) |
+            Q(last_name__icontains=query)
+        ).exclude(id=self.request.user.id)[:10] # Limitar a 10 resultados
+
+class UnreadChatCountView(APIView):
+    """
+    Devuelve el número total de mensajes de chat no leídos para el usuario actual.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        unread_count = ChatMessage.objects.filter(
+            conversation__participants=request.user
+        ).exclude(
+            read_by=request.user
+        ).count()
+        return Response({'unread_count': unread_count})
