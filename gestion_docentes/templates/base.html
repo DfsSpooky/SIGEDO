@@ -48,27 +48,28 @@
         
         <div class="drawer-content flex flex-col bg-base-200">
 
-            <div class="navbar bg-base-100/80 backdrop-blur-md sticky top-0 z-30 shadow-sm lg:hidden">
-                <div class="flex-none">
-                    <label for="my-drawer-2" class="btn btn-square btn-ghost transition-colors duration-300">
-                        <i class="fas fa-bars text-xl"></i>
-                    </label>
-                </div>
-                <div class="flex-1">
-                    <a class="btn btn-ghost text-xl">{{ configuracion.nombre_dashboard|default:"Gestión Docente" }}</a>
-                </div>
-            </div>
-
-            <div class="navbar bg-base-100/80 backdrop-blur-md sticky top-0 z-30 shadow-sm hidden lg:flex border-b border-base-300/50">
-                <div class="flex-1">
-                    <div class="text-sm breadcrumbs">
+            <div class="navbar bg-base-100/80 backdrop-blur-md sticky top-0 z-30 shadow-sm border-b border-base-300/50">
+                <!-- Hamburger y Título para móvil -->
+                <div class="navbar-start">
+                    <div class="lg:hidden">
+                        <label for="my-drawer-2" class="btn btn-square btn-ghost">
+                            <i class="fas fa-bars text-xl"></i>
+                        </label>
+                    </div>
+                    <div class="text-sm breadcrumbs hidden lg:flex">
                         <ul>
                           <li><a><i class="fas fa-home mr-2"></i> Inicio</a></li> 
                           <li><a>{% block breadcrumb %}{% endblock %}</a></li>
                         </ul>
                     </div>
                 </div>
-                <div class="flex-none gap-4">
+
+                <div class="navbar-center lg:hidden">
+                    <a href="{% url 'dashboard' %}" class="btn btn-ghost text-lg">{{ configuracion.nombre_dashboard|default:"Gestión Docente" }}</a>
+                </div>
+
+                <!-- Iconos de la derecha -->
+                <div class="navbar-end gap-2">
                     <!-- Notification Dropdown -->
                     <div class="dropdown dropdown-end">
                         <label tabindex="0" class="btn btn-ghost btn-circle">
@@ -81,7 +82,6 @@
                             <div class="card-body">
                                 <h3 class="card-title">Notificaciones</h3>
                                 <div id="notification-list" class="max-h-96 overflow-y-auto space-y-2 mt-2">
-                                    <!-- Notifications will be inserted here by JavaScript -->
                                     <div id="no-notifications-placeholder" class="text-center py-8">
                                         <i class="fas fa-bell-slash fa-2x text-base-content/30"></i>
                                         <p class="mt-2 text-sm">No tienes notificaciones nuevas.</p>
@@ -94,6 +94,7 @@
                         </div>
                     </div>
 
+                    <!-- User Profile Dropdown -->
                     <div class="dropdown dropdown-end">
                         <label tabindex="0" class="btn btn-ghost btn-circle avatar">
                             <div class="w-10 rounded-full ring-2 ring-offset-2 ring-offset-base-100 ring-transparent hover:ring-primary transition-shadow duration-300">
