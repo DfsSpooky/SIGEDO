@@ -90,6 +90,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         await self.accept()
 
+        self.user_group_name = f"chat_user_{self.user.id}"
+        await self.channel_layer.group_add(self.user_group_name, self.channel_name)
+
         self.conversation_groups = []
         conversations = await self.get_user_conversations()
         for conv in conversations:
@@ -98,6 +101,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.channel_layer.group_add(group_name, self.channel_name)
 
     async def disconnect(self, close_code):
+        await self.channel_layer.group_discard(self.user_group_name, self.channel_name)
         for group_name in self.conversation_groups:
             await self.channel_layer.group_discard(group_name, self.channel_name)
 
@@ -132,6 +136,27 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'type': 'new_message', # El cliente espera este tipo
             'message': event['message']
+        }))
+
+    async def chat_join(self, event):
+        """
+        Handler for when the user is added to a new chat.
+        Adds the user to the new conversation's group and sends the
+        conversation data to the client.
+        """
+        conversation = event['conversation']
+        conversation_id = conversation['id']
+        group_name = f'chat_{conversation_id}'
+
+        # Add the new conversation group to this consumer's list
+        if group_name not in self.conversation_groups:
+            self.conversation_groups.append(group_name)
+            await self.channel_layer.group_add(group_name, self.channel_name)
+
+        # Send the new conversation data to the client
+        await self.send(text_data=json.dumps({
+            'type': 'new_conversation',
+            'conversation': conversation
         }))
 
     @database_sync_to_async

@@ -465,6 +465,98 @@ class JustificacionTest(TestCase):
 
 
 from unittest.mock import patch, MagicMock, AsyncMock
+from channels.testing import WebsocketCommunicator
+from .consumers import ChatConsumer
+from .models import ChatConversation
+from django.contrib.auth import get_user_model
+
+class ChatRealTimeTest(TestCase):
+    def setUp(self):
+        self.user1 = PersonalDocente.objects.create_user(username='chatuser1', password='password', dni='11111111')
+        self.user2 = PersonalDocente.objects.create_user(username='chatuser2', password='password', dni='22222222')
+
+    @patch('core.api.views.get_channel_layer')
+    def test_create_conversation_sends_notification(self, mock_get_channel_layer):
+        """
+        Test that creating a new conversation via the API sends a notification
+        to the other participant's user-specific channel group.
+        """
+        # Mock the channel layer and its group_send method
+        mock_layer = MagicMock()
+        mock_layer.group_send = AsyncMock()
+        mock_get_channel_layer.return_value = mock_layer
+
+        self.client.login(username='chatuser1', password='password')
+
+        create_url = reverse('api:chat_conversation_list')
+
+        post_data = {
+            'participant_ids': [self.user2.id],
+            'is_group_chat': False
+        }
+
+        response = self.client.post(create_url, data=json.dumps(post_data), content_type='application/json')
+
+        self.assertEqual(response.status_code, 201)
+
+        # Check that group_send was called correctly
+        mock_layer.group_send.assert_called_once()
+
+        # Get the arguments passed to group_send
+        args, kwargs = mock_layer.group_send.call_args
+
+        # Check the target group name
+        self.assertEqual(args[0], f"chat_user_{self.user2.id}")
+
+        # Check the event payload
+        event_payload = args[1]
+        self.assertEqual(event_payload['type'], 'chat.join')
+        self.assertIn('conversation', event_payload)
+        self.assertIn('participants', event_payload['conversation'])
+        # Ensure both participants are in the conversation data
+        participant_ids_in_payload = {p['id'] for p in event_payload['conversation']['participants']}
+        self.assertEqual(participant_ids_in_payload, {self.user1.id, self.user2.id})
+
+    async def test_consumer_joins_new_conversation_group(self):
+        """
+        Test that the ChatConsumer correctly handles a 'chat.join' event,
+        joins the new group, and notifies the client.
+        """
+        # Setup an in-memory channel layer for testing
+        from channels.layers import get_channel_layer
+        channel_layer = get_channel_layer()
+
+        # Create a communicator for user 1
+        communicator = WebsocketCommunicator(ChatConsumer.as_asgi(), "/ws/chat/")
+        communicator.scope['user'] = self.user1
+
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+
+        # The conversation object that would be sent in the event
+        new_conversation_data = {
+            'id': 123,
+            'name': 'Test Convo',
+            'is_group_chat': False,
+            'participants': [
+                {'id': self.user1.id, 'first_name': self.user1.first_name},
+                {'id': self.user2.id, 'first_name': self.user2.first_name},
+            ]
+        }
+
+        # Simulate the server sending a 'chat.join' event to the user's group
+        await channel_layer.group_send(f"chat_user_{self.user1.id}", {
+            'type': 'chat.join',
+            'conversation': new_conversation_data
+        })
+
+        # Check for the message sent back to the client
+        response = await communicator.receive_json_from()
+        self.assertEqual(response['type'], 'new_conversation')
+        self.assertEqual(response['conversation']['id'], 123)
+
+        # Disconnect
+        await communicator.disconnect()
 
 class RfidAsistenciaTest(TestCase):
 

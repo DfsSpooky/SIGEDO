@@ -305,7 +305,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     renderConversations();
                 } else {
-                    fetchConversations(); // A new conversation was created
+                    // This case might happen if the user was just added to a conversation
+                    // and a message arrives before the 'new_conversation' event.
+                    // The 'new_conversation' event will handle adding it to the list.
+                    fetchConversations();
+                }
+            } else if (data.type === 'new_conversation') {
+                const newConvo = data.conversation;
+                if (!conversations.has(newConvo.id)) {
+                    conversations.set(newConvo.id, newConvo);
+                    renderConversations();
                 }
             }
         };

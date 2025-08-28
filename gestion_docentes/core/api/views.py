@@ -762,6 +762,21 @@ class ChatConversationListView(generics.ListCreateAPIView):
         conversation = serializer.save(is_group_chat=is_group, name=name)
         conversation.participants.set(participants)
 
+        # Notificar a los otros participantes en tiempo real
+        channel_layer = get_channel_layer()
+        context = self.get_serializer_context()
+        conversation_data = ChatConversationSerializer(conversation, context=context).data
+
+        for participant in participants:
+            if participant != self.request.user:
+                async_to_sync(channel_layer.group_send)(
+                    f"chat_user_{participant.id}",
+                    {
+                        "type": "chat.join",
+                        "conversation": conversation_data,
+                    },
+                )
+
 
 class ChatMessageListView(generics.ListAPIView):
     """
