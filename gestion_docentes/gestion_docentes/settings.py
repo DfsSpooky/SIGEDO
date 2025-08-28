@@ -10,7 +10,14 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
+import sys
 from pathlib import Path
+from django.urls import reverse_lazy
+from django.templatetags.static import static
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,24 +27,38 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-=w1huy-2d3)$32m)$+8+*kkuz(+#hx)eio37q8(+94@o-+av&s'
+SECRET_KEY = os.environ.get('SECRET_KEY')
+
+# Key for encrypting IDs
+ID_ENCRYPTION_KEY = os.environ.get('ID_ENCRYPTION_KEY', '').encode()
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 't')
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost').split(',')
+# ... cerca de ALLOWED_HOSTS ...
+
+CSRF_TRUSTED_ORIGINS = ['https://aquienpasco.lat', 'https://www.aquienpasco.lat']
+
+# Settings for running behind a reverse proxy like Nginx
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
 
 
 # Application definition
 
 INSTALLED_APPS = [
-    'jazzmin',
+    'daphne',
+    'channels',
+    'unfold',
+    'unfold.contrib.forms',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
     'core',
     'tailwind',
     
@@ -46,6 +67,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -66,12 +88,33 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'core.context_processors.unread_notifications_context',
+                'core.context_processors.site_configuration_context',
             ],
         },
     },
 ]
 
 WSGI_APPLICATION = 'gestion_docentes.wsgi.application'
+ASGI_APPLICATION = 'gestion_docentes.asgi.application'
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [(os.environ.get('REDIS_HOST'), os.environ.get('REDIS_PORT'))],
+        },
+    },
+}
+
+# If in DEBUG mode, override channel layer to use in-memory for local development
+# This avoids needing a Redis server running locally.
+if DEBUG:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer"
+        }
+    }
 
 
 # Database
@@ -79,10 +122,26 @@ WSGI_APPLICATION = 'gestion_docentes.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ.get('POSTGRES_DB'),
+        'USER': os.environ.get('POSTGRES_USER'),
+        'PASSWORD': os.environ.get('POSTGRES_PASSWORD'),
+        'HOST': os.environ.get('POSTGRES_HOST'),
+        'PORT': os.environ.get('POSTGRES_PORT'),
     }
 }
+
+# Use in-memory SQLite database and an in-memory channel layer for tests
+if 'test' in sys.argv:
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': ':memory:',
+    }
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer"
+        }
+    }
 
 
 # Password validation
@@ -120,6 +179,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 
 # Default primary key field type
@@ -127,77 +187,198 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+UNFOLD = {
+    "SITE_HEADER": "Gestión de Docentes",
+    "DASHBOARD_CALLBACK": "core.dashboard.dashboard_callback",
+    "STYLES": [
+        "https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css",
+        "https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css",
+        lambda request: static("css/admin_custom.css"),
+    ],
+    "SCRIPTS": [
+        "https://cdn.jsdelivr.net/npm/flatpickr",
+        "https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js",
+        lambda request: static("js/admin_custom.js"),
+    ],
+    "SIDEBAR": {
+        "show_search": False,
+        "navigation": [
+            {
+                "title": "Principal",
+                "items": [
+                    {
+                        "title": "Dashboard",
+                        "icon": "dashboard",
+                        "link": reverse_lazy("admin:index"),
+                    },
+                ],
+            },
+            {
+                "title": "Gestión Académica",
+                "icon": "school",
+                "items": [
+                    {
+                        "title": "Semestres",
+                        "icon": "date_range",
+                        "link": reverse_lazy("admin:core_semestre_changelist"),
+                    },
+                    {
+                        "title": "Carreras",
+                        "icon": "account_balance",
+                        "link": reverse_lazy("admin:core_carrera_changelist"),
+                    },
+                    {
+                        "title": "Especialidades",
+                        "icon": "category",
+                        "link": reverse_lazy("admin:core_especialidad_changelist"),
+                    },
+                    {
+                        "title": "Cursos",
+                        "icon": "book",
+                        "link": reverse_lazy("admin:core_curso_changelist"),
+                    },
+                    {
+                        "title": "Franjas Horarias",
+                        "icon": "schedule",
+                        "link": reverse_lazy("admin:core_franjahoraria_changelist"),
+                    },
+                    {
+                        "title": "Días Especiales",
+                        "icon": "event",
+                        "link": reverse_lazy("admin:core_diaespecial_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Gestión de Inventario",
+                "icon": "inventory_2",
+                "items": [
+                    {
+                        "title": "Tipos de Activo",
+                        "icon": "category",
+                        "link": reverse_lazy("admin:core_tipoactivo_changelist"),
+                    },
+                    {
+                        "title": "Activos",
+                        "icon": "inventory",
+                        "link": reverse_lazy("admin:core_activo_changelist"),
+                    },
+                    {
+                        "title": "Reservas y Préstamos",
+                        "icon": "event_available",
+                        "link": reverse_lazy("admin:core_reserva_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Personal",
+                "icon": "group",
+                "items": [
+                    {
+                        "title": "Docentes",
+                        "icon": "person",
+                        "link": reverse_lazy("admin:core_personaldocente_changelist"),
+                    },
+                    {
+                        "title": "Administradores",
+                        "icon": "shield_person",
+                        "link": reverse_lazy("admin:core_administrador_changelist"),
+                    },
+                    {
+                        "title": "Grupos",
+                        "icon": "groups",
+                        "link": reverse_lazy("admin:core_grupo_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Documentos y Justificaciones",
+                "icon": "folder_managed",
+                "items": [
+                    {
+                        "title": "Documentos",
+                        "icon": "folder",
+                        "link": reverse_lazy("admin:core_documento_changelist"),
+                        "badge": "core.badge_callbacks.documentos_badge_callback",
+                    },
+                    {
+                        "title": "Tipos de Documento",
+                        "icon": "description",
+                        "link": reverse_lazy("admin:core_tipodocumento_changelist"),
+                    },
+                    {
+                        "title": "Justificaciones",
+                        "icon": "assignment_turned_in",
+                        "link": reverse_lazy("admin:core_justificacion_changelist"),
+                        "badge": "core.badge_callbacks.justificaciones_badge_callback",
+                    },
+                    {
+                        "title": "Tipos de Justificación",
+                        "icon": "rule",
+                        "link": reverse_lazy("admin:core_tipojustificacion_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Asistencia",
+                "icon": "event_available",
+                "items": [
+                    {
+                        "title": "Registros de Asistencia",
+                        "icon": "person_check",
+                        "link": reverse_lazy("admin:core_asistencia_changelist"),
+                    },
+                    {
+                        "title": "Asistencia Diaria",
+                        "icon": "today",
+                        "link": reverse_lazy("admin:core_asistenciadiaria_changelist"),
+                    },
+                    {
+                        "title": "Solicitudes de Intercambio",
+                        "icon": "swap_horiz",
+                        "link": reverse_lazy("admin:core_solicitudintercambio_changelist"),
+                        "badge": "core.badge_callbacks.solicitudes_intercambio_badge_callback",
+                    },
+                ],
+            },
+            {
+                "title": "Comunicación",
+                "icon": "campaign",
+                "items": [
+                    {
+                        "title": "Anuncios",
+                        "icon": "campaign",
+                        "link": reverse_lazy("admin:core_anuncio_changelist"),
+                    },
+                    {
+                        "title": "Notificaciones",
+                        "icon": "notifications",
+                        "link": reverse_lazy("admin:core_notificacion_changelist"),
+                        "badge": "core.badge_callbacks.notificaciones_badge_callback",
+                    },
+                ],
+            },
+            {
+                "title": "Configuración",
+                "icon": "settings",
+                "items": [
+                    {
+                        "title": "Configuración de la Institución",
+                        "icon": "settings_applications",
+                        "link": reverse_lazy("admin:core_configuracioninstitucion_changelist"),
+                    },
+                ],
+            },
+        ],
+    },
+}
+
+
 AUTH_USER_MODEL = 'core.Docente'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 LOGIN_REDIRECT_URL = 'dashboard'
+LOGOUT_REDIRECT_URL = 'login'
 
-
-
-
-JAZZMIN_SETTINGS = {
-    # Título de la ventana (se verá en la pestaña del navegador)
-    "site_title": "Gestión Docente Admin",
-
-    # Título en la pantalla de login (puede ser corto)
-    "site_header": "Gestión Docente",
-
-    # Título en el logo (puede ser más corto)
-    "site_brand": "GD-Admin",
-
-    # Logo para la pantalla de login
-    "login_logo": "/static/placeholder.png", # Puedes cambiar esto a la ruta de tu logo
-
-    # Logo para la barra lateral en modo oscuro
-    "site_logo_dark": "/static/placeholder.png", # Puedes cambiar esto
-
-    # Temas de Bootswatch https://bootswatch.com/
-    "theme": "darkly",
-
-    # Opciones de la interfaz de usuario
-    "ui_tweaks": {
-        "navbar_small_text": False,
-        "footer_small_text": False,
-        "body_small_text": False,
-        "brand_small_text": False,
-        "brand_colour": "navbar-dark",
-        "accent": "accent-primary",
-        "navbar": "navbar-dark",
-        "no_navbar_border": False,
-        "sidebar": "sidebar-dark-primary",
-        "sidebar_nav_small_text": False,
-        "sidebar_disable_expand": False,
-        "sidebar_nav_child_indent": False,
-        "sidebar_nav_compact_style": False,
-        "sidebar_nav_legacy_style": False,
-        "sidebar_nav_flat_style": False,
-        "theme": "darkly",
-        "dark_mode_theme": "darkly",
-        "button_classes": {
-            "primary": "btn-primary",
-            "secondary": "btn-secondary",
-            "info": "btn-info",
-            "warning": "btn-warning",
-            "danger": "btn-danger",
-            "success": "btn-success"
-        }
-    },
-
-    # --- ORGANIZACIÓN DEL MENÚ LATERAL ---
-    "show_sidebar": True,
-    "navigation_expanded": True,
-    "order_with_respect_to": [
-        # Autenticación y Usuarios
-        "auth", "core.docente", "core.personal", "core.administrador",
-
-        # Organización Académica
-        "core.semestre", "core.carrera", "core.especialidad", "core.grupo", "core.curso",
-
-        # Asistencia y Horarios
-        "core.asistenciadiaria", "core.asistencia", "core.franjahoraria", "core.diaespecial",
-
-        # Otros
-        "core.documento", "core.tipodocumento", "core.solicitudintercambio"
-    ],
-}
+X_FRAME_OPTIONS = 'SAMEORIGIN'
