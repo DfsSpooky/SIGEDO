@@ -163,6 +163,12 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
+AUTHENTICATION_BACKENDS = [
+    'core.backends.DniOrUsernameBackend',
+    'django.contrib.auth.backends.ModelBackend', # Mantenemos el backend por defecto como fallback
+]
+
+
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 

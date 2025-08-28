@@ -1,7 +1,9 @@
 from django.test import TestCase, Client
 from django.urls import reverse
+from django.contrib.auth import authenticate
 from .models import PersonalDocente, Notificacion, TipoDocumento, Documento, Anuncio, Semestre, ConfiguracionInstitucion, Curso, Asistencia, AsistenciaDiaria, Carrera, Justificacion, TipoJustificacion
 from .utils.encryption import encrypt_id, decrypt_id
+from .backends import DniOrUsernameBackend
 import re
 from django.utils import timezone
 from datetime import time
@@ -698,3 +700,46 @@ class NotificationCreationTest(TestCase):
         expected_groups = {f'notifications_{self.docente.id}', f'notifications_{docente2.id}'}
         actual_groups = {call[0][0] for call in mock_channel_layer.group_send.call_args_list}
         self.assertEqual(expected_groups, actual_groups)
+
+
+class DniOrUsernameBackendTest(TestCase):
+
+    def setUp(self):
+        """Set up a test user for authentication tests."""
+        self.password = 'testpassword123'
+        self.username = 'auth_test_user'
+        self.dni = '12312312'
+        self.user = PersonalDocente.objects.create_user(
+            username=self.username,
+            password=self.password,
+            dni=self.dni
+        )
+
+    def test_authenticate_with_username_success(self):
+        """Test successful authentication using the username."""
+        user = authenticate(username=self.username, password=self.password)
+        self.assertIsNotNone(user)
+        self.assertEqual(user.username, self.username)
+
+    def test_authenticate_with_dni_success(self):
+        """Test successful authentication using the DNI."""
+        user = authenticate(username=self.dni, password=self.password)
+        self.assertIsNotNone(user)
+        self.assertEqual(user.dni, self.dni)
+        self.assertEqual(user.username, self.username)
+
+    def test_authenticate_with_case_insensitive_username(self):
+        """Test successful authentication with a case-insensitive username."""
+        user = authenticate(username=self.username.upper(), password=self.password)
+        self.assertIsNotNone(user)
+        self.assertEqual(user.username, self.username)
+
+    def test_authenticate_with_wrong_password(self):
+        """Test that authentication fails with an incorrect password."""
+        user = authenticate(username=self.username, password='wrongpassword')
+        self.assertIsNone(user)
+
+    def test_authenticate_with_nonexistent_user(self):
+        """Test that authentication fails for a user that does not exist."""
+        user = authenticate(username='nonexistentuser', password='anypassword')
+        self.assertIsNone(user)
