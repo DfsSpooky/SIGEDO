@@ -340,11 +340,74 @@ def api_desasignar_horario(request):
 
 @staff_member_required
 def api_get_teacher_conflicts(request):
-    """
-    DEBUG: Temporarily disabled to always return zero conflicts.
-    This helps isolate whether the problem is in conflict detection or elsewhere.
-    """
-    return success_response(data={'conflicts': []})
+    curso_id = request.GET.get('curso_id')
+    if not curso_id:
+        return error_response('Falta el ID del curso.')
+
+    try:
+        curso_a_asignar = get_object_or_404(Curso, pk=curso_id)
+        docente = curso_a_asignar.docente
+        semestre = curso_a_asignar.semestre
+
+        conflictos = set()
+
+        if not docente:
+            return success_response(data={'conflicts': []})
+
+        # Pre-cache franjas for performance
+        todas_las_franjas = list(FranjaHoraria.objects.order_by('hora_inicio'))
+        franja_start_time_map = {f.hora_inicio: f for f in todas_las_franjas}
+
+        bloques_asignados = BloqueCurso.objects.filter(curso__semestre=semestre).select_related('curso__docente')
+
+        # STEP 1: Only check for the teacher's own schedule conflicts (using a simpler, more direct logic)
+        for bloque in bloques_asignados.filter(curso__docente=docente):
+            if bloque.curso_id == curso_a_asignar.id:
+                continue
+
+            franjas_del_bloque = FranjaHoraria.objects.filter(
+                hora_inicio__gte=bloque.hora_inicio,
+                hora_inicio__lt=bloque.hora_fin
+            )
+            for franja in franjas_del_bloque:
+                conflictos.add((bloque.dia, franja.id))
+
+        # 2. Conflictos de grupo
+        if grupo_del_curso and semestre_cursado_a_asignar:
+            q_grupo_base = Q(curso__especialidad__grupo=grupo_del_curso, curso__semestre_cursado=semestre_cursado_a_asignar)
+
+            if curso_a_asignar.tipo_curso == 'ESPECIALIDAD':
+                bloques_conflicto = bloques_asignados.filter(q_grupo_base & Q(curso__tipo_curso='GENERAL'))
+            else: # GENERAL
+                bloques_conflicto = bloques_asignados.filter(q_grupo_base & Q(curso__tipo_curso='ESPECIALIDAD'))
+
+            for bloque in bloques_conflicto:
+                franjas_del_bloque_conflicto = FranjaHoraria.objects.filter(
+                    hora_inicio__gte=bloque.hora_inicio,
+                    hora_inicio__lt=bloque.hora_fin
+                )
+                for franja in franjas_del_bloque_conflicto:
+                    conflictos.add((bloque.dia, franja.id))
+
+        # 3. Indisponibilidad del docente
+        if docente:
+            franjas_no_disponibles_ids = set()
+            if docente.disponibilidad == 'MANANA':
+                franjas_no_disponibles_ids = set(FranjaHoraria.objects.filter(turno='TARDE').values_list('id', flat=True))
+            elif docente.disponibilidad == 'TARDE':
+                franjas_no_disponibles_ids = set(FranjaHoraria.objects.filter(turno='MANANA').values_list('id', flat=True))
+
+            if franjas_no_disponibles_ids:
+                dias_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
+                for dia in dias_semana:
+                    for franja_id in franjas_no_disponibles_ids:
+                        conflictos.add((dia, franja_id))
+
+        conflictos_list = [{'dia': dia, 'franja_id': franja_id} for dia, franja_id in conflictos]
+        return success_response(data={'conflicts': conflictos_list})
+
+    except Curso.DoesNotExist:
+        return not_found_response('Curso no encontrado.')
 
 def _get_planner_data(especialidad_id, semestre_cursado):
     try:
