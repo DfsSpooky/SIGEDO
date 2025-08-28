@@ -312,7 +312,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const convo = conversations.get(message.conversation);
                 if (convo) {
                     convo.last_message = message;
-                    if (message.conversation !== activeConversationId) {
+                    if (message.conversation != activeConversationId) {
                         convo.unread_count = (convo.unread_count || 0) + 1;
                     } else {
                         activeConversationMessages.push(message);
