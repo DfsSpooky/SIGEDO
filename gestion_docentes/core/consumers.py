@@ -80,8 +80,6 @@ class KioskConsumer(AsyncWebsocketConsumer):
 
 
 from channels.db import database_sync_to_async
-from .models import ChatConversation, ChatMessage
-from .api.serializers import ChatMessageSerializer
 
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -119,6 +117,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 # No se pudo crear el mensaje (p. ej., usuario no es participante)
                 return
 
+            from .api.serializers import ChatMessageSerializer
             serializer = ChatMessageSerializer(message)
 
             await self.channel_layer.group_send(
@@ -137,10 +136,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_user_conversations(self):
+        from .models import ChatConversation
         return list(self.user.chat_conversations.all())
 
     @database_sync_to_async
     def create_chat_message(self, conversation_id, content):
+        from .models import ChatConversation, ChatMessage
         try:
             conversation = ChatConversation.objects.get(id=conversation_id)
             if self.user not in conversation.participants.all():
