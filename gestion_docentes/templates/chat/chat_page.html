@@ -126,6 +126,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentUserId = {{ request.user.id }};
     let activeConversationId = null;
     let conversations = new Map();
+    let activeConversationMessages = [];
     let selectedParticipants = new Map();
     let chatSocket = null;
     let searchTimeout = null;
@@ -248,7 +249,8 @@ document.addEventListener('DOMContentLoaded', function() {
     async function fetchMessages(conversationId) {
         try {
             const messages = await apiCall(`/api/chat/conversations/${conversationId}/messages/`);
-            renderMessages(messages);
+            activeConversationMessages = messages;
+            renderMessages(activeConversationMessages);
         } catch (error) {
             console.error(error);
             messageListEl.innerHTML = `<div class="p-4 text-center text-error">Error al cargar mensajes.</div>`;
@@ -297,7 +299,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (message.conversation !== activeConversationId) {
                         convo.unread_count = (convo.unread_count || 0) + 1;
                     } else {
-                        renderMessages([...messageListEl.querySelectorAll('.chat'), message]);
+                        activeConversationMessages.push(message);
+                        renderMessages(activeConversationMessages);
                         markAsRead(activeConversationId);
                     }
                     renderConversations();
