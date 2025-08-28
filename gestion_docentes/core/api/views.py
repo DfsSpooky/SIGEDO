@@ -728,7 +728,8 @@ def marcar_todas_como_leidas(request):
 from rest_framework import generics, permissions
 from .serializers import ChatConversationSerializer, ChatMessageSerializer, UserSerializer
 from ..models import ChatConversation, ChatMessage, Docente
-from django.db.models import Max
+from django.db.models import Max, F
+from django.db.models.functions import Coalesce
 
 class ChatConversationListView(generics.ListCreateAPIView):
     """
@@ -742,7 +743,7 @@ class ChatConversationListView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         return self.request.user.chat_conversations.annotate(
-            last_message_time=Max('messages__timestamp')
+            last_message_time=Coalesce(Max('messages__timestamp'), F('created_at'))
         ).order_by('-last_message_time')
 
     def perform_create(self, serializer):
