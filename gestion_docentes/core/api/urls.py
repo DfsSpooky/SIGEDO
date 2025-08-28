@@ -26,11 +26,4 @@ urlpatterns = [
     path('notificaciones/json/', views.notificaciones_json, name='notificaciones_json'),
     path('notificaciones/<int:notificacion_id>/marcar-leida/', views.marcar_notificacion_como_leida, name='marcar_notificacion_leida'),
     path('notificaciones/marcar-todas-leidas/', views.marcar_todas_como_leidas, name='marcar_todas_leidas'),
-
-    # --- URLs para el Chat ---
-    path('chat/conversations/', views.ChatConversationListView.as_view(), name='chat_conversation_list'),
-    path('chat/conversations/<int:conversation_id>/messages/', views.ChatMessageListView.as_view(), name='chat_message_list'),
-    path('chat/conversations/<int:conversation_id>/read/', views.MarkConversationAsReadView.as_view(), name='chat_mark_as_read'),
-    path('users/search/', views.UserSearchView.as_view(), name='user_search'),
-    path('chat/unread-count/', views.UnreadChatCountView.as_view(), name='chat_unread_count'),
 ]

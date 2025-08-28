@@ -316,46 +316,5 @@ class Justificacion(models.Model):
     class Meta:
         ordering = ['-fecha_creacion']
 
-# Modelos para el sistema de Chat
-from django.conf import settings
-
-class ChatConversation(models.Model):
-    participants = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='chat_conversations', verbose_name="Participantes")
-    is_group_chat = models.BooleanField(default=False, verbose_name="Es Grupal")
-    name = models.CharField(max_length=255, blank=True, null=True, help_text="Nombre del grupo de chat", verbose_name="Nombre del Grupo")
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
-
-    class Meta:
-        ordering = ['-created_at']
-        verbose_name = "Conversación de Chat"
-        verbose_name_plural = "Conversaciones de Chat"
-
-    def __str__(self):
-        if self.is_group_chat and self.name:
-            return self.name
-
-        participants = self.participants.all()
-        if not self.is_group_chat and participants.count() > 0:
-            # Esto es una representación simple. Se puede mejorar en la vista/serializador.
-            return f"Chat 1-a-1 ({', '.join(p.username for p in participants)})"
-
-        return f"Conversación ID: {self.id}"
-
-class ChatMessage(models.Model):
-    conversation = models.ForeignKey(ChatConversation, on_delete=models.CASCADE, related_name='messages', verbose_name="Conversación")
-    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sent_messages', verbose_name="Remitente")
-    content = models.TextField(verbose_name="Contenido")
-    timestamp = models.DateTimeField(auto_now_add=True, verbose_name="Fecha y Hora")
-    read_by = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='read_messages', blank=True, verbose_name="Leído por")
-
-    class Meta:
-        ordering = ['timestamp']
-        verbose_name = "Mensaje de Chat"
-        verbose_name_plural = "Mensajes de Chat"
-
-    def __str__(self):
-        return f"Mensaje de {self.sender.username} a las {self.timestamp.strftime('%Y-%m-%d %H:%M')}"
-
-
 # Importar modelos de módulos separados para mantener el código organizado
 from .models_inventario import *

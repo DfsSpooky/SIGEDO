@@ -1,50 +1,5 @@
 from rest_framework import serializers
-from ..models import Docente, Curso, Asistencia, ChatConversation, ChatMessage
-
-class UserSerializer(serializers.ModelSerializer):
-    """
-    Serializer para la información básica del usuario a ser usada en otros serializers.
-    """
-    class Meta:
-        model = Docente
-        fields = ['id', 'username', 'first_name', 'last_name', 'foto']
-
-class ChatMessageSerializer(serializers.ModelSerializer):
-    """
-    Serializer para los mensajes de chat.
-    """
-    sender = UserSerializer(read_only=True)
-    class Meta:
-        model = ChatMessage
-        fields = ['id', 'conversation', 'sender', 'content', 'timestamp', 'read_by']
-        read_only_fields = ['id', 'sender', 'timestamp', 'read_by']
-
-
-class ChatConversationSerializer(serializers.ModelSerializer):
-    """
-    Serializer para las conversaciones de chat. Incluye el último mensaje.
-    """
-    participants = UserSerializer(many=True, read_only=True)
-    last_message = serializers.SerializerMethodField()
-    unread_count = serializers.SerializerMethodField()
-
-    class Meta:
-        model = ChatConversation
-        fields = ['id', 'participants', 'is_group_chat', 'name', 'created_at', 'last_message', 'unread_count']
-
-    def get_last_message(self, obj):
-        last_msg = obj.messages.order_by('-timestamp').first()
-        if last_msg:
-            return ChatMessageSerializer(last_msg).data
-        return None
-
-    def get_unread_count(self, obj):
-        user = self.context.get('request').user
-        if user and user.is_authenticated:
-            # Contar mensajes en esta conversación que no han sido leídos por el usuario actual
-            return obj.messages.exclude(read_by=user).count()
-        return 0
-
+from ..models import Docente, Curso, Asistencia
 
 class DocenteInfoSerializer(serializers.ModelSerializer):
     """
