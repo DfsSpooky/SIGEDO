@@ -340,81 +340,11 @@ def api_desasignar_horario(request):
 
 @staff_member_required
 def api_get_teacher_conflicts(request):
-    curso_id = request.GET.get('curso_id')
-    if not curso_id:
-        return error_response('Falta el ID del curso.')
-
-    try:
-        curso_a_asignar = get_object_or_404(Curso, pk=curso_id)
-        docente = curso_a_asignar.docente
-        semestre = curso_a_asignar.semestre
-        grupo_del_curso = curso_a_asignar.especialidad.grupo if curso_a_asignar.especialidad else None
-        semestre_cursado_a_asignar = curso_a_asignar.semestre_cursado
-
-        conflictos = set()
-
-        # Pre-cache franjas for performance
-        todas_las_franjas = list(FranjaHoraria.objects.order_by('hora_inicio'))
-        franja_map = {f.id: f for f in todas_las_franjas}
-        franja_start_time_map = {f.hora_inicio: f for f in todas_las_franjas}
-
-        # Obtener todos los bloques relevantes del semestre de una sola vez
-        bloques_asignados = BloqueCurso.objects.filter(curso__semestre=semestre).select_related('curso__docente', 'curso__especialidad__grupo')
-
-        # Función auxiliar para añadir conflictos de un bloque
-        def add_block_conflicts(bloque):
-            try:
-                start_franja = franja_start_time_map.get(bloque.hora_inicio)
-                if not start_franja: return
-
-                start_index = todas_las_franjas.index(start_franja)
-                for i in range(bloque.duracion_bloques):
-                    if start_index + i < len(todas_las_franjas):
-                        franja_ocupada = todas_las_franjas[start_index + i]
-                        conflictos.add((bloque.dia, franja_ocupada.id))
-            except (ValueError, KeyError):
-                # Ocurre si la hora_inicio de un bloque no está en el mapa, debería ser raro
-                pass
-
-        # 1. Conflictos del propio docente
-        if docente:
-            for bloque in bloques_asignados.filter(curso__docente=docente):
-                if bloque.curso_id != curso_a_asignar.id:
-                    add_block_conflicts(bloque)
-
-        # 2. Conflictos de grupo
-        if grupo_del_curso and semestre_cursado_a_asignar:
-            q_grupo_base = Q(curso__especialidad__grupo=grupo_del_curso, curso__semestre_cursado=semestre_cursado_a_asignar)
-
-            if curso_a_asignar.tipo_curso == 'ESPECIALIDAD':
-                bloques_conflicto = bloques_asignados.filter(q_grupo_base & Q(curso__tipo_curso='GENERAL'))
-            else: # GENERAL
-                bloques_conflicto = bloques_asignados.filter(q_grupo_base & Q(curso__tipo_curso='ESPECIALIDAD'))
-
-            for bloque in bloques_conflicto:
-                add_block_conflicts(bloque)
-
-        # 3. Indisponibilidad del docente
-        if docente:
-            franjas_no_disponibles_ids = set()
-            if docente.disponibilidad == 'MANANA':
-                franjas_no_disponibles_ids = {f.id for f in franja_map.values() if f.turno in ['TARDE', 'NOCHE']}
-            elif docente.disponibilidad == 'TARDE':
-                franjas_no_disponibles_ids = {f.id for f in franja_map.values() if f.turno in ['MANANA', 'NOCHE']}
-
-            if franjas_no_disponibles_ids:
-                dias_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
-                for dia in dias_semana:
-                    for franja_id in franjas_no_disponibles_ids:
-                        conflictos.add((dia, franja_id))
-
-        # Convertir el set de tuplas a una lista de diccionarios
-        conflictos_list = [{'dia': dia, 'franja_id': franja_id} for dia, franja_id in conflictos]
-
-        return success_response(data={'conflicts': conflictos_list})
-
-    except Curso.DoesNotExist:
-        return not_found_response('Curso no encontrado.')
+    """
+    DEBUG: Temporarily disabled to always return zero conflicts.
+    This helps isolate whether the problem is in conflict detection or elsewhere.
+    """
+    return success_response(data={'conflicts': []})
 
 def _get_planner_data(especialidad_id, semestre_cursado):
     try:
