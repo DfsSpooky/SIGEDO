@@ -150,37 +150,35 @@
         border-radius: var(--pm-border-radius);
     }
 
-    /* Schedule Tabs */
+    /* Schedule Tabs Styling (Corrected for <a> tags) */
     .planner-modern .tabs-lifted {
         border-bottom: 1px solid var(--pm-border);
         margin-bottom: 1rem;
-        padding-left: 0;
     }
     .planner-modern .tabs-lifted .tab {
         border: none;
         border-bottom: 2px solid transparent;
         border-radius: 0;
-        margin-bottom: -1px; /* Align with container's bottom border */
+        margin-bottom: -1px;
         padding: 0.5rem 1rem;
         color: var(--pm-text-secondary);
-    }
-    /* Remove DaisyUI's pseudo-elements that create the lifted effect */
-    .planner-modern .tabs-lifted .tab::before,
-    .planner-modern .tabs-lifted .tab::after {
-        display: none;
+        transition: color 0.2s, border-color 0.2s;
     }
     .planner-modern .tabs-lifted .tab:hover {
         color: var(--pm-text-primary);
-        border-bottom-color: #d1d5da;
     }
-    .planner-modern .tabs-lifted input[type="radio"]:checked + .tab {
-        background-color: transparent;
+    .planner-modern .tabs-lifted .tab.tab-active {
         color: var(--pm-text-primary);
         font-weight: 600;
         border-bottom-color: var(--pm-text-link);
-        border-inline-start: none;
-        border-top: none;
-        border-inline-end: none;
+    }
+
+    /* Tab Content Panes */
+    .tab-pane {
+        display: none;
+    }
+    .tab-pane.active {
+        display: block;
     }
 
 
@@ -342,39 +340,40 @@
             <div class="planner-main-grid grid grid-cols-1 lg:grid-cols-4 mt-4">
                 
                 <main class="lg:col-span-3">
-                    <div role="tablist" class="tabs tabs-lifted">
-                        <input type="radio" name="schedule_tabs" role="tab" class="tab" aria-label="Turno Mañana" checked />
-                        <div role="tabpanel" class="tab-content">
-                             <div class="schedule-container">
-                                <table class="table table-fixed w-full">
-                                    <thead>
-                                        <tr>
-                                            <th class="w-32">Horas</th>
-                                            {% for dia in dias_semana %}<th>{{ dia }}</th>{% endfor %}
-                                        </tr>
-                                    </thead>
-                                    <tbody id="schedule-grid-manana">
-                                        <!-- Mañana Grid will be populated by JS -->
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+                    <div role="tablist" class="tabs tabs-lifted" id="schedule-tabs-container">
+                        <a role="tab" class="tab tab-active" data-tab-target="#schedule-morning">Turno Mañana</a>
+                        <a role="tab" class="tab" data-tab-target="#schedule-afternoon">Turno Tarde</a>
+                    </div>
 
-                        <input type="radio" name="schedule_tabs" role="tab" class="tab" aria-label="Turno Tarde" />
-                        <div role="tabpanel" class="tab-content">
-                            <div class="schedule-container">
-                                <table class="table table-fixed w-full">
-                                    <thead>
-                                        <tr>
-                                            <th class="w-32">Horas</th>
-                                            {% for dia in dias_semana %}<th>{{ dia }}</th>{% endfor %}
-                                        </tr>
-                                    </thead>
-                                    <tbody id="schedule-grid-tarde">
-                                        <!-- Tarde Grid will be populated by JS -->
-                                    </tbody>
-                                </table>
-                            </div>
+                    <div id="schedule-morning" class="tab-pane active">
+                        <div class="schedule-container">
+                            <table class="table table-fixed w-full">
+                                <thead>
+                                    <tr>
+                                        <th class="w-32">Horas</th>
+                                        {% for dia in dias_semana %}<th>{{ dia }}</th>{% endfor %}
+                                    </tr>
+                                </thead>
+                                <tbody id="schedule-grid-manana">
+                                    <!-- Mañana Grid will be populated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div id="schedule-afternoon" class="tab-pane">
+                        <div class="schedule-container">
+                            <table class="table table-fixed w-full">
+                                <thead>
+                                    <tr>
+                                        <th class="w-32">Horas</th>
+                                        {% for dia in dias_semana %}<th>{{ dia }}</th>{% endfor %}
+                                    </tr>
+                                </thead>
+                                <tbody id="schedule-grid-tarde">
+                                    <!-- Tarde Grid will be populated by JS -->
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </main>
@@ -443,7 +442,8 @@ document.addEventListener('DOMContentLoaded', function () {
         searchInput: '#course-search-input',
         autoAssignBtn: '#auto-assign-btn',
         autoAssignLog: '#auto-assign-log',
-        tabs: '.tabs .tab',
+        sidebarTabs: '.planner-sidebar .tabs .tab', // More specific selector for sidebar
+        scheduleTabsContainer: '#schedule-tabs-container', // Container for the main schedule tabs
         globalAutoAssignBtn: '#global-auto-assign-btn'
     };
     const DOMElements = Object.fromEntries(Object.entries(selectors).map(([key, selector]) => [key, document.querySelector(selector)]));
@@ -818,13 +818,34 @@ document.addEventListener('DOMContentLoaded', function () {
             card.style.display = card.textContent.toLowerCase().includes(searchTerm) ? '' : 'none';
         });
     });
-    DOMElements.tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            DOMElements.tabs.forEach(t => t.classList.remove('tab-active'));
+    // Logic for Sidebar Tabs (Manual/Auto)
+    const sidebarTabs = document.querySelectorAll(selectors.sidebarTabs);
+    sidebarTabs.forEach(tab => {
+        tab.addEventListener('click', (e) => {
+            e.preventDefault();
+            sidebarTabs.forEach(t => t.classList.remove('tab-active'));
             tab.classList.add('tab-active');
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+            // This logic correctly toggles the sidebar content
+            document.querySelectorAll('#tab-manual, #tab-auto').forEach(c => c.classList.remove('active'));
             document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
         });
+    });
+
+    // New logic for Schedule Tabs (Mañana/Tarde)
+    DOMElements.scheduleTabsContainer.addEventListener('click', (e) => {
+        if (e.target.matches('.tab')) {
+            e.preventDefault();
+
+            DOMElements.scheduleTabsContainer.querySelectorAll('.tab').forEach(tab => tab.classList.remove('tab-active'));
+            e.target.classList.add('tab-active');
+
+            document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+            const targetPane = document.querySelector(e.target.dataset.tabTarget);
+            if (targetPane) {
+                targetPane.classList.add('active');
+            }
+        }
     });
     if (DOMElements.especialidad.value && DOMElements.semestre.value) {
         loadPlannerData();
