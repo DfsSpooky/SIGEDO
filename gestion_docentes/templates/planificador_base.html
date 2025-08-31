@@ -39,11 +39,28 @@
     </style>
 </head>
 <body class="bg-base-200">
+    <div role="navigation" class="navbar bg-base-100/80 backdrop-blur-md sticky top-0 z-40 shadow-sm border-b border-base-300/50">
+        <div class="navbar-start">
+            <a href="{% url 'dashboard' %}" class="btn btn-ghost text-lg">
+                <i class="fas fa-arrow-left mr-2"></i>
+                Volver al Dashboard
+            </a>
+        </div>
+        <div class="navbar-center">
+            <span class="font-bold text-xl text-base-content/50">Modo Planificador</span>
+        </div>
+        <div class="navbar-end">
+            <a href="/admin" target="_blank" class="btn btn-ghost">
+                <i class="fas fa-cogs mr-2"></i>
+                Panel de Admin
+            </a>
+        </div>
+    </div>
 
     <main class="p-4 sm:p-6 lg:p-8 animate-fade-in">
 
         {% if messages %}
-        <div id="message-container" class="fixed top-5 right-5 z-50 w-full max-w-sm space-y-3">
+        <div id="message-container" class="fixed top-20 right-5 z-50 w-full max-w-sm space-y-3">
             {% for message in messages %}
             <div class="alert shadow-lg text-white animate-fade-in {% if message.tags == 'success' %}bg-success{% elif message.tags == 'error' %}bg-error{% elif message.tags == 'warning' %}bg-warning{% else %}bg-info{% endif %}">
                 <div class="flex items-center w-full">
