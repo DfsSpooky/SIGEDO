@@ -142,30 +142,33 @@ class SemestreAdmin(ModelAdmin):
 
 from .models import BloqueHorario
 
-from django.forms.models import BaseInlineFormSet
+from django import forms
 
-class BloqueHorarioInlineFormSet(BaseInlineFormSet):
-    def __init__(self, *args, **kwargs):
-        # El admin de Django (y temas como Unfold) pueden pasar argumentos extra al formset.
-        # Los capturamos aquí para evitar que se pasen al __init__ del padre, que no los espera.
-        self.request = kwargs.pop('request', None)
-        kwargs.pop('per_page', None)
-        super().__init__(*args, **kwargs)
+class BloqueHorarioInlineForm(forms.ModelForm):
+    class Meta:
+        model = BloqueHorario
+        fields = '__all__'
 
     def clean(self):
-        super().clean()
-        for form in self.forms:
-            # Ignorar formularios vacíos que no tienen datos cambiados
-            if not form.has_changed():
-                continue
-            # Si el formulario tiene datos pero le falta la franja_inicio, lanzar error
-            if form.cleaned_data and not form.cleaned_data.get('franja_inicio'):
-                 if not form.cleaned_data.get('DELETE', False):
-                    form.add_error('franja_inicio', 'Este campo es obligatorio si se crea un bloque.')
+        cleaned_data = super().clean()
+        # Este 'clean' se ejecuta para cada formulario del inline.
+        # Si el formulario está vacío (el usuario no llenó nada en un 'extra' form),
+        # no hacemos nada, Django lo ignorará.
+        if not self.has_changed():
+            return cleaned_data
+
+        # Si el formulario SÍ ha cambiado (el usuario escribió algo),
+        # pero falta un campo obligatorio como 'franja_inicio',
+        # la validación estándar de ModelForm ya debería haber lanzado un error.
+        # Esta es una doble verificación por si acaso.
+        if 'franja_inicio' not in cleaned_data:
+            raise forms.ValidationError("Debe seleccionar una franja horaria de inicio.")
+
+        return cleaned_data
 
 class BloqueHorarioInline(TabularInline):
     model = BloqueHorario
-    formset = BloqueHorarioInlineFormSet
+    form = BloqueHorarioInlineForm
     extra = 1
     autocomplete_fields = ('franja_inicio',)
     classes = ('collapse',)
