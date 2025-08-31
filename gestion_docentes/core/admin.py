@@ -142,40 +142,6 @@ class SemestreAdmin(ModelAdmin):
 
 from .models import BloqueHorario
 
-from django import forms
-
-class BloqueHorarioInlineForm(forms.ModelForm):
-    class Meta:
-        model = BloqueHorario
-        fields = '__all__'
-
-    def clean(self):
-        cleaned_data = super().clean()
-        # Este 'clean' se ejecuta para cada formulario del inline.
-        # Si el formulario está vacío (el usuario no llenó nada en un 'extra' form),
-        # no hacemos nada, Django lo ignorará.
-        if not self.has_changed():
-            return cleaned_data
-
-        # Si el formulario SÍ ha cambiado (el usuario escribió algo),
-        # pero falta un campo obligatorio como 'franja_inicio',
-        # la validación estándar de ModelForm ya debería haber lanzado un error.
-        # Esta es una doble verificación por si acaso.
-        if 'franja_inicio' not in cleaned_data:
-            raise forms.ValidationError("Debe seleccionar una franja horaria de inicio.")
-
-        return cleaned_data
-
-class BloqueHorarioInline(TabularInline):
-    model = BloqueHorario
-    form = BloqueHorarioInlineForm
-    extra = 1
-    autocomplete_fields = ('franja_inicio',)
-    classes = ('collapse',)
-    verbose_name = "Bloque de Horario"
-    verbose_name_plural = "Bloques de Horario Asignados"
-
-
 @admin.register(Curso)
 class CursoAdmin(ModelAdmin):
     list_display = ('nombre', 'tipo_curso', 'docente', 'especialidad', 'semestre', 'semestre_cursado', 'acciones')
@@ -185,7 +151,6 @@ class CursoAdmin(ModelAdmin):
     search_as_command = True
     ordering = ('semestre', 'semestre_cursado', 'nombre')
     autocomplete_fields = ['docente', 'carrera', 'especialidad', 'semestre']
-    inlines = [BloqueHorarioInline]
     fieldsets = (
         ('Información General', {'fields': ('nombre', 'tipo_curso', 'horas_academicas_semanales')}),
         ('Organización Académica', {'fields': ('docente', 'carrera', 'especialidad', 'semestre', 'semestre_cursado')}),
@@ -415,3 +380,4 @@ class SolicitudIntercambioAdmin(ModelAdmin):
 # --- REGISTRO DEL RESTO DE MODELOS ---
 admin.site.register(Grupo)
 admin.site.register(AsistenciaDiaria)
+admin.site.register(BloqueHorario)
