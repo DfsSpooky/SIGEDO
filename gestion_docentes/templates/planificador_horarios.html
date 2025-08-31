@@ -205,45 +205,38 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // --- RENDERING FUNCTIONS ---
     function createCourseElement(curso, isAssigned = false) {
-        const docenteNombre = `${curso.docente__first_name || ''} ${curso.docente__last_name || ''}`.trim();
         const div = document.createElement('div');
         div.className = `relative p-2 rounded-lg text-sm transition-all duration-300 cursor-grab active:cursor-grabbing border`;
-        div.dataset.cursoId = curso.id;
-        div.dataset.duracion = curso.duracion_bloques;
-        div.dataset.fullData = JSON.stringify(curso);
 
-        // 1. Color Coding based on course type
         let colors = '';
-        if (curso.tipo_curso === 'GENERAL') {
-            colors = 'bg-purple-500/10 border-purple-500/20 text-purple-800 dark:text-purple-300';
-        } else { // ESPECIALIDAD
-            colors = 'bg-sky-500/10 border-sky-500/20 text-sky-800 dark:text-sky-300';
-        }
-        // Unassigned courses have a neutral background
-        if (!isAssigned) {
-            colors = 'bg-base-200 border-base-300';
-        }
-        div.classList.add(...colors.split(' '));
-
-        div.innerHTML = `
-            <p class="font-bold truncate pr-4">${curso.nombre}</p>
-            <p class="text-xs opacity-70 truncate">${docenteNombre}</p>
-            <p class="text-xs opacity-50">${curso.duracion_bloques} bloque(s)</p>
-        `;
-
         if (isAssigned) {
+            // --- Elemento ASIGNADO (Bloque de Horario) ---
+            div.dataset.bloqueId = curso.bloque_id;
+            div.dataset.cursoId = curso.curso_id; // Mantenemos el cursoId por si es útil
+            div.dataset.fullData = JSON.stringify(curso);
+
+            if (curso.tipo_curso === 'GENERAL') {
+                colors = 'bg-purple-500/10 border-purple-500/20 text-purple-800 dark:text-purple-300';
+            } else { // ESPECIALIDAD
+                colors = 'bg-sky-500/10 border-sky-500/20 text-sky-800 dark:text-sky-300';
+            }
+            div.innerHTML = `
+                <p class="font-bold truncate pr-4">${curso.nombre}</p>
+                <p class="text-xs opacity-70 truncate">${curso.docente_nombre}</p>
+                <p class="text-xs opacity-50">${curso.duracion_bloques} bloque(s)</p>
+            `;
+
             const deleteButton = document.createElement('button');
             deleteButton.className = 'absolute top-1 right-1 btn btn-xs btn-circle btn-ghost text-error/50 hover:text-error hover:bg-error/10';
             deleteButton.innerHTML = `<i class="fas fa-times"></i>`;
-            deleteButton.addEventListener('click', () => {
+            deleteButton.addEventListener('click', (e) => {
+                e.stopPropagation();
                 Swal.fire({
-                    title: '¿Desasignar curso?',
-                    text: `"${curso.nombre}" volverá a la lista de pendientes.`,
+                    title: '¿Eliminar este bloque?',
+                    text: `Se eliminará el bloque de ${curso.duracion_bloques} hora(s) para "${curso.nombre}".`,
                     icon: 'warning',
                     showCancelButton: true,
-                    confirmButtonColor: '#3085d6',
-                    cancelButtonColor: '#d33',
-                    confirmButtonText: 'Sí, desasignar',
+                    confirmButtonText: 'Sí, eliminar',
                     cancelButtonText: 'No'
                 }).then((result) => {
                     if (result.isConfirmed) {
@@ -252,7 +245,23 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
             });
             div.appendChild(deleteButton);
+
+        } else {
+            // --- Elemento PENDIENTE de Asignar (Curso) ---
+            div.dataset.cursoId = curso.id;
+            div.dataset.fullData = JSON.stringify(curso);
+            // Al arrastrar, decidimos con cuántos bloques se intenta asignar. 2 es un default razonable.
+            // Lo ideal sería un selector en la UI.
+            div.dataset.duracion = Math.min(2, curso.horas_pendientes);
+            colors = 'bg-base-200 border-base-300';
+            div.innerHTML = `
+                <p class="font-bold truncate">${curso.nombre}</p>
+                <p class="text-xs opacity-70 truncate">${curso.docente_nombre}</p>
+                <p class="text-xs opacity-50 font-semibold text-info">${curso.horas_pendientes} de ${curso.horas_totales}h pendientes</p>
+            `;
         }
+
+        div.classList.add(...colors.split(' '));
         return div;
     }
 
@@ -272,9 +281,9 @@ document.addEventListener('DOMContentLoaded', function () {
         renderGrid(DOMElements.gridManana, franjasManana);
         renderGrid(DOMElements.gridTarde, franjasTarde);
 
-        // 2. Render Unassigned Courses
+        // 2. Render Unassigned Courses (now "Pending Courses")
         DOMElements.unassignedContainer.innerHTML = '';
-        const { generales, especialidad } = plannerData.cursos_no_asignados;
+        const { generales, especialidad } = plannerData.cursos_pendientes;
         const createAccordion = (title, courses, id) => {
             const collapseDiv = document.createElement('div');
             collapseDiv.className = 'collapse collapse-arrow bg-base-200/50';
@@ -283,29 +292,29 @@ document.addEventListener('DOMContentLoaded', function () {
             if (courses.length > 0) {
                 courses.forEach(curso => courseList.appendChild(createCourseElement(curso, false)));
             } else {
-                courseList.innerHTML = '<p class="text-xs text-base-content/50 p-2">No hay cursos.</p>';
+                courseList.innerHTML = '<p class="text-xs text-base-content/50 p-2">No hay cursos pendientes.</p>';
             }
             return collapseDiv;
         };
-        DOMElements.unassignedContainer.appendChild(createAccordion('Generales', generales, 'unassigned-generales'));
-        DOMElements.unassignedContainer.appendChild(createAccordion('Especialidad', especialidad, 'unassigned-especialidad'));
+        DOMElements.unassignedContainer.appendChild(createAccordion('Generales Pendientes', generales, 'unassigned-generales'));
+        DOMElements.unassignedContainer.appendChild(createAccordion('Especialidad Pendientes', especialidad, 'unassigned-especialidad'));
 
-        // 3. Render Assigned Courses
-        plannerData.cursos_asignados.forEach(curso => {
-            if (!curso.franja_id_inicio) return;
-            const cell = document.querySelector(`td[data-dia="${curso.dia}"][data-franja-id="${curso.franja_id_inicio}"]`);
+        // 3. Render Assigned Courses (now "Blocks")
+        plannerData.cursos_asignados.forEach(bloque => {
+            if (!bloque.franja_id_inicio) return;
+            const cell = document.querySelector(`td[data-dia="${bloque.dia}"][data-franja-id="${bloque.franja_id_inicio}"]`);
             if (cell) {
-                cell.appendChild(createCourseElement(curso, true));
+                cell.appendChild(createCourseElement(bloque, true));
 
                 // Visual spanning logic
-                const duration = curso.duracion_bloques;
+                const duration = bloque.duracion_bloques;
                 if (duration > 1) {
                     cell.setAttribute('rowspan', duration);
                     let currentRow = cell.parentElement;
                     for (let i = 1; i < duration; i++) {
                         currentRow = currentRow.nextElementSibling;
                         if (currentRow) {
-                            const cellToHide = currentRow.querySelector(`[data-dia="${curso.dia}"]`);
+                            const cellToHide = currentRow.querySelector(`[data-dia="${bloque.dia}"]`);
                             if (cellToHide) cellToHide.style.display = 'none';
                         }
                     }
@@ -329,21 +338,27 @@ document.addEventListener('DOMContentLoaded', function () {
             const { item, to, from } = evt;
             revertVisualSpan(from, item.dataset.duracion);
             if (to.classList.contains('conflict-cell') || to.children.length > 1) {
-                from.appendChild(item);
+                from.appendChild(item); // Revert drag
                 return Toast.fire({ icon: 'error', title: 'No se puede asignar en este espacio.' });
             }
             try {
-                const data = await callApi('/api/asignar-horario/', 'POST', { curso_id: item.dataset.cursoId, dia: to.dataset.dia, franja_id: to.dataset.franjaId });
+                const payload = {
+                    curso_id: item.dataset.cursoId,
+                    dia: to.dataset.dia,
+                    franja_id: to.dataset.franjaId,
+                    duracion: parseInt(item.dataset.duracion, 10)
+                };
+                const data = await callApi('/api/asignar-horario/', 'POST', payload);
                 Toast.fire({ icon: 'success', title: data.message });
-                applyVisualSpan(to, item.dataset.duracion);
-                to.replaceChild(createCourseElement(JSON.parse(item.dataset.fullData), true), item);
+                // En lugar de manipular el DOM directamente, recargamos todo para obtener el estado real.
+                await loadPlannerData();
             } catch (error) {
-                Toast.fire({ icon: 'error', title: error.message });
-                from.appendChild(item);
+                Toast.fire({ icon: 'error', title: `Error al asignar: ${error.message}` });
+                from.appendChild(item); // Revert drag on failure
             }
         };
 
-        const onStart = (evt) => highlightConflicts(evt.item.dataset.cursoId);
+        const onStart = (evt) => highlightConflicts(evt.item);
         const onEnd = () => clearConflicts();
 
         sortableInstances.push(new Sortable(document.getElementById('unassigned-generales'), sharedConfig));
@@ -357,33 +372,30 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     async function handleDeassign(courseElement, fromCell = null) {
-        const cursoId = courseElement.dataset.cursoId;
-        if (!cursoId) return;
+        const bloqueId = courseElement.dataset.bloqueId;
+        if (!bloqueId) {
+            // Si no tiene bloqueId, es un curso pendiente, no hacer nada.
+            courseElement.remove(); // Simplemente lo quita de la zona de basura
+            return;
+        }
 
         try {
-            await callApi('/api/desasignar-horario/', 'POST', { curso_id: cursoId });
-            Toast.fire({ icon: 'info', title: 'Curso desasignado' });
-
-            // If the element came from a cell, revert its span. Otherwise, just remove.
-            if (fromCell) {
-                revertVisualSpan(fromCell, courseElement.dataset.duracion);
-            }
-            courseElement.remove();
-
-            // Reload all data to refresh the unassigned list correctly
+            await callApi('/api/desasignar-horario/', 'POST', { bloque_id: bloqueId });
+            Toast.fire({ icon: 'info', title: 'Bloque de horario eliminado' });
             await loadPlannerData();
         } catch (error) {
-            Toast.fire({ icon: 'error', title: `Error al desasignar: ${error.message}` });
-            // If dragging failed, put it back. This part is tricky if not a drag op.
+            Toast.fire({ icon: 'error', title: `Error al eliminar: ${error.message}` });
             if (fromCell) {
                 fromCell.appendChild(courseElement);
             }
         }
     }
 
-    async function highlightConflicts(cursoId) {
+    async function highlightConflicts(item) {
         clearConflicts();
-        const data = await callApi(`/api/get-teacher-conflicts/?curso_id=${cursoId}`);
+        const cursoId = item.dataset.cursoId;
+        const duracion = item.dataset.duracion;
+        const data = await callApi(`/api/get-teacher-conflicts/?curso_id=${cursoId}&duracion=${duracion}`);
         data.conflicts.forEach(c => document.querySelector(`td[data-dia="${c.dia}"][data-franja-id="${c.franja_id}"]`)?.classList.add('conflict-cell'));
     }
     function clearConflicts() {

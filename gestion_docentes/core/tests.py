@@ -256,12 +256,12 @@ class ReporteAsistenciaTest(TestCase):
         curso_manana = Curso.objects.create(
             docente=self.docente,
             nombre="Curso de Mañana",
-            dia='Lunes', # Corresponds to the adjusted `today`
-            horario_inicio="09:00:00",
-            horario_fin="11:00:00",
             semestre=Semestre.objects.first(),
             carrera=self.carrera
         )
+        franja = FranjaHoraria.objects.create(turno='MANANA', hora_inicio=time(9,0), hora_fin=time(10,50))
+        BloqueHorario.objects.create(curso=curso_manana, dia='Lunes', franja_inicio=franja, duracion_bloques=2)
+
 
         # 2. Test "Falta" (Absent)
         url = reverse('reporte_asistencia') + f'?fecha_inicio={today}&fecha_fin={today}'
@@ -429,15 +429,15 @@ class JustificacionTest(TestCase):
 
         Semestre.objects.create(nombre="Test Semestre Just", fecha_inicio=today-timedelta(days=30), fecha_fin=today+timedelta(days=30), estado='ACTIVO')
         carrera = Carrera.objects.create(nombre="Ingeniería de Justificaciones")
-        Curso.objects.create(
+        curso = Curso.objects.create(
             docente=self.teacher,
             nombre="Curso con Falta",
-            dia='Lunes',
-            horario_inicio="14:00:00",
-            horario_fin="16:00:00",
             semestre=Semestre.objects.first(),
             carrera=carrera
         )
+        franja = FranjaHoraria.objects.create(turno='TARDE', hora_inicio=time(14,0), hora_fin=time(15,50))
+        BloqueHorario.objects.create(curso=curso, dia='Lunes', franja_inicio=franja, duracion_bloques=2)
+
 
         # 1. First, confirm the status is 'Falta' without justification
         url = reverse('reporte_asistencia') + f'?fecha_inicio={today}&fecha_fin={today}'
@@ -571,40 +571,44 @@ class AutoCheckoutTest(TestCase):
         self.carrera = Carrera.objects.create(nombre="Ingeniería de Checkout")
         self.semestre = Semestre.objects.create(nombre="Test Semestre Checkout", fecha_inicio=date.today()-timedelta(days=30), fecha_fin=date.today()+timedelta(days=30), estado='ACTIVO')
 
+        franja_pasada = FranjaHoraria.objects.create(turno='MANANA', hora_inicio=time(8, 0), hora_fin=time(10, 0))
+        franja_futura = FranjaHoraria.objects.create(turno='TARDE', hora_inicio=time(18, 0), hora_fin=time(20, 0))
+
         self.curso_pasado = Curso.objects.create(
             docente=self.docente,
             nombre="Curso Pasado",
-            dia='Lunes',
-            horario_inicio=time(8, 0),
-            horario_fin=time(10, 0),
             semestre=self.semestre,
             carrera=self.carrera
         )
+        BloqueHorario.objects.create(curso=self.curso_pasado, dia='Lunes', franja_inicio=franja_pasada, duracion_bloques=2)
+
 
         self.curso_futuro = Curso.objects.create(
             docente=self.docente,
             nombre="Curso Futuro",
-            dia='Lunes',
-            horario_inicio=time(18, 0),
-            horario_fin=time(20, 0),
             semestre=self.semestre,
             carrera=self.carrera
         )
+        BloqueHorario.objects.create(curso=self.curso_futuro, dia='Lunes', franja_inicio=franja_futura, duracion_bloques=2)
 
         # Create an attendance record for a course that has already ended today
         # but has no checkout time.
+        today = date.today()
+        # Ensure the date is a Monday to match the created BloqueHorario
+        last_monday = today - timedelta(days=today.weekday())
+
         self.asistencia_abierta = Asistencia.objects.create(
             docente=self.docente,
             curso=self.curso_pasado,
-            fecha=date.today() - timedelta(days=7), # Last week
-            hora_entrada=timezone.make_aware(datetime.combine(date.today() - timedelta(days=7), time(8, 5)))
+            fecha=last_monday,
+            hora_entrada=timezone.make_aware(datetime.combine(last_monday, time(8, 5)))
         )
 
         # Create an attendance record for a course that has not yet ended today.
         self.asistencia_futura = Asistencia.objects.create(
             docente=self.docente,
             curso=self.curso_futuro,
-            fecha=date.today(),
+            fecha=today, # This can remain today as it's for a future course check
             hora_entrada=timezone.now()
         )
 
@@ -627,8 +631,9 @@ class AutoCheckoutTest(TestCase):
         self.assertIsNotNone(self.asistencia_abierta.hora_salida)
 
         # The exit time should be the scheduled end time of the course.
+        bloque_pasado = BloqueHorario.objects.get(curso=self.curso_pasado)
         expected_checkout_time = timezone.make_aware(
-            datetime.combine(self.asistencia_abierta.fecha, self.curso_pasado.horario_fin)
+            datetime.combine(self.asistencia_abierta.fecha, bloque_pasado.horario_fin)
         )
         self.assertEqual(self.asistencia_abierta.hora_salida, expected_checkout_time)
 
@@ -743,3 +748,142 @@ class DniOrUsernameBackendTest(TestCase):
         """Test that authentication fails for a user that does not exist."""
         user = authenticate(username='nonexistentuser', password='anypassword')
         self.assertIsNone(user)
+
+
+from .models import Especialidad, Grupo, BloqueHorario, FranjaHoraria
+
+class HorarioFlexibleTest(TestCase):
+    def setUp(self):
+        """Set up a test environment for flexible scheduling."""
+        self.client = Client()
+        self.admin_user = PersonalDocente.objects.create_superuser(
+            username='admin_horarios', password='password', dni='11111111'
+        )
+        self.client.login(username='admin_horarios', password='password')
+
+        self.docente = PersonalDocente.objects.create_user(
+            username='profesor_flexible', password='password', dni='22222222'
+        )
+        self.semestre = Semestre.objects.create(
+            nombre="Semestre de Prueba Flex",
+            fecha_inicio=date.today() - timedelta(days=30),
+            fecha_fin=date.today() + timedelta(days=30),
+            estado='ACTIVO'
+        )
+        self.carrera = Carrera.objects.create(nombre="Ingeniería Flexible")
+        self.grupo = Grupo.objects.create(nombre="Grupo Test")
+        self.especialidad = Especialidad.objects.create(nombre="Especialidad Test", grupo=self.grupo)
+
+        # Crear franjas horarias para mañana y tarde
+        for i in range(8, 13): # Mañana
+            FranjaHoraria.objects.create(turno='MANANA', hora_inicio=time(i, 0), hora_fin=time(i, 50))
+        for i in range(14, 19): # Tarde
+            FranjaHoraria.objects.create(turno='TARDE', hora_inicio=time(i, 0), hora_fin=time(i, 50))
+
+        self.url_generar = reverse('api:generar_horario_automatico')
+        self.url_asignar = reverse('api:asignar_horario')
+        self.url_desasignar = reverse('api:desasignar_horario')
+
+    def test_generar_horario_distribuido(self):
+        """
+        Test that the automatic generator can create multiple blocks for a single course
+        to meet its weekly hours requirement.
+        """
+        # Crear un curso que requiere 6 horas semanales
+        curso = Curso.objects.create(
+            nombre="Cálculo Avanzado",
+            docente=self.docente,
+            semestre=self.semestre,
+            carrera=self.carrera,
+            especialidad=self.especialidad,
+            semestre_cursado=1,
+            horas_academicas_semanales=6
+        )
+
+        self.assertEqual(BloqueHorario.objects.count(), 0)
+
+        # Ejecutar el generador automático
+        response = self.client.post(self.url_generar)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['status'], 'success')
+
+        # Verificar que se crearon bloques para el curso
+        bloques = BloqueHorario.objects.filter(curso=curso)
+        self.assertTrue(bloques.exists())
+
+        # Verificar que la suma de las duraciones de los bloques es igual a las horas semanales
+        total_horas_asignadas = sum(b.duracion_bloques for b in bloques)
+        self.assertEqual(total_horas_asignadas, curso.horas_academicas_semanales)
+
+        # Verificar que la distribución es razonable (p.ej. 3 bloques de 2h, 2 de 3h, etc.)
+        # La lógica actual intenta bloques de 3, 2, 1. Para 6h, debería ser 3+3 o 3+2+1 o 2+2+2
+        duraciones = [b.duracion_bloques for b in bloques]
+        self.assertIn(sorted(duraciones), [[3, 3], [1, 2, 3], [2, 2, 2]])
+
+    def test_asignar_y_desasignar_bloque_manual(self):
+        """
+        Test manual assignment and deassignment of a single schedule block.
+        """
+        curso = Curso.objects.create(
+            nombre="Física Cuántica",
+            docente=self.docente,
+            semestre=self.semestre,
+            carrera=self.carrera,
+            especialidad=self.especialidad,
+            semestre_cursado=1,
+            horas_academicas_semanales=4
+        )
+        franja_inicio = FranjaHoraria.objects.filter(turno='MANANA').first()
+
+        # 1. Asignar un bloque de 2 horas
+        payload_asignar = {
+            'curso_id': curso.id,
+            'dia': 'Lunes',
+            'franja_id': franja_inicio.id,
+            'duracion': 2
+        }
+        response = self.client.post(self.url_asignar, json.dumps(payload_asignar), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['status'], 'success')
+
+        self.assertEqual(BloqueHorario.objects.count(), 1)
+        bloque = BloqueHorario.objects.first()
+        self.assertEqual(bloque.curso, curso)
+        self.assertEqual(bloque.duracion_bloques, 2)
+
+        # 2. Desasignar el bloque creado
+        payload_desasignar = {'bloque_id': bloque.id}
+        response = self.client.post(self.url_desasignar, json.dumps(payload_desasignar), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['status'], 'success')
+
+        self.assertEqual(BloqueHorario.objects.count(), 0)
+
+    def test_asignar_bloque_excediendo_horas(self):
+        """
+        Test that the API prevents assigning a block that would exceed the course's total weekly hours.
+        """
+        curso = Curso.objects.create(
+            nombre="Termodinámica",
+            docente=self.docente,
+            semestre=self.semestre,
+            carrera=self.carrera,
+            especialidad=self.especialidad,
+            semestre_cursado=1,
+            horas_academicas_semanales=2 # Solo 2 horas permitidas
+        )
+        franja_inicio = FranjaHoraria.objects.filter(turno='MANANA').first()
+
+        # Intentar asignar un bloque de 3 horas (más de las 2 permitidas)
+        payload = {
+            'curso_id': curso.id,
+            'dia': 'Martes',
+            'franja_id': franja_inicio.id,
+            'duracion': 3
+        }
+        response = self.client.post(self.url_asignar, json.dumps(payload), content_type='application/json')
+        self.assertEqual(response.status_code, 400) # Bad Request
+        self.assertEqual(response.json()['status'], 'error')
+        self.assertIn('excede las horas semanales', response.json()['message'])
+
+        self.assertEqual(BloqueHorario.objects.count(), 0)

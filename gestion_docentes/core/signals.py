@@ -79,7 +79,7 @@ def crear_notificacion_asignacion_curso(sender, instance, **kwargs):
         try:
             old_instance = Curso.objects.get(pk=instance.pk)
             if old_instance.docente != instance.docente and instance.docente is not None:
-                message = f"Se le ha asignado un nuevo curso: '{instance.nombre}' en el horario de {instance.dia} de {instance.horario_inicio} a {instance.horario_fin}."
+                message = f"Se le ha asignado un nuevo curso: '{instance.nombre}'. Consulte su horario para ver los detalles."
 
                 notificacion = Notificacion.objects.create(
                     destinatario=instance.docente,

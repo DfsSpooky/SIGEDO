@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from datetime import datetime
-from core.models import Asistencia
+from core.models import Asistencia, BloqueHorario
 
 class Command(BaseCommand):
     help = 'Automatically checks out courses where the end time has passed but no exit has been marked.'
@@ -10,14 +10,25 @@ class Command(BaseCommand):
         self.stdout.write("Starting auto-checkout process...")
 
         now = timezone.now()
-        open_attendances = Asistencia.objects.filter(hora_entrada__isnull=False, hora_salida__isnull=True)
+        open_attendances = Asistencia.objects.filter(hora_entrada__isnull=False, hora_salida__isnull=True).select_related('curso')
 
         checked_out_count = 0
+        dias_semana = {0: 'Lunes', 1: 'Martes', 2: 'Miércoles', 3: 'Jueves', 4: 'Viernes', 5: 'Sábado', 6: 'Domingo'}
 
         for a in open_attendances:
-            if a.curso and a.curso.horario_fin:
-                # Combine the attendance date with the course's end time
-                end_time_naive = datetime.combine(a.fecha, a.curso.horario_fin)
+            if not a.curso:
+                continue
+
+            # Find the schedule block for this course on the day of attendance
+            dia_asistencia = dias_semana.get(a.fecha.weekday())
+            if not dia_asistencia:
+                continue
+
+            bloque_del_dia = BloqueHorario.objects.filter(curso=a.curso, dia=dia_asistencia).first()
+
+            if bloque_del_dia:
+                # Combine the attendance date with the block's end time
+                end_time_naive = datetime.combine(a.fecha, bloque_del_dia.horario_fin)
                 # Make it timezone-aware
                 end_time_aware = timezone.make_aware(end_time_naive, timezone.get_current_timezone())
 

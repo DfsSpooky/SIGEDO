@@ -1,7 +1,7 @@
 from django.utils import timezone
 from datetime import date, timedelta
 
-from ..models import Docente, Asistencia, Curso, ConfiguracionInstitucion, Justificacion, AsistenciaDiaria, Semestre
+from ..models import Docente, Asistencia, Curso, ConfiguracionInstitucion, Justificacion, AsistenciaDiaria, Semestre, BloqueHorario
 from collections import defaultdict
 
 def _generar_datos_reporte_asistencia(filters):
@@ -36,13 +36,14 @@ def _generar_datos_reporte_asistencia(filters):
     # Pre-cargar todos los datos necesarios en lugar de consultarlos en el bucle
     asistencias_en_rango = Asistencia.objects.filter(fecha__range=[fecha_inicio, fecha_fin]).select_related('docente', 'curso')
     asistencias_diarias_en_rango = AsistenciaDiaria.objects.filter(fecha__range=[fecha_inicio, fecha_fin])
-    cursos_programados_qs = Curso.objects.filter(semestre=semestre_activo, dia__isnull=False).select_related('docente')
+
+    # La fuente de verdad ahora son los Bloques de Horario
+    bloques_programados_qs = BloqueHorario.objects.filter(curso__semestre=semestre_activo).select_related('curso__docente')
 
     if curso_id:
-        cursos_programados_qs = cursos_programados_qs.filter(id=curso_id)
-        # Si se filtra por curso, filtramos también los docentes para reducir el bucle principal
+        bloques_programados_qs = bloques_programados_qs.filter(curso_id=curso_id)
         if not docente_id:
-            docentes_del_curso_ids = cursos_programados_qs.values_list('docente_id', flat=True).distinct()
+            docentes_del_curso_ids = bloques_programados_qs.values_list('curso__docente_id', flat=True).distinct()
             docentes_qs = docentes_qs.filter(id__in=docentes_del_curso_ids)
 
     # Estructuras de datos para búsqueda rápida en memoria
@@ -52,9 +53,9 @@ def _generar_datos_reporte_asistencia(filters):
 
     asistencias_diarias_map = {(ad.docente_id, ad.fecha): ad for ad in asistencias_diarias_en_rango}
 
-    cursos_por_dia_map = defaultdict(list)
-    for curso in cursos_programados_qs:
-        cursos_por_dia_map[(curso.docente_id, curso.dia)].append(curso)
+    bloques_por_dia_map = defaultdict(list)
+    for bloque in bloques_programados_qs:
+        bloques_por_dia_map[(bloque.curso.docente_id, bloque.dia)].append(bloque)
 
     justificaciones_aprobadas = Justificacion.objects.filter(estado='APROBADO', fecha_inicio__lte=fecha_fin, fecha_fin__gte=fecha_inicio)
     justificaciones_set = set()
@@ -76,9 +77,9 @@ def _generar_datos_reporte_asistencia(filters):
             dia_semana_str = dias_semana_map[dia_actual.weekday()]
 
             # Búsqueda en memoria, no en BD
-            cursos_del_dia = cursos_por_dia_map.get((docente.id, dia_semana_str), [])
+            bloques_del_dia = bloques_por_dia_map.get((docente.id, dia_semana_str), [])
 
-            if not cursos_del_dia:
+            if not bloques_del_dia:
                 if estado_filtro == 'todos':
                     reporte_final.append({'docente': docente, 'fecha': dia_actual, 'estado': 'No Requerido', 'asistencias': [], 'asistencia_diaria': None})
                 continue
@@ -91,8 +92,12 @@ def _generar_datos_reporte_asistencia(filters):
                 estado_dia = 'Presente'
                 for asis in asistencias_del_dia:
                     asis.es_tardanza = False
-                    if asis.hora_entrada and asis.curso and asis.curso.horario_inicio:
-                        hora_inicio_dt = timezone.make_aware(timezone.datetime.combine(dia_actual, asis.curso.horario_inicio))
+                    # Encontrar el bloque correspondiente a la asistencia.
+                    # Asumimos que un curso tiene un solo bloque en un día.
+                    bloque_asistencia = next((b for b in bloques_del_dia if b.curso_id == asis.curso_id), None)
+
+                    if asis.hora_entrada and bloque_asistencia:
+                        hora_inicio_dt = timezone.make_aware(timezone.datetime.combine(dia_actual, bloque_asistencia.horario_inicio))
                         if (asis.hora_entrada - hora_inicio_dt) > limite_tardanza:
                             asis.es_tardanza = tiene_tardanza = True
                 if tiene_tardanza:

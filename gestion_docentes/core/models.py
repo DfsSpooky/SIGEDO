@@ -87,16 +87,15 @@ class Curso(models.Model):
     SEMESTRE_CURSADO_CHOICES = [(1, 'Semestre I'), (2, 'Semestre II'), (3, 'Semestre III'), (4, 'Semestre IV'), (5, 'Semestre V'), (6, 'Semestre VI'), (7, 'Semestre VII'), (8, 'Semestre VIII'), (9, 'Semestre IX'), (10, 'Semestre X')]
     nombre = models.CharField(max_length=100)
     tipo_curso = models.CharField(max_length=20, choices=TIPO_CURSO_CHOICES, default='ESPECIALIDAD', help_text="Indica si el curso es de especialidad o de estudios generales.")
-    docente = models.ForeignKey(Docente, on_delete=models.SET_NULL, null=True, blank=True)
+    docente = models.ForeignKey(Docente, on_delete=models.SET_NULL, null=True, blank=True, related_name='cursos')
     carrera = models.ForeignKey(Carrera, on_delete=models.CASCADE)
     especialidad = models.ForeignKey(Especialidad, on_delete=models.SET_NULL, null=True, related_name='cursos')
     semestre = models.ForeignKey(Semestre, on_delete=models.SET_NULL, null=True, related_name='cursos')
     semestre_cursado = models.IntegerField(choices=SEMESTRE_CURSADO_CHOICES, null=True, blank=True)
-    horario_inicio = models.TimeField(null=True, blank=True)
-    horario_fin = models.TimeField(null=True, blank=True)
-    dia = models.CharField(max_length=20, choices=[('Lunes', 'Lunes'), ('Martes', 'Martes'), ('Miércoles', 'Miércoles'), ('Jueves', 'Jueves'), ('Viernes', 'Viernes')], null=True, blank=True)
-    dia_semana = models.PositiveSmallIntegerField(null=True, blank=True, editable=False, db_index=True, help_text="Día de la semana como número (0=Lunes, 1=Martes...)")
-    duracion_bloques = models.IntegerField(default=2, help_text="Número de bloques de 50 minutos que dura el curso.")
+
+    # NUEVO CAMPO PARA HORAS TOTALES
+    horas_academicas_semanales = models.PositiveIntegerField(default=2, help_text="Número total de bloques de 50 minutos que el curso requiere a la semana.")
+
 
     class Meta:
         permissions = [
@@ -106,11 +105,59 @@ class Curso(models.Model):
     def __str__(self): return f"{self.nombre} ({self.especialidad.nombre if self.especialidad else 'N/A'})"
 
     def save(self, *args, **kwargs):
+        # La lógica de 'dia_semana' se ha movido a BloqueHorario
+        super().save(*args, **kwargs)
+
+class BloqueHorario(models.Model):
+    DIAS_SEMANA_CHOICES = [('Lunes', 'Lunes'), ('Martes', 'Martes'), ('Miércoles', 'Miércoles'), ('Jueves', 'Jueves'), ('Viernes', 'Viernes')]
+
+    curso = models.ForeignKey(Curso, on_delete=models.CASCADE, related_name='bloques_horario')
+    dia = models.CharField(max_length=20, choices=DIAS_SEMANA_CHOICES)
+    franja_inicio = models.ForeignKey(FranjaHoraria, on_delete=models.PROTECT, related_name='bloques_inicio')
+    duracion_bloques = models.PositiveIntegerField(default=1, help_text="Duración de este bloque específico en unidades de 50 minutos.")
+
+    # Campos denormalizados para facilitar consultas. Se actualizan con save().
+    horario_inicio = models.TimeField(editable=False)
+    horario_fin = models.TimeField(editable=False)
+    dia_semana = models.PositiveSmallIntegerField(editable=False, db_index=True)
+
+    class Meta:
+        verbose_name = "Bloque de Horario"
+        verbose_name_plural = "Bloques de Horario"
+        ordering = ['dia_semana', 'horario_inicio']
+        unique_together = ('curso', 'dia', 'franja_inicio') # Un curso no puede estar dos veces en el mismo bloque
+
+    def __str__(self):
+        return f"{self.curso.nombre} - {self.dia} {self.horario_inicio}-{self.horario_fin}"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        # Asegurarse de que el docente esté disponible
+        if self.curso.docente:
+            turno_franja = self.franja_inicio.turno
+            disponibilidad_docente = self.curso.docente.disponibilidad
+            if (disponibilidad_docente == 'MANANA' and turno_franja != 'MANANA') or \
+               (disponibilidad_docente == 'TARDE' and turno_franja != 'TARDE'):
+                raise ValidationError(f"El docente {self.curso.docente} no está disponible en el turno de {turno_franja}.")
+
+    def save(self, *args, **kwargs):
+        # Actualizar campos denormalizados
         DIAS = {'Lunes': 0, 'Martes': 1, 'Miércoles': 2, 'Jueves': 3, 'Viernes': 4}
-        if self.dia:
-            self.dia_semana = DIAS.get(self.dia)
-        else:
-            self.dia_semana = None
+        self.dia_semana = DIAS.get(self.dia)
+        self.horario_inicio = self.franja_inicio.hora_inicio
+
+        # Calcular la hora de fin
+        todas_las_franjas = list(FranjaHoraria.objects.order_by('hora_inicio'))
+        try:
+            start_index = todas_las_franjas.index(self.franja_inicio)
+            end_index = start_index + self.duracion_bloques - 1
+            if end_index < len(todas_las_franjas):
+                self.horario_fin = todas_las_franjas[end_index].hora_fin
+            else:
+                self.horario_fin = todas_las_franjas[-1].hora_fin
+        except (ValueError, IndexError):
+             self.horario_fin = self.franja_inicio.hora_fin
+
         super().save(*args, **kwargs)
 
 class Documento(models.Model):
