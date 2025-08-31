@@ -1,0 +1,308 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Nueva Solicitud de Justificación{% endblock %}
+
+{% block breadcrumb %}
+    <a href="{% url 'lista_justificaciones' %}" class="hover:underline">Justificaciones</a>
+    <span class="mx-2">/</span>
+    <span>Nueva Solicitud</span>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <form id="justification-form" method="post" enctype="multipart/form-data" class="card bg-base-100 shadow-xl overflow-hidden">
+        {% csrf_token %}
+        <div class="card-body p-6 md:p-10">
+            <div class="text-center mb-8">
+                <h1 class="text-4xl font-bold">Solicitud de Justificación</h1>
+                <p class="text-base-content/70 mt-2">Completa tu solicitud en 3 sencillos pasos.</p>
+            </div>
+
+            <ul id="steps-indicator" class="steps w-full mb-10">
+                <li class="step step-primary">Detalles</li>
+                <li class="step">Periodo</li>
+                <li class="step">Sustento</li>
+            </ul>
+
+            <div id="steps-container">
+
+                <div id="step-1" class="step-content">
+                    <div class="mb-6">
+                        <label class="label" for="{{ form.tipo.id_for_label }}">
+                            <span class="label-text text-lg font-semibold">¿Cuál es el tipo de justificación?</span>
+                        </label>
+                        {{ form.tipo }}
+                    </div>
+                    <div>
+                        <label class="label" for="{{ form.motivo.id_for_label }}">
+                            <span class="label-text text-lg font-semibold">Describe el motivo de tu ausencia</span>
+                        </label>
+                        {{ form.motivo }}
+                        <p class="text-sm text-base-content/60 mt-1">Sé breve y conciso. Esta información es confidencial.</p>
+                    </div>
+                </div>
+
+                <div id="step-2" class="step-content hidden">
+                    <p class="text-center text-lg font-semibold mb-6">¿Durante qué fechas te ausentarás?</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="form-control">
+                            <label class="label" for="{{ form.fecha_inicio.id_for_label }}">
+                                <span class="label-text font-semibold">Fecha de Inicio</span>
+                            </label>
+                            {{ form.fecha_inicio }}
+                            <p class="text-sm text-base-content/60 mt-1">El primer día de tu ausencia.</p>
+                        </div>
+                        <div class="form-control">
+                            <label class="label" for="{{ form.fecha_fin.id_for_label }}">
+                                <span class="label-text font-semibold">Fecha de Fin</span>
+                            </label>
+                            {{ form.fecha_fin }}
+                            <p class="text-sm text-base-content/60 mt-1">Si es un solo día, usa la misma fecha.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="step-3" class="step-content hidden">
+                    <p class="text-center text-lg font-semibold mb-6">¿Tienes algún documento de respaldo?</p>
+                    <div class="mt-2 flex justify-center rounded-lg border border-dashed border-base-content/30 px-6 py-10">
+                        <div class="text-center">
+                            <i class="fas fa-cloud-upload-alt fa-3x text-base-content/40"></i>
+                            <div class="mt-4 flex text-sm leading-6 text-base-content/60">
+                                <label for="{{ form.documento_adjunto.id_for_label }}" class="relative cursor-pointer rounded-md font-semibold text-primary focus-within:outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 hover:text-primary-focus">
+                                    <span>Sube un archivo</span>
+                                    {{ form.documento_adjunto }}
+                                </label>
+                                <p class="pl-1">o arrástralo aquí</p>
+                            </div>
+                            <p class="text-xs leading-5 text-base-content/60">PDF, PNG, JPG hasta 5MB</p>
+                            <p id="file-name-display" class="text-sm font-semibold text-success mt-2"></p>
+                        </div>
+                    </div>
+                     <p class="text-sm text-center text-base-content/60 mt-4">Adjuntar un documento es opcional, pero muy recomendado.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-base-200 p-4">
+             {% if form.errors %}
+                <div role="alert" class="alert alert-error mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <span><strong>¡Error!</strong> Por favor, regresa y corrige los campos marcados.</span>
+                </div>
+            {% endif %}
+
+            <div id="navigation-buttons" class="flex justify-between items-center">
+                <button type="button" id="prev-btn" class="btn btn-ghost">
+                    <i class="fas fa-arrow-left mr-2"></i> Anterior
+                </button>
+                <button type="button" id="next-btn" class="btn btn-primary">
+                    Siguiente <i class="fas fa-arrow-right ml-2"></i>
+                </button>
+                <button type="submit" id="submit-btn" class="btn btn-primary btn-wide hidden">
+                    <i class="fas fa-paper-plane mr-2"></i> Enviar Solicitud
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Form elements
+    const form = document.getElementById('justification-form');
+    const tipoField = form.querySelector('[name=tipo]');
+    const motivoField = form.querySelector('[name=motivo]');
+    const fechaInicioField = form.querySelector('[name=fecha_inicio]');
+    const fechaFinField = form.querySelector('[name=fecha_fin]');
+    const fileInput = document.getElementById('{{ form.documento_adjunto.id_for_label }}');
+    const fileUploadBox = fileInput ? fileInput.closest('.border-dashed') : null;
+    const fileNameDisplay = document.getElementById('file-name-display');
+
+    // Navigation
+    const steps = Array.from(document.querySelectorAll('.step-content'));
+    const stepIndicators = Array.from(document.querySelectorAll('#steps-indicator .step'));
+    const originalStepText = stepIndicators.map(s => s.textContent.trim()); // Store original text
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const submitBtn = document.getElementById('submit-btn');
+
+    let currentStep = 0;
+
+    // --- UTILITY FUNCTIONS ---
+    const applyStyles = () => {
+        const addClasses = (selector, classes) => {
+            document.querySelectorAll(selector).forEach(el => el.classList.add(...classes));
+        };
+        addClasses('select', ['select', 'select-bordered', 'w-full']);
+        addClasses('textarea', ['textarea', 'textarea-bordered', 'w-full', 'h-32']);
+        addClasses('input[type="date"]', ['input', 'input-bordered', 'w-full']);
+        if (fileInput) fileInput.classList.add('hidden-file-input');
+    };
+
+    const showError = (field, message) => {
+        clearError(field);
+        field.classList.add('input-error', 'select-error', 'textarea-error');
+        const error = document.createElement('p');
+        error.className = 'text-error text-sm mt-1';
+        error.textContent = message;
+        field.parentElement.appendChild(error);
+    };
+
+    const clearError = (field) => {
+        field.classList.remove('input-error', 'select-error', 'textarea-error');
+        const oldError = field.parentElement.querySelector('.text-error');
+        if (oldError) {
+            oldError.remove();
+        }
+    };
+
+    // --- VALIDATION LOGIC ---
+    const validateStep1 = () => {
+        let isValid = true;
+        clearError(tipoField);
+        clearError(motivoField);
+
+        if (!tipoField.value) {
+            showError(tipoField, 'Debes seleccionar un tipo de justificación.');
+            isValid = false;
+        }
+        if (motivoField.value.trim() === '') {
+            showError(motivoField, 'Debes describir el motivo.');
+            isValid = false;
+        }
+        return isValid;
+    };
+
+    const validateStep2 = () => {
+        let isValid = true;
+        clearError(fechaInicioField);
+        clearError(fechaFinField);
+
+        if (!fechaInicioField.value) {
+            showError(fechaInicioField, 'La fecha de inicio es obligatoria.');
+            isValid = false;
+        }
+        if (!fechaFinField.value) {
+            showError(fechaFinField, 'La fecha de fin es obligatoria.');
+            isValid = false;
+        }
+
+        if (isValid && fechaInicioField.value > fechaFinField.value) {
+            showError(fechaFinField, 'La fecha de fin no puede ser anterior a la de inicio.');
+            isValid = false;
+        }
+        return isValid;
+    };
+
+    // --- STEP NAVIGATION ---
+    const showStep = (stepIndex) => {
+        steps.forEach((step, index) => {
+            step.classList.toggle('hidden', index !== stepIndex);
+            if (index === stepIndex) step.classList.add('animate-fade-in');
+        });
+
+        stepIndicators.forEach((indicator, index) => {
+            indicator.classList.remove('step-primary');
+            indicator.innerHTML = originalStepText[index]; // Reset text first
+            if (index < stepIndex) {
+                indicator.classList.add('step-primary');
+                indicator.innerHTML = `<i class="fas fa-check"></i>`;
+            } else if (index === stepIndex) {
+                indicator.classList.add('step-primary');
+            }
+        });
+
+        currentStep = stepIndex;
+        updateButtons();
+    };
+
+    const updateButtons = () => {
+        prevBtn.classList.toggle('invisible', currentStep === 0);
+        nextBtn.classList.toggle('hidden', currentStep === steps.length - 1);
+        submitBtn.classList.toggle('hidden', currentStep !== steps.length - 1);
+    };
+
+    nextBtn.addEventListener('click', () => {
+        let isValid = false;
+        if (currentStep === 0) isValid = validateStep1();
+        else if (currentStep === 1) isValid = validateStep2();
+        else isValid = true; // Step 3 is optional
+
+        if (isValid && currentStep < steps.length - 1) {
+            showStep(currentStep + 1);
+        }
+    });
+
+    prevBtn.addEventListener('click', () => {
+        if (currentStep > 0) {
+            showStep(currentStep - 1);
+        }
+    });
+
+    // --- FILE UPLOAD ---
+    const handleFileChange = (files) => {
+        if (files && files.length > 0) {
+            fileNameDisplay.innerHTML = `<i class="fas fa-check-circle text-success mr-2"></i> ${files[0].name}`;
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'btn btn-xs btn-ghost text-error ml-2';
+            removeBtn.innerHTML = '&times;';
+            removeBtn.onclick = () => {
+                fileInput.value = ''; // Clear the file input
+                fileNameDisplay.textContent = '';
+            };
+            fileNameDisplay.appendChild(removeBtn);
+        } else {
+            fileNameDisplay.textContent = '';
+        }
+    };
+
+    if (fileInput) {
+        fileInput.addEventListener('change', () => handleFileChange(fileInput.files));
+    }
+
+    if (fileUploadBox) {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            fileUploadBox.addEventListener(eventName, e => {
+                e.preventDefault();
+                e.stopPropagation();
+            }, false);
+        });
+        ['dragenter', 'dragover'].forEach(eventName => {
+            fileUploadBox.addEventListener(eventName, () => fileUploadBox.classList.add('border-primary', 'bg-primary/10'), false);
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            fileUploadBox.addEventListener(eventName, () => fileUploadBox.classList.remove('border-primary', 'bg-primary/10'), false);
+        });
+        fileUploadBox.addEventListener('drop', e => {
+            fileInput.files = e.dataTransfer.files;
+            handleFileChange(fileInput.files);
+        }, false);
+    }
+
+    // --- INITIALIZATION ---
+    applyStyles();
+    showStep(0);
+});
+
+// Animation styles
+const style = document.createElement('style');
+style.innerHTML = `
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in {
+        animation: fadeIn 0.5s ease-out forwards;
+    }
+    .hidden-file-input {
+        width: 0.1px; height: 0.1px; opacity: 0;
+        overflow: hidden; position: absolute; z-index: -1;
+    }
+`;
+document.head.appendChild(style);
+</script>
+{% endblock %}
