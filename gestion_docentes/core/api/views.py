@@ -389,7 +389,9 @@ def api_get_teacher_conflicts(request):
 
         # 1. Conflictos del propio docente
         if docente:
-            for bloque in bloques_asignados.filter(curso__docente=docente):
+            # Excluimos los bloques del curso que se está intentando asignar para evitar que un curso entre en conflicto consigo mismo.
+            bloques_docente = bloques_asignados.filter(curso__docente=docente).exclude(curso=curso_a_asignar)
+            for bloque in bloques_docente:
                 franja_idx = todas_las_franjas.index(bloque.franja_inicio)
                 for i in range(bloque.duracion_bloques):
                     conflictos.add((bloque.dia, todas_las_franjas[franja_idx + i].id))

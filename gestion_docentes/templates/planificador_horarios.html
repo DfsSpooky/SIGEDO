@@ -340,10 +340,11 @@ document.addEventListener('DOMContentLoaded', function () {
             const { item, to, from } = evt;
             revertVisualSpan(from);
 
-            // BUG FIX: Check if cell already contains a block element
+            // Si el movimiento no es válido según la validación del cliente, recargar para restaurar el estado.
             if (to.classList.contains('conflict-cell') || to.querySelector('[data-bloque-id]')) {
-                from.appendChild(item);
-                return Toast.fire({ icon: 'error', title: 'No se puede asignar en este espacio ocupado o en conflicto.' });
+                Toast.fire({ icon: 'error', title: 'No se puede asignar en este espacio ocupado o en conflicto.' });
+                await loadPlannerData(); // Recargar para restaurar el estado visual original.
+                return;
             }
 
             try {
@@ -364,7 +365,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 await loadPlannerData();
             } catch (error) {
                 Toast.fire({ icon: 'error', title: `Error: ${error.message}` });
-                from.appendChild(item);
+                await loadPlannerData(); // En caso de error del servidor, recargar también.
             }
         };
 
@@ -379,23 +380,25 @@ document.addEventListener('DOMContentLoaded', function () {
     async function handleDeassign(courseElement) {
         const bloqueId = courseElement.dataset.bloqueId;
         if (!bloqueId) {
-            courseElement.remove();
+            courseElement.remove(); // Handles unassigned courses dragged to trash
             return;
         }
 
-        // Clean up cell style before removing
+        // Clean up cell style only if the element comes from a schedule cell
         const fromCell = courseElement.parentElement;
-        if (fromCell) {
+        if (fromCell && fromCell.classList.contains('drop-zone')) {
             revertVisualSpan(fromCell);
         }
 
         try {
             await callApi('/api/desasignar-horario/', 'POST', { bloque_id: bloqueId });
             Toast.fire({ icon: 'info', title: 'Bloque de horario eliminado' });
-            await loadPlannerData();
+            courseElement.remove(); // Explicitly remove the element from the DOM
+            await loadPlannerData(); // Reload to update the 'unassigned' list and hours
         } catch (error) {
             Toast.fire({ icon: 'error', title: `Error al eliminar: ${error.message}` });
-            if (fromCell) fromCell.appendChild(courseElement); // Revert on failure
+            // If deletion fails, reload the planner to restore the block to its original cell
+            await loadPlannerData();
         }
     }
 
