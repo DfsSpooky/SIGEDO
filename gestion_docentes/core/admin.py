@@ -146,9 +146,10 @@ from django.forms.models import BaseInlineFormSet
 
 class BloqueHorarioInlineFormSet(BaseInlineFormSet):
     def __init__(self, *args, **kwargs):
-        # El admin de Django a veces pasa el 'request' al formset.
-        # Lo capturamos aquí para evitar que se pase al __init__ del padre, que no lo espera.
+        # El admin de Django (y temas como Unfold) pueden pasar argumentos extra al formset.
+        # Los capturamos aquí para evitar que se pasen al __init__ del padre, que no los espera.
         self.request = kwargs.pop('request', None)
+        kwargs.pop('per_page', None)
         super().__init__(*args, **kwargs)
 
     def clean(self):
