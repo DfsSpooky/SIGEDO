@@ -445,16 +445,26 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // --- CONFLICTS & DURATION (no changes) ---
+    // --- CONFLICTS & DURATION (UPDATED FOR DETAILED REASONS) ---
     async function highlightConflicts(item) {
         clearConflicts();
         const cursoId = item.dataset.cursoId;
-        const duracion = item.dataset.duracion;
-        const data = await callApi(`/api/get-teacher-conflicts/?curso_id=${cursoId}&duracion=${duracion}`);
-        data.conflicts.forEach(c => document.querySelector(`td[data-dia="${c.dia}"][data-franja-id="${c.franja_id}"]`)?.classList.add('conflict-cell'));
+        const data = await callApi(`/api/get-teacher-conflicts/?curso_id=${cursoId}`);
+        if (data.conflicts) {
+            data.conflicts.forEach(c => {
+                const cell = document.querySelector(`td[data-dia="${c.dia}"][data-franja-id="${c.franja_id}"]`);
+                if (cell) {
+                    cell.classList.add('conflict-cell');
+                    cell.setAttribute('title', c.razon); // Usar el atributo 'title' para tooltips nativos del navegador
+                }
+            });
+        }
     }
     function clearConflicts() {
-        document.querySelectorAll('.conflict-cell').forEach(c => c.classList.remove('conflict-cell'));
+        document.querySelectorAll('.conflict-cell').forEach(c => {
+            c.classList.remove('conflict-cell');
+            c.removeAttribute('title');
+        });
     }
     async function handleDurationChange(bloqueId, action) {
         try {

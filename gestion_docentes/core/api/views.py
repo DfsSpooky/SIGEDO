@@ -366,66 +366,67 @@ def api_ajustar_duracion(request):
 @staff_member_required
 def api_get_teacher_conflicts(request):
     curso_id = request.GET.get('curso_id')
-    duracion_str = request.GET.get('duracion', '1') # Duración del bloque que se está arrastrando
     if not curso_id:
         return error_response('Falta el ID del curso.')
-    try:
-        duracion = int(duracion_str)
-    except ValueError:
-        return error_response('La duración debe ser un número.')
 
     try:
-        curso_a_asignar = Curso.objects.get(pk=curso_id)
+        curso_a_asignar = Curso.objects.select_related('docente', 'especialidad__grupo').get(pk=curso_id)
         docente = curso_a_asignar.docente
         semestre = curso_a_asignar.semestre
         grupo_del_curso = curso_a_asignar.especialidad.grupo if curso_a_asignar.especialidad else None
         semestre_cursado_a_asignar = curso_a_asignar.semestre_cursado
 
-        conflictos = set()
+        # Usamos un diccionario para almacenar la razón del conflicto, evitando duplicados.
+        conflictos = {}
         todas_las_franjas = list(FranjaHoraria.objects.order_by('hora_inicio'))
+        mapa_franjas = {franja.id: franja for franja in todas_las_franjas}
 
-        # Obtener todos los bloques del semestre para evitar múltiples consultas
-        bloques_asignados = BloqueHorario.objects.filter(curso__semestre=semestre).select_related('curso__docente', 'curso__especialidad__grupo')
+        bloques_asignados = BloqueHorario.objects.filter(curso__semestre=semestre).select_related('curso__docente', 'curso__especialidad__grupo', 'curso__especialidad')
 
         # 1. Conflictos del propio docente
         if docente:
-            # Excluimos los bloques del curso que se está intentando asignar para evitar que un curso entre en conflicto consigo mismo.
             bloques_docente = bloques_asignados.filter(curso__docente=docente).exclude(curso=curso_a_asignar)
             for bloque in bloques_docente:
                 franja_idx = todas_las_franjas.index(bloque.franja_inicio)
                 for i in range(bloque.duracion_bloques):
-                    conflictos.add((bloque.dia, todas_las_franjas[franja_idx + i].id))
+                    franja_actual = todas_las_franjas[franja_idx + i]
+                    key = (bloque.dia, franja_actual.id)
+                    if key not in conflictos:
+                        conflictos[key] = f"Docente Ocupado: {bloque.curso.nombre}"
 
         # 2. Conflictos del grupo de estudiantes
         if grupo_del_curso and semestre_cursado_a_asignar:
             q_grupo = Q(curso__especialidad__grupo=grupo_del_curso, curso__semestre_cursado=semestre_cursado_a_asignar)
-
-            for bloque in bloques_asignados.filter(q_grupo):
-                 # Evitar que un curso entre en conflicto consigo mismo
-                if bloque.curso == curso_a_asignar: continue
-
+            bloques_grupo = bloques_asignados.filter(q_grupo).exclude(curso=curso_a_asignar)
+            for bloque in bloques_grupo:
                 franja_idx = todas_las_franjas.index(bloque.franja_inicio)
                 for i in range(bloque.duracion_bloques):
-                    conflictos.add((bloque.dia, todas_las_franjas[franja_idx + i].id))
+                    franja_actual = todas_las_franjas[franja_idx + i]
+                    key = (bloque.dia, franja_actual.id)
+                    if key not in conflictos:
+                        conflictos[key] = f"Grupo Ocupado: {bloque.curso.nombre}"
 
         # 3. Conflictos de disponibilidad del docente
-        if docente:
-            franjas_no_disponibles_ids = set()
-            if docente.disponibilidad == 'MANANA':
-                franjas_no_disponibles_ids = set(FranjaHoraria.objects.filter(turno__in=['TARDE', 'NOCHE']).values_list('id', flat=True))
-            elif docente.disponibilidad == 'TARDE':
-                franjas_no_disponibles_ids = set(FranjaHoraria.objects.filter(turno__in=['MANANA', 'NOCHE']).values_list('id', flat=True))
-
+        if docente and docente.disponibilidad != 'COMPLETO':
+            turno_no_disponible = 'TARDE' if docente.disponibilidad == 'MANANA' else 'MANANA'
+            franjas_no_disponibles_ids = set(FranjaHoraria.objects.filter(turno=turno_no_disponible).values_list('id', flat=True))
             if franjas_no_disponibles_ids:
                 dias_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
                 for dia in dias_semana:
                     for franja_id in franjas_no_disponibles_ids:
-                        conflictos.add((dia, franja_id))
+                        key = (dia, franja_id)
+                        if key not in conflictos:
+                            conflictos[key] = f"No disponible en turno de {turno_no_disponible.title()}"
 
-        return success_response(data={'conflicts': [{'dia': c[0], 'franja_id': c[1]} for c in conflictos]})
+        # Convertir el diccionario de conflictos al formato de lista esperado por el frontend
+        response_data = [{'dia': k[0], 'franja_id': k[1], 'razon': v} for k, v in conflictos.items()]
+
+        return success_response(data={'conflicts': response_data})
 
     except Curso.DoesNotExist:
         return not_found_response('Curso no encontrado.')
+    except Exception as e:
+        return server_error_response(f"Error inesperado: {e}")
 
 def _get_planner_data(especialidad_id, semestre_cursado):
     try:
