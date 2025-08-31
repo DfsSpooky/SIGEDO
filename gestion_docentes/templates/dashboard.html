@@ -65,11 +65,11 @@
         <div class="card bg-base-100 shadow-lg border border-base-300/20">
             <div class="card-body">
                 <h2 class="card-title text-xl"><i class="fas fa-hourglass-half mr-2 text-primary"></i> Próxima Clase Hoy</h2>
-                {% if proximo_curso %}
-                    <p class="text-4xl font-bold mt-2 text-base-content">{{ proximo_curso.nombre }}</p>
+                {% if proximo_bloque %}
+                    <p class="text-4xl font-bold mt-2 text-base-content">{{ proximo_bloque.curso.nombre }}</p>
                     <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-base-content/80">
-                        <p><i class="fas fa-clock fa-fw mr-2 opacity-70"></i> <strong>Hora:</strong> {{ proximo_curso.horario_inicio|time:"h:i A" }} - {{ proximo_curso.horario_fin|time:"h:i A" }}</p>
-                        <p><i class="fas fa-book fa-fw mr-2 opacity-70"></i> <strong>Carrera:</strong> {{ proximo_curso.carrera.nombre }}</p>
+                        <p><i class="fas fa-clock fa-fw mr-2 opacity-70"></i> <strong>Hora:</strong> {{ proximo_bloque.horario_inicio|time:"h:i A" }} - {{ proximo_bloque.horario_fin|time:"h:i A" }}</p>
+                        <p><i class="fas fa-book fa-fw mr-2 opacity-70"></i> <strong>Carrera:</strong> {{ proximo_bloque.curso.carrera.nombre }}</p>
                     </div>
                 {% else %}
                     <div class="text-center py-12">

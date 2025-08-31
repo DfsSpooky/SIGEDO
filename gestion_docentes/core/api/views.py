@@ -156,7 +156,11 @@ class MarkAttendanceView(APIView):
                 asistencia.foto_entrada = photo_file
                 response_data['es_tardanza'] = asistencia.es_tardanza()
 
-                duracion_minima_minutos = (curso.duracion_bloques * 50) - 15
+                # Lógica corregida para usar la duración del bloque específico de ese día
+                bloque_del_dia = BloqueHorario.objects.filter(curso=curso, dia_semana=today.weekday()).first()
+                duracion_bloques_hoy = bloque_del_dia.duracion_bloques if bloque_del_dia else 2 # Default a 2 si no se encuentra
+
+                duracion_minima_minutos = (duracion_bloques_hoy * 50) - 15
                 if duracion_minima_minutos < 15: duracion_minima_minutos = 15
                 asistencia.hora_salida_permitida = now + timedelta(minutes=duracion_minima_minutos)
                 asistencia.save()

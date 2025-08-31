@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from ..models import Docente, Curso, Asistencia
+from ..models import Docente, Curso, Asistencia, BloqueHorario
 
 class DocenteInfoSerializer(serializers.ModelSerializer):
     """
@@ -35,7 +35,11 @@ class CursoAsistenciaSerializer(serializers.ModelSerializer):
 
     def get_name(self, obj):
         # obj es una instancia de Asistencia, accedemos al curso relacionado
-        return f'{obj.curso.nombre} ({obj.curso.horario_inicio.strftime("%H:%M")} - {obj.curso.horario_fin.strftime("%H:%M")})'
+        # y buscamos el bloque de horario para la fecha de la asistencia.
+        bloque = BloqueHorario.objects.filter(curso=obj.curso, dia_semana=obj.fecha.weekday()).first()
+        if bloque:
+            return f'{obj.curso.nombre} ({bloque.horario_inicio.strftime("%H:%M")} - {bloque.horario_fin.strftime("%H:%M")})'
+        return obj.curso.nombre
 
     def get_entryMarked(self, obj):
         return obj.hora_entrada is not None

@@ -46,11 +46,11 @@
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {% if reserva.curso %}
                             <div class="font-semibold text-gray-800">Curso: {{ reserva.curso.nombre }}</div>
-                            <div class="text-gray-600">Horario: {{ reserva.curso.horario_inicio|time:"H:i" }} - {{ reserva.curso.horario_fin|time:"H:i" }}</div>
-                        {% elif reserva.franja_horaria_inicio %}
-                            Horario: {{ reserva.franja_horaria_inicio.hora_inicio|time:"H:i" }} - {{ reserva.franja_horaria_fin.hora_fin|time:"H:i" }}
+                        {% endif %}
+                        {% if reserva.franja_horaria_inicio and reserva.franja_horaria_fin %}
+                            <div class="text-gray-600">Horario: {{ reserva.franja_horaria_inicio.hora_inicio|time:"H:i" }} - {{ reserva.franja_horaria_fin.hora_fin|time:"H:i" }}</div>
                         {% else %}
-                            N/A
+                            <div class="text-gray-600">Horario: N/A</div>
                         {% endif %}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">

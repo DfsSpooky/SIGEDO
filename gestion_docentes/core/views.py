@@ -714,48 +714,34 @@ def vista_publica_horarios(request):
     if especialidad_seleccionada_id:
         try:
             especialidad_seleccionada = Especialidad.objects.get(id=especialidad_seleccionada_id)
-            
-            # --- INICIO DE LA LÓGICA CORREGIDA ---
-            
-            # Obtenemos el grupo de la especialidad seleccionada
             grupo_seleccionado = especialidad_seleccionada.grupo
             
-            # 1. Preparamos una consulta para los cursos propios de la especialidad
-            query_cursos_propios = Q(especialidad=especialidad_seleccionada)
+            query_cursos_propios = Q(curso__especialidad=especialidad_seleccionada)
+            query_cursos_generales_del_grupo = Q(curso__tipo_curso='GENERAL', curso__especialidad__grupo=grupo_seleccionado)
             
-            # 2. Preparamos otra para los cursos generales del mismo grupo
-            query_cursos_generales_del_grupo = Q(tipo_curso='GENERAL', especialidad__grupo=grupo_seleccionado)
-            
-            # 3. Unimos las consultas: tráeme los cursos que cumplan la condición 1 O la condición 2
-            cursos_asignados = Curso.objects.filter(
+            bloques_asignados = BloqueHorario.objects.filter(
                 query_cursos_propios | query_cursos_generales_del_grupo,
-                semestre=semestre_activo,
-                dia__isnull=False
-            ).distinct().order_by('semestre_cursado')
-            
-            # --- FIN DE LA LÓGICA CORREGIDA ---
+                curso__semestre=semestre_activo
+            ).distinct().select_related('curso', 'curso__docente', 'franja_inicio').order_by('curso__semestre_cursado')
 
-            # El resto de la función que construye la parrilla no necesita cambios
-            semestres_cursados = sorted(list(cursos_asignados.values_list('semestre_cursado', flat=True).distinct()))
+            semestres_cursados = sorted(list(bloques_asignados.values_list('curso__semestre_cursado', flat=True).distinct()))
             franjas_horarias = list(FranjaHoraria.objects.order_by('hora_inicio'))
             dias_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
             
             for semestre_num in semestres_cursados:
-                grid = {}
-                for franja in franjas_horarias:
-                    grid[franja.id] = {dia: None for dia in dias_semana}
+                grid = {franja.id: {dia: None for dia in dias_semana} for franja in franjas_horarias}
 
-                cursos_del_semestre = cursos_asignados.filter(semestre_cursado=semestre_num)
-                for curso in cursos_del_semestre:
+                bloques_del_semestre = bloques_asignados.filter(curso__semestre_cursado=semestre_num)
+                for bloque in bloques_del_semestre:
                     try:
-                        franja_inicio_obj = next(f for f in franjas_horarias if f.hora_inicio == curso.horario_inicio)
-                        start_index = franjas_horarias.index(franja_inicio_obj)
-                        grid[franja_inicio_obj.id][curso.dia] = curso
-                        for i in range(1, curso.duracion_bloques):
-                            if (start_index + i) < len(franjas_horarias):
-                                franja_ocupada = franjas_horarias[start_index + i]
-                                grid[franja_ocupada.id][curso.dia] = 'OCUPADO'
-                    except (StopIteration, TypeError, AttributeError):
+                        grid[bloque.franja_inicio.id][bloque.dia] = bloque
+                        if bloque.duracion_bloques > 1:
+                            start_index = franjas_horarias.index(bloque.franja_inicio)
+                            for i in range(1, bloque.duracion_bloques):
+                                if (start_index + i) < len(franjas_horarias):
+                                    franja_ocupada = franjas_horarias[start_index + i]
+                                    grid[franja_ocupada.id][bloque.dia] = 'OCUPADO'
+                    except (ValueError, IndexError):
                         continue
                 horarios_por_semestre_cursado[semestre_num] = grid
 

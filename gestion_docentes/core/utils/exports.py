@@ -6,7 +6,7 @@ from reportlab.platypus import BaseDocTemplate, Frame, PageTemplate, Table, Tabl
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib import colors
-from ..models import Docente, Asistencia, Curso, ConfiguracionInstitucion, Justificacion, AsistenciaDiaria, Documento
+from ..models import Docente, Asistencia, Curso, ConfiguracionInstitucion, Justificacion, AsistenciaDiaria, Documento, BloqueHorario
 from io import BytesIO
 from django.utils import timezone
 from .reports import _generar_datos_reporte_asistencia
@@ -133,8 +133,15 @@ def exportar_reporte_pdf(request):
             for asis in record['asistencias']:
                 hora_entrada_str = asis.hora_entrada.astimezone(peru_tz).strftime('%H:%M:%S') if asis.hora_entrada else "--:--"
                 detalle_str = f"• {asis.curso.nombre} (Entrada: {hora_entrada_str})"
-                if asis.es_tardanza:
-                    detalle_str += " <font color='orange'><b>(TARDE)</b></font>"
+
+                # Lógica de tardanza corregida
+                bloque_asistencia = BloqueHorario.objects.filter(curso=asis.curso, dia_semana=asis.fecha.weekday()).first()
+                if asis.hora_entrada and bloque_asistencia:
+                    limite_tardanza = timedelta(minutes=(ConfiguracionInstitucion.load().tiempo_limite_tardanza or 10))
+                    hora_inicio_dt = timezone.make_aware(timezone.datetime.combine(asis.fecha, bloque_asistencia.horario_inicio))
+                    if (asis.hora_entrada - hora_inicio_dt) > limite_tardanza:
+                        detalle_str += " <font color='orange'><b>(TARDE)</b></font>"
+
                 detalles_cells.append(Paragraph(detalle_str, STYLES['TableCellSmall']))
         elif not record['asistencia_diaria']:
             detalles_cells.append(Paragraph("N/A", STYLES['TableCellSmall']))
@@ -184,8 +191,10 @@ def exportar_reporte_excel(request):
             for asis in record['asistencias']:
                 hora_entrada_str = asis.hora_entrada.astimezone(peru_tz).strftime('%H:%M') if asis.hora_entrada else "--:--"
                 detalle = f"{asis.curso.nombre} (Entrada: {hora_entrada_str})"
-                if asis.hora_entrada and asis.curso.horario_inicio:
-                    hora_inicio_dt = timezone.make_aware(timezone.datetime.combine(record['fecha'], asis.curso.horario_inicio))
+
+                bloque_asistencia = BloqueHorario.objects.filter(curso=asis.curso, dia_semana=asis.fecha.weekday()).first()
+                if asis.hora_entrada and bloque_asistencia:
+                    hora_inicio_dt = timezone.make_aware(timezone.datetime.combine(record['fecha'], bloque_asistencia.horario_inicio))
                     if (asis.hora_entrada - hora_inicio_dt) > timedelta(minutes=limite_tardanza):
                         detalle += " (TARDE)"
                 detalles_list.append(detalle)

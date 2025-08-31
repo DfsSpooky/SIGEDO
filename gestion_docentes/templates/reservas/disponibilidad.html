@@ -61,13 +61,13 @@
 
     <!-- Course List -->
     <div class="space-y-6">
-        {% for item in cursos_con_disponibilidad %}
+        {% for item in bloques_con_disponibilidad %}
             <div class="bg-white rounded-2xl shadow-lg overflow-hidden course-card">
                 <!-- Course Header -->
                 <div class="p-6 border-b border-gray-200">
-                    <h2 class="text-2xl font-bold text-gray-900">{{ item.curso.nombre }}</h2>
+                    <h2 class="text-2xl font-bold text-gray-900">{{ item.bloque.curso.nombre }}</h2>
                     <p class="text-lg font-semibold text-indigo-700 mt-1">
-                        Horario: {{ item.curso.horario_inicio|time:"H:i" }} - {{ item.curso.horario_fin|time:"H:i" }}
+                        Horario: {{ item.bloque.horario_inicio|time:"H:i" }} - {{ item.bloque.horario_fin|time:"H:i" }}
                     </p>
                 </div>
 
@@ -84,12 +84,12 @@
                                     </div>
                                     <form class="reserve-form" method="post" action="{% url 'reservas:disponibilidad' %}">
                                         {% csrf_token %}
-                                        <input type="hidden" name="curso_id" value="{{ item.curso.id }}">
+                                        <input type="hidden" name="bloque_id" value="{{ item.bloque.id }}">
                                         <input type="hidden" name="activo_id" value="{{ activo.id }}">
                                         <input type="hidden" name="fecha" value="{{ fecha_seleccionada_str }}">
                                         <button type="button" class="reserve-button px-4 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700"
                                                 data-activo-nombre="{{ activo.nombre }}"
-                                                data-curso-nombre="{{ item.curso.nombre }}">
+                                                data-curso-nombre="{{ item.bloque.curso.nombre }}">
                                             Reservar
                                         </button>
                                     </form>
