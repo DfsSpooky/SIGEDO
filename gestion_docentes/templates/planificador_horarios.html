@@ -150,6 +150,40 @@
         border-radius: var(--pm-border-radius);
     }
 
+    /* Schedule Tabs */
+    .planner-modern .tabs-lifted {
+        border-bottom: 1px solid var(--pm-border);
+        margin-bottom: 1rem;
+        padding-left: 0;
+    }
+    .planner-modern .tabs-lifted .tab {
+        border: none;
+        border-bottom: 2px solid transparent;
+        border-radius: 0;
+        margin-bottom: -1px; /* Align with container's bottom border */
+        padding: 0.5rem 1rem;
+        color: var(--pm-text-secondary);
+    }
+    /* Remove DaisyUI's pseudo-elements that create the lifted effect */
+    .planner-modern .tabs-lifted .tab::before,
+    .planner-modern .tabs-lifted .tab::after {
+        display: none;
+    }
+    .planner-modern .tabs-lifted .tab:hover {
+        color: var(--pm-text-primary);
+        border-bottom-color: #d1d5da;
+    }
+    .planner-modern .tabs-lifted input[type="radio"]:checked + .tab {
+        background-color: transparent;
+        color: var(--pm-text-primary);
+        font-weight: 600;
+        border-bottom-color: var(--pm-text-link);
+        border-inline-start: none;
+        border-top: none;
+        border-inline-end: none;
+    }
+
+
     /* Sidebar Tabs */
     .planner-modern .tabs-boxed {
         background-color: #eef1f4;
@@ -310,7 +344,7 @@
                 <main class="lg:col-span-3">
                     <div role="tablist" class="tabs tabs-lifted">
                         <input type="radio" name="schedule_tabs" role="tab" class="tab" aria-label="Turno Mañana" checked />
-                        <div role="tabpanel" class="tab-content bg-base-100 border-base-300 rounded-box p-0">
+                        <div role="tabpanel" class="tab-content">
                              <div class="schedule-container">
                                 <table class="table table-fixed w-full">
                                     <thead>
@@ -327,7 +361,7 @@
                         </div>
 
                         <input type="radio" name="schedule_tabs" role="tab" class="tab" aria-label="Turno Tarde" />
-                        <div role="tabpanel" class="tab-content bg-base-100 border-base-300 rounded-box p-0">
+                        <div role="tabpanel" class="tab-content">
                             <div class="schedule-container">
                                 <table class="table table-fixed w-full">
                                     <thead>
