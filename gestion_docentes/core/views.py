@@ -33,7 +33,7 @@ from .models import (
     Docente, Curso, Documento, Asistencia, Carrera, SolicitudIntercambio,
     TipoDocumento, AsistenciaDiaria, PersonalDocente, ConfiguracionInstitucion,
     Semestre, DiaEspecial, Especialidad, FranjaHoraria, VersionDocumento, Anuncio,
-    Notificacion, Justificacion, TipoJustificacion, Activo, TipoActivo, Reserva
+    Notificacion, Justificacion, TipoJustificacion, Activo, TipoActivo, Reserva, BloqueHorario
 )
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
