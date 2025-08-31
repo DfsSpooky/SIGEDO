@@ -210,9 +210,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
         let colors = '';
         if (isAssigned) {
+            div.classList.add('group'); // Needed for group-hover to work
             // --- Elemento ASIGNADO (Bloque de Horario) ---
             div.dataset.bloqueId = curso.bloque_id;
             div.dataset.cursoId = curso.curso_id; // Mantenemos el cursoId por si es útil
+            div.dataset.duracion = curso.duracion_bloques; // <-- CORRECCIÓN: Añadir duración al bloque
             div.dataset.fullData = JSON.stringify(curso);
 
             if (curso.tipo_curso === 'GENERAL') {
@@ -226,8 +228,21 @@ document.addEventListener('DOMContentLoaded', function () {
                 <p class="text-xs opacity-50">${curso.duracion_bloques} bloque(s)</p>
             `;
 
+            const controlsDiv = document.createElement('div');
+            controlsDiv.className = 'absolute top-0 right-1 flex flex-col items-center space-y-0.5 opacity-0 group-hover:opacity-100 transition-opacity';
+
+            const increaseButton = document.createElement('button');
+            increaseButton.className = 'btn btn-xs btn-square btn-ghost text-success/60 hover:bg-success/10 hover:text-success';
+            increaseButton.innerHTML = '<i class="fas fa-plus"></i>';
+            increaseButton.addEventListener('click', (e) => { e.stopPropagation(); handleDurationChange(div.dataset.bloqueId, 'increase'); });
+
+            const decreaseButton = document.createElement('button');
+            decreaseButton.className = 'btn btn-xs btn-square btn-ghost text-warning/60 hover:bg-warning/10 hover:text-warning';
+            decreaseButton.innerHTML = '<i class="fas fa-minus"></i>';
+            decreaseButton.addEventListener('click', (e) => { e.stopPropagation(); handleDurationChange(div.dataset.bloqueId, 'decrease'); });
+
             const deleteButton = document.createElement('button');
-            deleteButton.className = 'absolute top-1 right-1 btn btn-xs btn-circle btn-ghost text-error/50 hover:text-error hover:bg-error/10';
+            deleteButton.className = 'btn btn-xs btn-square btn-ghost text-error/60 hover:bg-error/10 hover:text-error';
             deleteButton.innerHTML = `<i class="fas fa-times"></i>`;
             deleteButton.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -244,7 +259,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 });
             });
-            div.appendChild(deleteButton);
+
+            controlsDiv.appendChild(increaseButton);
+            controlsDiv.appendChild(decreaseButton);
+            controlsDiv.appendChild(deleteButton);
+            div.appendChild(controlsDiv);
 
         } else {
             // --- Elemento PENDIENTE de Asignar (Curso) ---
@@ -341,19 +360,36 @@ document.addEventListener('DOMContentLoaded', function () {
                 from.appendChild(item); // Revert drag
                 return Toast.fire({ icon: 'error', title: 'No se puede asignar en este espacio.' });
             }
+
             try {
-                const payload = {
-                    curso_id: item.dataset.cursoId,
-                    dia: to.dataset.dia,
-                    franja_id: to.dataset.franjaId,
-                    duracion: parseInt(item.dataset.duracion, 10)
-                };
-                const data = await callApi('/api/asignar-horario/', 'POST', payload);
+                let promise;
+                const isExistingBlock = item.dataset.bloqueId;
+
+                if (isExistingBlock) {
+                    // --- Lógica para MOVER un bloque existente ---
+                    const payload = {
+                        bloque_id: item.dataset.bloqueId,
+                        dia: to.dataset.dia,
+                        franja_id: to.dataset.franjaId,
+                    };
+                    promise = callApi('/api/mover-bloque/', 'POST', payload);
+                } else {
+                    // --- Lógica para CREAR un nuevo bloque ---
+                    const payload = {
+                        curso_id: item.dataset.cursoId,
+                        dia: to.dataset.dia,
+                        franja_id: to.dataset.franjaId,
+                        duracion: parseInt(item.dataset.duracion, 10)
+                    };
+                    promise = callApi('/api/asignar-horario/', 'POST', payload);
+                }
+
+                const data = await promise;
                 Toast.fire({ icon: 'success', title: data.message });
-                // En lugar de manipular el DOM directamente, recargamos todo para obtener el estado real.
                 await loadPlannerData();
+
             } catch (error) {
-                Toast.fire({ icon: 'error', title: `Error al asignar: ${error.message}` });
+                Toast.fire({ icon: 'error', title: `Error: ${error.message}` });
                 from.appendChild(item); // Revert drag on failure
             }
         };
@@ -400,6 +436,17 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     function clearConflicts() {
         document.querySelectorAll('.conflict-cell').forEach(c => c.classList.remove('conflict-cell'));
+    }
+
+    async function handleDurationChange(bloqueId, action) {
+        try {
+            const payload = { bloque_id: bloqueId, accion: action };
+            const data = await callApi('/api/ajustar-duracion/', 'POST', payload);
+            Toast.fire({ icon: 'success', title: data.message });
+            await loadPlannerData(); // Recargar para mostrar el cambio
+        } catch (error) {
+            Toast.fire({ icon: 'error', title: `Error: ${error.message}` });
+        }
     }
     function applyVisualSpan(cell, duration) {
         if (!cell || duration < 2) return;

@@ -859,6 +859,56 @@ class HorarioFlexibleTest(TestCase):
 
         self.assertEqual(BloqueHorario.objects.count(), 0)
 
+    def test_mover_bloque_existente(self):
+        """Test that an existing block can be moved to a new day and slot."""
+        curso = Curso.objects.create(nombre="Curso Movible", docente=self.docente, semestre=self.semestre, carrera=self.carrera, horas_academicas_semanales=4)
+        franja1 = FranjaHoraria.objects.get(hora_inicio=time(9, 0))
+        franja2 = FranjaHoraria.objects.get(hora_inicio=time(14, 0))
+
+        bloque = BloqueHorario.objects.create(curso=curso, dia='Lunes', franja_inicio=franja1, duracion_bloques=2)
+        self.assertEqual(bloque.dia, 'Lunes')
+
+        # Mover el bloque al martes
+        url = reverse('api:mover_bloque')
+        payload = {'bloque_id': bloque.id, 'dia': 'Martes', 'franja_id': franja2.id}
+        response = self.client.post(url, json.dumps(payload), content_type='application/json')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['status'], 'success')
+
+        bloque.refresh_from_db()
+        self.assertEqual(bloque.dia, 'Martes')
+        self.assertEqual(bloque.franja_inicio, franja2)
+
+    def test_ajustar_duracion_bloque(self):
+        """Test that a block's duration can be increased and decreased."""
+        curso = Curso.objects.create(nombre="Curso Ajustable", docente=self.docente, semestre=self.semestre, carrera=self.carrera, horas_academicas_semanales=5)
+        franja = FranjaHoraria.objects.get(hora_inicio=time(10, 0))
+        bloque = BloqueHorario.objects.create(curso=curso, dia='Miércoles', franja_inicio=franja, duracion_bloques=2)
+
+        url = reverse('api:ajustar_duracion')
+
+        # Aumentar duración
+        payload_increase = {'bloque_id': bloque.id, 'accion': 'increase'}
+        response_increase = self.client.post(url, json.dumps(payload_increase), content_type='application/json')
+        self.assertEqual(response_increase.status_code, 200)
+        bloque.refresh_from_db()
+        self.assertEqual(bloque.duracion_bloques, 3)
+
+        # Disminuir duración
+        payload_decrease = {'bloque_id': bloque.id, 'accion': 'decrease'}
+        response_decrease = self.client.post(url, json.dumps(payload_decrease), content_type='application/json')
+        self.assertEqual(response_decrease.status_code, 200)
+        bloque.refresh_from_db()
+        self.assertEqual(bloque.duracion_bloques, 2)
+
+        # Probar límite inferior (no puede ser menos de 1)
+        self.client.post(url, json.dumps(payload_decrease), content_type='application/json') # a 1
+        response_limit = self.client.post(url, json.dumps(payload_decrease), content_type='application/json') # intentar bajar a 0
+        self.assertEqual(response_limit.status_code, 400)
+        bloque.refresh_from_db()
+        self.assertEqual(bloque.duracion_bloques, 1)
+
     def test_asignar_bloque_excediendo_horas(self):
         """
         Test that the API prevents assigning a block that would exceed the course's total weekly hours.
