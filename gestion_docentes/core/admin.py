@@ -142,8 +142,23 @@ class SemestreAdmin(ModelAdmin):
 
 from .models import BloqueHorario
 
+from django.forms.models import BaseInlineFormSet
+
+class BloqueHorarioInlineFormSet(BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        for form in self.forms:
+            # Ignorar formularios vacíos que no tienen datos cambiados
+            if not form.has_changed():
+                continue
+            # Si el formulario tiene datos pero le falta la franja_inicio, lanzar error
+            if form.cleaned_data and not form.cleaned_data.get('franja_inicio'):
+                 if not form.cleaned_data.get('DELETE', False):
+                    form.add_error('franja_inicio', 'Este campo es obligatorio si se crea un bloque.')
+
 class BloqueHorarioInline(TabularInline):
     model = BloqueHorario
+    formset = BloqueHorarioInlineFormSet
     extra = 1
     autocomplete_fields = ('franja_inicio',)
     classes = ('collapse',)
