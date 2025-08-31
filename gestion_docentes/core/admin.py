@@ -140,6 +140,17 @@ class SemestreAdmin(ModelAdmin):
         change_url = reverse(f'admin:{obj._meta.app_label}_{obj._meta.model_name}_change', args=[obj.pk])
         return format_html(f'<a href="{change_url}" class="button">Editar</a>')
 
+from .models import BloqueHorario
+
+class BloqueHorarioInline(TabularInline):
+    model = BloqueHorario
+    extra = 1
+    autocomplete_fields = ('franja_inicio',)
+    classes = ('collapse',)
+    verbose_name = "Bloque de Horario"
+    verbose_name_plural = "Bloques de Horario Asignados"
+
+
 @admin.register(Curso)
 class CursoAdmin(ModelAdmin):
     list_display = ('nombre', 'tipo_curso', 'docente', 'especialidad', 'semestre', 'semestre_cursado', 'acciones')
@@ -149,10 +160,10 @@ class CursoAdmin(ModelAdmin):
     search_as_command = True
     ordering = ('semestre', 'semestre_cursado', 'nombre')
     autocomplete_fields = ['docente', 'carrera', 'especialidad', 'semestre']
+    inlines = [BloqueHorarioInline]
     fieldsets = (
-        ('Información General', {'classes': ('tab',),'fields': ('nombre', 'tipo_curso', 'duracion_bloques')}),
-        ('Organización Académica', {'classes': ('tab',),'fields': ('docente', 'carrera', 'especialidad', 'semestre', 'semestre_cursado')}),
-        ('Horario', {'classes': ('tab',),'fields': ('dia', 'horario_inicio', 'horario_fin')}),
+        ('Información General', {'fields': ('nombre', 'tipo_curso', 'horas_academicas_semanales')}),
+        ('Organización Académica', {'fields': ('docente', 'carrera', 'especialidad', 'semestre', 'semestre_cursado')}),
     )
 
     @admin.display(description="Acciones")
