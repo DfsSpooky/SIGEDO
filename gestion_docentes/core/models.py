@@ -92,6 +92,7 @@ class Curso(models.Model):
     especialidad = models.ForeignKey(Especialidad, on_delete=models.SET_NULL, null=True, related_name='cursos')
     semestre = models.ForeignKey(Semestre, on_delete=models.SET_NULL, null=True, related_name='cursos')
     semestre_cursado = models.IntegerField(choices=SEMESTRE_CURSADO_CHOICES, null=True, blank=True)
+    excepcion_horario = models.BooleanField(default=False, help_text="Permite que este curso se asigne en la tarde aunque sea de un semestre bajo.")
 
     # NUEVO CAMPO PARA HORAS TOTALES
     horas_academicas_semanales = models.PositiveIntegerField(default=2, help_text="Número total de bloques de 50 minutos que el curso requiere a la semana.")

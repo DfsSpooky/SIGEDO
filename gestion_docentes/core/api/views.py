@@ -460,6 +460,8 @@ def _get_planner_data(especialidad_id, semestre_cursado):
                     'horas_pendientes': curso.horas_academicas_semanales - curso.horas_asignadas,
                     'horas_totales': curso.horas_academicas_semanales,
                     'tipo_curso': curso.tipo_curso,
+                    'semestre_cursado': curso.semestre_cursado,
+                    'excepcion_horario': curso.excepcion_horario,
                 }
                 if curso.tipo_curso == 'GENERAL':
                     cursos_pendientes_generales.append(curso_data)
@@ -477,6 +479,8 @@ def _get_planner_data(especialidad_id, semestre_cursado):
                     'franja_id_inicio': bloque.franja_inicio.id,
                     'duracion_bloques': bloque.duracion_bloques,
                     'tipo_curso': curso.tipo_curso,
+                    'semestre_cursado': curso.semestre_cursado,
+                    'excepcion_horario': curso.excepcion_horario,
                 })
 
     return {

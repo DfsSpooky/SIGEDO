@@ -111,18 +111,28 @@ class Command(BaseCommand):
                             especialidad=especialidad,
                             semestre=semestre,
                             semestre_cursado=sem_cursado,
-                            duracion_bloques=random.choice([2, 3])
+                            horas_academicas_semanales=random.choice([2, 3, 4])
                         )
-                    # Crear 1 curso general
+
+                    # Crear 1 curso general con posible excepción
+                    nombre_curso_general = f"Curso General {sem_cursado}"
+                    es_excepcion = False
+
+                    # Hacemos que el curso general del 2do semestre del primer grupo sea 'Educación Física'
+                    if sem_cursado == 2 and grupo_nombre == "Grupo A":
+                        nombre_curso_general = "Educación Física"
+                        es_excepcion = True
+
                     Curso.objects.create(
-                        nombre=f"Curso General {sem_cursado}",
+                        nombre=nombre_curso_general,
                         tipo_curso='GENERAL',
                         docente=random.choice(docentes_generales),
                         carrera=carrera_edu,
                         especialidad=especialidad,
                         semestre=semestre,
                         semestre_cursado=sem_cursado,
-                        duracion_bloques=random.choice([2, 3])
+                        horas_academicas_semanales=random.choice([2, 3]),
+                        excepcion_horario=es_excepcion
                     )
 
         self.stdout.write(self.style.SUCCESS('-> Estructura académica creada.'))

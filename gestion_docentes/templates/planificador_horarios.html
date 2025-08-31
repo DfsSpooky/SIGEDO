@@ -605,10 +605,33 @@ document.addEventListener('DOMContentLoaded', function () {
             const { item, to, from } = evt;
             revertVisualSpan(from);
 
+            // --- INICIO DE VALIDACIÓN PERSONALIZADA ---
+            const cursoData = JSON.parse(item.dataset.fullData);
+            const targetFranjaId = parseInt(to.dataset.franjaId, 10);
+
+            const isTarde = franjasTarde.some(f => f.id === targetFranjaId);
+            const targetTurno = isTarde ? 'TARDE' : 'MANANA';
+
+            // Regla 1: Semestres 1-4 solo pueden ir en la mañana, salvo excepción.
+            if (cursoData.semestre_cursado <= 4 && targetTurno === 'TARDE' && !cursoData.excepcion_horario) {
+                Toast.fire({ icon: 'error', title: 'Horario no permitido', text: 'Los cursos de semestres inferiores solo pueden llevarse en el turno de mañana.' });
+                await loadPlannerData();
+                return;
+            }
+
+            // Regla 2: Semestres 5-10 solo pueden ir en la tarde.
+            if (cursoData.semestre_cursado >= 5 && targetTurno === 'MANANA') {
+                Toast.fire({ icon: 'error', title: 'Horario no permitido', text: 'Los cursos de semestres superiores solo pueden llevarse en el turno de tarde.' });
+                await loadPlannerData();
+                return;
+            }
+            // --- FIN DE VALIDACIÓN PERSONALIZADA ---
+
+
             // Si el movimiento no es válido según la validación del cliente, recargar para restaurar el estado.
             if (to.classList.contains('conflict-cell') || to.querySelector('[data-bloque-id]')) {
                 Toast.fire({ icon: 'error', title: 'No se puede asignar en este espacio ocupado o en conflicto.' });
-                await loadPlannerData(); // Recargar para restaurar el estado visual original.
+                await loadPlannerData(); // Recargar para restaurar elestado visual original.
                 return;
             }
 
