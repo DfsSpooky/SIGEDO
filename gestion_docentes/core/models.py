@@ -141,6 +141,10 @@ class BloqueHorario(models.Model):
                 raise ValidationError(f"El docente {self.curso.docente} no está disponible en el turno de {turno_franja}.")
 
     def save(self, *args, **kwargs):
+        # Salvaguarda para ignorar la creación de bloques vacíos desde el admin inline
+        if not self.franja_inicio_id:
+            return
+
         # Actualizar campos denormalizados
         DIAS = {'Lunes': 0, 'Martes': 1, 'Miércoles': 2, 'Jueves': 3, 'Viernes': 4}
         self.dia_semana = DIAS.get(self.dia)
