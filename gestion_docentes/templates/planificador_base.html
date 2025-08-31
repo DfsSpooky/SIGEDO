@@ -1,0 +1,92 @@
+{% load static %} <!DOCTYPE html>
+<html lang="es" data-theme="winter"> <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Planificador de Horarios{% endblock %} | {{ configuracion.nombre_institucion|default:"Sistema de Gestión" }}</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.2/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: hsl(var(--b2)); }
+        ::-webkit-scrollbar-thumb { background-color: hsl(var(--b3)); border-radius: 4px; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+
+        @keyframes fadeOut {
+            from { opacity: 1; transform: translateX(0); }
+            to { opacity: 0; transform: translateX(20px); }
+        }
+        .animate-fade-out {
+            animation: fadeOut 0.5s ease-in forwards;
+        }
+    </style>
+</head>
+<body class="bg-base-200">
+
+    <main class="p-4 sm:p-6 lg:p-8 animate-fade-in">
+
+        {% if messages %}
+        <div id="message-container" class="fixed top-5 right-5 z-50 w-full max-w-sm space-y-3">
+            {% for message in messages %}
+            <div class="alert shadow-lg text-white animate-fade-in {% if message.tags == 'success' %}bg-success{% elif message.tags == 'error' %}bg-error{% elif message.tags == 'warning' %}bg-warning{% else %}bg-info{% endif %}">
+                <div class="flex items-center w-full">
+                    {% if message.tags == 'success' %}<i class="fas fa-check-circle"></i>{% elif message.tags == 'error' %}<i class="fas fa-times-circle"></i>{% elif message.tags == 'warning' %}<i class="fas fa-exclamation-triangle"></i>{% else %}<i class="fas fa-info-circle"></i>{% endif %}
+                    <span class="flex-grow mx-3">{{ message }}</span>
+                    <button type="button" class="ml-auto" onclick="this.closest('.alert').remove()"><i class="fas fa-times text-sm"></i></button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const messageContainer = document.getElementById('message-container');
+                if (messageContainer) {
+                    setTimeout(() => {
+                        const alerts = messageContainer.querySelectorAll('.alert');
+                        alerts.forEach(alert => {
+                            alert.classList.add('animate-fade-out');
+                            alert.addEventListener('animationend', () => alert.remove());
+                        });
+                        setTimeout(() => {
+                            if (!messageContainer.children.length) {
+                                messageContainer.remove();
+                            }
+                        }, 500);
+                    }, 5000);
+                }
+            });
+        </script>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    {% block extra_js %}{% endblock %}
+
+    {% if user.is_authenticated %}
+    <script>
+    // NOTE: Notification system is excluded from this base as it's part of the top navbar,
+    // which is not present in this full-screen layout.
+    </script>
+    {% endif %}
+
+</body>
+</html>

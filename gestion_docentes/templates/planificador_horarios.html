@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends 'planificador_base.html' %}
 {% load template_extras %}
 {% block title %}Planificador de Horarios{% endblock %}
 {% block breadcrumb %}Planificador{% endblock %}
@@ -206,46 +206,69 @@ document.addEventListener('DOMContentLoaded', function () {
     // --- RENDERING FUNCTIONS ---
     function createCourseElement(curso, isAssigned = false) {
         const div = document.createElement('div');
-        div.className = `relative p-2 rounded-lg text-sm transition-all duration-300 cursor-grab active:cursor-grabbing border`;
+        // AÑADIDO: h-full para que el div ocupe toda la altura de la celda (<td>)
+        // AÑADIDO: flex y flex-col para controlar el layout interno
+        div.className = `relative p-2 rounded-lg text-sm transition-all duration-300 cursor-grab active:cursor-grabbing border h-full flex flex-col`;
 
         let colors = '';
         if (isAssigned) {
-            div.classList.add('group'); // Needed for group-hover to work
-            // --- Elemento ASIGNADO (Bloque de Horario) ---
+            div.classList.add('group');
             div.dataset.bloqueId = curso.bloque_id;
-            div.dataset.cursoId = curso.curso_id; // Mantenemos el cursoId por si es útil
-            div.dataset.duracion = curso.duracion_bloques; // <-- CORRECCIÓN: Añadir duración al bloque
+            div.dataset.cursoId = curso.curso_id;
+            div.dataset.duracion = curso.duracion_bloques;
             div.dataset.fullData = JSON.stringify(curso);
 
+            // --- ESTILOS MEJORADOS ---
+            let icon = '';
             if (curso.tipo_curso === 'GENERAL') {
-                colors = 'bg-purple-500/10 border-purple-500/20 text-purple-800 dark:text-purple-300';
+                colors = 'bg-purple-100 border-purple-200 text-purple-800 dark:bg-purple-900 dark:border-purple-700 dark:text-purple-200';
+                icon = '<i class="fas fa-globe-americas fa-fw mr-2 text-purple-400"></i>';
             } else { // ESPECIALIDAD
-                colors = 'bg-sky-500/10 border-sky-500/20 text-sky-800 dark:text-sky-300';
+                colors = 'bg-sky-100 border-sky-200 text-sky-800 dark:bg-sky-900 dark:border-sky-700 dark:text-sky-200';
+                icon = '<i class="fas fa-graduation-cap fa-fw mr-2 text-sky-400"></i>';
             }
+
+            // --- CÁLCULO DE LA HORA ---
+            const allFranjas = [...franjasManana, ...franjasTarde];
+            const startFranjaIndex = allFranjas.findIndex(f => f.id === curso.franja_id_inicio);
+            let timeText = '';
+            if (startFranjaIndex !== -1) {
+                const startFranja = allFranjas[startFranjaIndex];
+                const endFranjaIndex = startFranjaIndex + curso.duracion_bloques - 1;
+                const endFranja = allFranjas[endFranjaIndex];
+                if (startFranja && endFranja) {
+                    timeText = `${startFranja.hora_inicio.slice(0,5)} - ${endFranja.hora_fin.slice(0,5)}`;
+                }
+            }
+
+            // --- HTML INTERNO MEJORADO ---
             div.innerHTML = `
-                <p class="font-bold truncate pr-4">${curso.nombre}</p>
-                <p class="text-xs opacity-70 truncate">${curso.docente_nombre}</p>
-                <p class="text-xs opacity-50">${curso.duracion_bloques} bloque(s)</p>
+                <div class="flex-grow">
+                    <p class="font-bold truncate pr-4">${curso.nombre}</p>
+                    <p class="text-xs opacity-70 truncate">${curso.docente_nombre}</p>
+                </div>
+                <div class="mt-2 text-xs opacity-80">
+                    <div class="flex items-center">${icon} ${curso.tipo_curso}</div>
+                    <div class="font-mono mt-1"><i class="far fa-clock fa-fw mr-2 opacity-60"></i>${timeText} (${curso.duracion_bloques}h)</div>
+                </div>
             `;
 
+            // --- CONTROLES MEJORADOS ---
             const controlsDiv = document.createElement('div');
-            controlsDiv.className = 'absolute top-0 right-1 flex flex-col items-center space-y-0.5 opacity-0 group-hover:opacity-100 transition-opacity';
+            controlsDiv.className = 'absolute top-1 right-1 flex flex-col items-center space-y-1 opacity-0 group-hover:opacity-100 transition-opacity';
 
-            const increaseButton = document.createElement('button');
-            increaseButton.className = 'btn btn-xs btn-square btn-ghost text-success/60 hover:bg-success/10 hover:text-success';
-            increaseButton.innerHTML = '<i class="fas fa-plus"></i>';
-            increaseButton.addEventListener('click', (e) => { e.stopPropagation(); handleDurationChange(div.dataset.bloqueId, 'increase'); });
+            const createControlButton = (iconClass, colorClass, title, onClick) => {
+                const button = document.createElement('button');
+                button.className = `btn btn-xs btn-square bg-base-100/50 backdrop-blur-sm border-0 text-${colorClass}/80 hover:bg-base-100 hover:text-${colorClass}`;
+                button.innerHTML = `<i class="fas ${iconClass}"></i>`;
+                button.title = title;
+                button.addEventListener('click', (e) => { e.stopPropagation(); onClick(e); });
+                return button;
+            };
 
-            const decreaseButton = document.createElement('button');
-            decreaseButton.className = 'btn btn-xs btn-square btn-ghost text-warning/60 hover:bg-warning/10 hover:text-warning';
-            decreaseButton.innerHTML = '<i class="fas fa-minus"></i>';
-            decreaseButton.addEventListener('click', (e) => { e.stopPropagation(); handleDurationChange(div.dataset.bloqueId, 'decrease'); });
-
-            const deleteButton = document.createElement('button');
-            deleteButton.className = 'btn btn-xs btn-square btn-ghost text-error/60 hover:bg-error/10 hover:text-error';
-            deleteButton.innerHTML = `<i class="fas fa-times"></i>`;
-            deleteButton.addEventListener('click', (e) => {
-                e.stopPropagation();
+            controlsDiv.appendChild(createControlButton('fa-plus', 'success', 'Aumentar duración', () => handleDurationChange(div.dataset.bloqueId, 'increase')));
+            controlsDiv.appendChild(createControlButton('fa-minus', 'warning', 'Disminuir duración', () => handleDurationChange(div.dataset.bloqueId, 'decrease')));
+            controlsDiv.appendChild(createControlButton('fa-times', 'error', 'Eliminar bloque', () => {
                 Swal.fire({
                     title: '¿Eliminar este bloque?',
                     text: `Se eliminará el bloque de ${curso.duracion_bloques} hora(s) para "${curso.nombre}".`,
@@ -253,24 +276,15 @@ document.addEventListener('DOMContentLoaded', function () {
                     showCancelButton: true,
                     confirmButtonText: 'Sí, eliminar',
                     cancelButtonText: 'No'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        handleDeassign(div, div.parentElement);
-                    }
-                });
-            });
+                }).then(result => result.isConfirmed && handleDeassign(div, div.parentElement));
+            }));
 
-            controlsDiv.appendChild(increaseButton);
-            controlsDiv.appendChild(decreaseButton);
-            controlsDiv.appendChild(deleteButton);
             div.appendChild(controlsDiv);
 
         } else {
-            // --- Elemento PENDIENTE de Asignar (Curso) ---
+            // Elemento PENDIENTE (sin cambios drásticos)
             div.dataset.cursoId = curso.id;
             div.dataset.fullData = JSON.stringify(curso);
-            // Al arrastrar, decidimos con cuántos bloques se intenta asignar. 2 es un default razonable.
-            // Lo ideal sería un selector en la UI.
             div.dataset.duracion = Math.min(2, curso.horas_pendientes);
             colors = 'bg-base-200 border-base-300';
             div.innerHTML = `
