@@ -17,18 +17,18 @@ document.addEventListener('DOMContentLoaded', function() {
         flatpickr('.vTimeField', {
             enableTime: true,
             noCalendar: true,
-            dateFormat: "H:i:S",
-            time_24hr: true,
+            dateFormat: "h:i:S K",
+            time_24hr: false,
             allowInput: true,
         });
 
         // Initialize for datetime fields
         flatpickr('.vDateTimeField', {
             enableTime: true,
-            dateFormat: "Y-m-d H:i:S",
+            dateFormat: "Y-m-d h:i:S K",
             altInput: true,
-            altFormat: "F j, Y H:i",
-            time_24hr: true,
+            altFormat: "F j, Y h:i K",
+            time_24hr: false,
         });
     }
 });
