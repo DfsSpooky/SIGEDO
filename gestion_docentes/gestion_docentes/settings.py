@@ -60,7 +60,13 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'drf_yasg',
+
+    # Local apps
     'core',
+    'apps.inventario',
+    'apps.reservas',
+
+    # Third-party styling
     'tailwind',
     
 ]
