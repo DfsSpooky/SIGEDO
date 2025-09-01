@@ -23,7 +23,7 @@ class Command(BaseCommand):
 
         reservas_expiradas_count = 0
 
-        self.stdout.write(f"Verificando reservas a las {now.strftime('%Y-%m-%d %H:%M:%S')}...")
+        self.stdout.write(f"Verificando reservas a las {now.strftime('%Y-%m-%d %I:%M:%S %p')}...")
 
         for reserva in reservas_pendientes:
             # Combinamos la fecha de la reserva con la hora de inicio de la franja horaria

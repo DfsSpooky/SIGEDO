@@ -93,6 +93,7 @@ class Curso(models.Model):
     semestre = models.ForeignKey(Semestre, on_delete=models.SET_NULL, null=True, related_name='cursos')
     semestre_cursado = models.IntegerField(choices=SEMESTRE_CURSADO_CHOICES, null=True, blank=True)
     excepcion_horario = models.BooleanField(default=False, help_text="Permite que este curso se asigne en la tarde aunque sea de un semestre bajo.")
+    tolerancia_tardanza_minutos = models.PositiveIntegerField(null=True, blank=True, help_text="Tolerancia de tardanza en minutos, específica para este curso. Si se deja en blanco, se usará la configuración general de la institución.")
 
     # NUEVO CAMPO PARA HORAS TOTALES
     horas_academicas_semanales = models.PositiveIntegerField(default=2, help_text="Número total de bloques de 50 minutos que el curso requiere a la semana.")
@@ -224,20 +225,32 @@ class Asistencia(models.Model):
         """
         Determina si la marca de entrada de esta asistencia se considera tardanza.
         """
-        if not self.hora_entrada or not self.curso or not self.curso.horario_inicio:
+        from datetime import datetime, timedelta
+
+        if not self.hora_entrada or not self.curso:
             return False
 
-        # Cargar la configuración de la institución para obtener el límite de tardanza
-        configuracion = ConfiguracionInstitucion.load()
+        # Determinar la tolerancia a usar
+        if self.curso.tolerancia_tardanza_minutos is not None:
+            minutos_tolerancia = self.curso.tolerancia_tardanza_minutos
+        else:
+            configuracion = ConfiguracionInstitucion.load()
+            minutos_tolerancia = configuracion.tiempo_limite_tardanza
+
+        # Obtener el horario de inicio del bloque para el día de la asistencia
+        bloque_del_dia = BloqueHorario.objects.filter(curso=self.curso, dia_semana=self.fecha.weekday()).first()
+        if not bloque_del_dia:
+            return False # No hay bloque programado para este día
+
+        horario_inicio_curso = bloque_del_dia.horario_inicio
 
         # Combinar la fecha de la asistencia con la hora de inicio del curso para crear un datetime
-        # Es importante usar la fecha de la asistencia, no la fecha actual.
         horario_inicio_dt = timezone.make_aware(
-            datetime.combine(self.fecha, self.curso.horario_inicio)
+            datetime.combine(self.fecha, horario_inicio_curso)
         )
 
         # Calcular el tiempo límite para marcar sin ser considerado tardanza
-        limite_tardanza = horario_inicio_dt + timedelta(minutes=configuracion.tiempo_limite_tardanza)
+        limite_tardanza = horario_inicio_dt + timedelta(minutes=minutos_tolerancia)
 
         # Comparar la hora de entrada (que es un datetime) con el límite (que también es un datetime)
         return self.hora_entrada > limite_tardanza

@@ -153,7 +153,7 @@ class CursoAdmin(ModelAdmin):
     autocomplete_fields = ['docente', 'carrera', 'especialidad', 'semestre']
     fieldsets = (
         ('Información General', {'fields': ('nombre', 'tipo_curso', 'horas_academicas_semanales')}),
-        ('Organización Académica', {'fields': ('docente', 'carrera', 'especialidad', 'semestre', 'semestre_cursado', 'excepcion_horario')}),
+        ('Organización Académica', {'fields': ('docente', 'carrera', 'especialidad', 'semestre', 'semestre_cursado', 'excepcion_horario', 'tolerancia_tardanza_minutos')}),
     )
 
     @admin.display(description="Acciones")

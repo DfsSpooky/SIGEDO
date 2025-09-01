@@ -216,7 +216,7 @@ class RegistrarAsistenciaRfidView(APIView):
         else:
             response_data = {
                 'status': 'warning',
-                'message': f'La asistencia de hoy ya fue registrada a las {asistencia_diaria.hora_entrada.strftime("%H:%M:%S")}.',
+                'message': f'La asistencia de hoy ya fue registrada a las {asistencia_diaria.hora_entrada.strftime("%I:%M:%S %p")}.',
                 'teacher': teacher_serializer.data
             }
 
@@ -796,8 +796,8 @@ def detalle_asistencia_docente_ajax(request, docente_id):
                 {
                     'curso': asis.curso.nombre if asis.curso else 'N/A',
                     'fecha': asis.fecha.strftime('%d/%m/%Y'),
-                    'hora_entrada': asis.hora_entrada.strftime('%H:%M') if asis.hora_entrada else '-',
-                    'hora_salida': asis.hora_salida.strftime('%H:%M') if asis.hora_salida else '-',
+                    'hora_entrada': asis.hora_entrada.strftime('%I:%M %p') if asis.hora_entrada else '-',
+                    'hora_salida': asis.hora_salida.strftime('%I:%M %p') if asis.hora_salida else '-',
                     'foto_entrada_url': asis.foto_entrada.url if asis.foto_entrada else None,
                     'foto_salida_url': asis.foto_salida.url if asis.foto_salida else None,
                 }

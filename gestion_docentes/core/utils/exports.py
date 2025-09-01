@@ -68,7 +68,7 @@ class ReportePDFTemplate(BaseDocTemplate):
         canvas.setStrokeColorRGB(0.8, 0.8, 0.8)
         canvas.line(self.leftMargin, self.height + self.topMargin - h + 0.2*inch, self.width + self.leftMargin, self.height + self.topMargin - h + 0.2*inch)
         
-        fecha_generacion = Paragraph(f"Generado el: {timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M:%S')}", STYLES['TableCellSmall'])
+        fecha_generacion = Paragraph(f"Generado el: {timezone.localtime(timezone.now()).strftime('%d/%m/%Y %I:%M:%S %p')}", STYLES['TableCellSmall'])
         numero_pagina = Paragraph(f"Página {doc.page} de {self.page_count}", STYLES['TableCellSmall'])
         footer_table = Table([[fecha_generacion, numero_pagina]], colWidths=[self.width/2, self.width/2])
         footer_table.setStyle(TableStyle([('ALIGN', (0,0), (0,0), 'LEFT'), ('ALIGN', (1,0), (1,0), 'RIGHT')]))
@@ -126,12 +126,12 @@ def exportar_reporte_pdf(request):
         
         detalles_cells = []
         if record['asistencia_diaria']:
-            hora_general_str = record['asistencia_diaria'].hora_entrada.astimezone(peru_tz).strftime('%H:%M:%S')
+            hora_general_str = record['asistencia_diaria'].hora_entrada.astimezone(peru_tz).strftime('%I:%M:%S %p')
             detalles_cells.append(Paragraph(f"<b>Asistencia General: {hora_general_str}</b>", STYLES['TableCellSmall']))
 
         if record['asistencias']:
             for asis in record['asistencias']:
-                hora_entrada_str = asis.hora_entrada.astimezone(peru_tz).strftime('%H:%M:%S') if asis.hora_entrada else "--:--"
+                hora_entrada_str = asis.hora_entrada.astimezone(peru_tz).strftime('%I:%M:%S %p') if asis.hora_entrada else "--:--"
                 detalle_str = f"• {asis.curso.nombre} (Entrada: {hora_entrada_str})"
 
                 # Lógica de tardanza corregida
@@ -189,7 +189,7 @@ def exportar_reporte_excel(request):
         detalles_list = []
         if record['asistencias']:
             for asis in record['asistencias']:
-                hora_entrada_str = asis.hora_entrada.astimezone(peru_tz).strftime('%H:%M') if asis.hora_entrada else "--:--"
+                hora_entrada_str = asis.hora_entrada.astimezone(peru_tz).strftime('%I:%M %p') if asis.hora_entrada else "--:--"
                 detalle = f"{asis.curso.nombre} (Entrada: {hora_entrada_str})"
 
                 bloque_asistencia = BloqueHorario.objects.filter(curso=asis.curso, dia_semana=asis.fecha.weekday()).first()

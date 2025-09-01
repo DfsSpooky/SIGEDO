@@ -38,7 +38,7 @@ class CursoAsistenciaSerializer(serializers.ModelSerializer):
         # y buscamos el bloque de horario para la fecha de la asistencia.
         bloque = BloqueHorario.objects.filter(curso=obj.curso, dia_semana=obj.fecha.weekday()).first()
         if bloque:
-            return f'{obj.curso.nombre} ({bloque.horario_inicio.strftime("%H:%M")} - {bloque.horario_fin.strftime("%H:%M")})'
+            return f'{obj.curso.nombre} ({bloque.horario_inicio.strftime("%I:%M %p")} - {bloque.horario_fin.strftime("%I:%M %p")})'
         return obj.curso.nombre
 
     def get_entryMarked(self, obj):
