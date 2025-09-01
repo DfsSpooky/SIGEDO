@@ -57,13 +57,15 @@ class TeacherInfoView(APIView):
         if not semestre_activo:
             return Response({'status': 'error', 'message': 'No hay un semestre académico activo.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Usamos la consulta optimizada con el campo `dia_semana`
+        # Lógica corregida para obtener los cursos del día a través de los bloques de horario
         dia_semana_hoy = today.weekday()
-        cursos_hoy = Curso.objects.filter(
-            docente=docente,
-            semestre=semestre_activo,
+        curso_ids_hoy = BloqueHorario.objects.filter(
+            curso__docente=docente,
+            curso__semestre=semestre_activo,
             dia_semana=dia_semana_hoy
-        )
+        ).values_list('curso_id', flat=True).distinct()
+
+        cursos_hoy = Curso.objects.filter(id__in=curso_ids_hoy)
 
         # Para cada curso del día, nos aseguramos de que exista un registro de asistencia
         # Esto simplifica la lógica y asegura que siempre tengamos un objeto para serializar.
