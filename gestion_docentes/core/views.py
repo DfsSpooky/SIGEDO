@@ -851,7 +851,7 @@ class DisponibilidadEquiposView(LoginRequiredMixin, TemplateView):
             activos_ocupados_ids = Reserva.objects.filter(
                 fecha_reserva=fecha_seleccionada,
                 estado__in=['RESERVADO', 'EN_USO'],
-                franja_horaria_inicio_id__in=franjas_del_curso_ids
+                franja_horaria_inicio_id__in=franjas_del_bloque_ids
             ).values_list('activo_id', flat=True)
 
             # Filtrar la lista de activos disponibles
