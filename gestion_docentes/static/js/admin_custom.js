@@ -17,7 +17,9 @@ document.addEventListener('DOMContentLoaded', function() {
         flatpickr('.vTimeField', {
             enableTime: true,
             noCalendar: true,
-            dateFormat: "h:i:S K",
+            dateFormat: "H:i:S", // Format for Django backend
+            altInput: true,
+            altFormat: "h:i K", // Format for user
             time_24hr: false,
             allowInput: true,
         });
@@ -25,9 +27,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // Initialize for datetime fields
         flatpickr('.vDateTimeField', {
             enableTime: true,
-            dateFormat: "Y-m-d h:i:S K",
+            dateFormat: "Y-m-d H:i:S", // Format for Django backend
             altInput: true,
-            altFormat: "F j, Y h:i K",
+            altFormat: "F j, Y h:i K", // Format for user
             time_24hr: false,
         });
     }
