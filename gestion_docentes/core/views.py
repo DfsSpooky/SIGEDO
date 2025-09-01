@@ -889,6 +889,7 @@ class DisponibilidadEquiposView(LoginRequiredMixin, TemplateView):
 
             # --- Validaciones ---
             bloque = get_object_or_404(BloqueHorario, pk=bloque_id, curso__docente=docente)
+            curso = bloque.curso # Definir la variable curso a partir del bloque
             activo = get_object_or_404(Activo, pk=activo_id)
             fecha = timezone.datetime.strptime(fecha_str, '%Y-%m-%d').date()
 
