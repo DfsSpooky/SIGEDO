@@ -1,0 +1,165 @@
+{% extends 'base.html' %}
+
+{% block title %}Mi Calendario de Horarios{% endblock %}
+
+{% block breadcrumb %}
+    <a href="{% url 'dashboard' %}">Dashboard</a> / Mi Calendario
+{% endblock %}
+
+{% block content %}
+<div class="card bg-base-100 shadow-xl">
+    <div class="card-body">
+        <h2 class="card-title text-2xl mb-4">Mi Calendario de Horarios</h2>
+        <div id="calendar" class="transition-opacity duration-500 opacity-0"></div>
+    </div>
+</div>
+
+<style>
+    /* Estilos para personalizar FullCalendar para que coincida con DaisyUI */
+    #calendar {
+        opacity: 1 !important; /* Forzar la visibilidad una vez cargado */
+    }
+    .fc {
+        /* Fuente y color de texto base */
+        font-family: 'Inter', sans-serif;
+        color: hsl(var(--bc) / var(--tw-text-opacity, 1));
+    }
+    .fc .fc-toolbar-title {
+        color: hsl(var(--bc));
+        font-weight: 700;
+    }
+    .fc .fc-button-primary {
+        background-color: hsl(var(--p));
+        border-color: hsl(var(--p));
+        color: hsl(var(--pc));
+    }
+    .fc .fc-button-primary:hover {
+        background-color: hsl(var(--pf));
+        border-color: hsl(var(--pf));
+    }
+    .fc .fc-button-primary:disabled {
+        background-color: hsl(var(--p));
+        border-color: hsl(var(--p));
+        opacity: 0.5;
+    }
+    .fc .fc-daygrid-day.fc-day-today {
+        background-color: hsl(var(--a) / 0.1);
+    }
+    .fc .fc-daygrid-day-number {
+        color: hsl(var(--bc));
+    }
+    .fc-event {
+        background-color: hsl(var(--b2));
+        border-color: hsl(var(--b3));
+        color: hsl(var(--bc));
+        padding: 4px;
+        font-size: 0.8em;
+    }
+    .fc-event-main {
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .fc-h-event {
+        border: 1px solid hsl(var(--b3));
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const calendarEl = document.getElementById('calendar');
+
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'timeGridWeek', // Vista semanal por defecto
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek,timeGridDay'
+        },
+        locale: 'es', // Establecer el idioma a español
+        slotMinTime: '07:00:00', // Hora de inicio del calendario
+        slotMaxTime: '22:00:00', // Hora de fin del calendario
+        allDaySlot: false, // No mostrar el slot de "todo el día"
+
+        // Los eventos se obtendrán de la API
+        events: "{% url 'api:horario_docente' %}",
+
+        // Mostrar un spinner mientras se cargan los eventos
+        loading: function(isLoading) {
+            if (isLoading) {
+                // Podríamos mostrar un spinner aquí
+                calendarEl.classList.add('opacity-50');
+            } else {
+                calendarEl.classList.remove('opacity-50');
+            }
+        },
+
+        // Forzar la transición de opacidad
+        viewDidMount: function() {
+            setTimeout(() => {
+                calendarEl.style.opacity = '1';
+            }, 50);
+        }
+    });
+
+    calendar.render();
+
+    // --- Lógica para WebSocket en Tiempo Real ---
+    function connectWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsPath = `${protocol}//${window.location.host}/ws/calendar/`;
+        const socket = new WebSocket(wsPath);
+
+        socket.onopen = function(e) {
+            console.log("Conexión WebSocket para el calendario establecida.");
+        };
+
+        socket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            if (data.type === 'horario.update') {
+                console.log('Actualización de horario recibida:', data.message);
+
+                // Opcional: Mostrar una notificación Toast no intrusiva
+                const Toast = Swal.mixin({
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 3000,
+                    timerProgressBar: true,
+                    didOpen: (toast) => {
+                        toast.addEventListener('mouseenter', Swal.stopTimer)
+                        toast.addEventListener('mouseleave', Swal.resumeTimer)
+                    }
+                });
+                Toast.fire({
+                    icon: 'info',
+                    title: 'Tu horario ha sido actualizado'
+                });
+
+                // Recargar los eventos del calendario
+                calendar.refetchEvents();
+            }
+        };
+
+        socket.onclose = function(e) {
+            console.error('El WebSocket del calendario se cerró. Intentando reconectar en 5 segundos...');
+            setTimeout(function() {
+                connectWebSocket();
+            }, 5000);
+        };
+
+        socket.onerror = function(err) {
+            console.error('Error de WebSocket:', err.message, 'Cerrando socket.');
+            socket.close();
+        };
+    }
+
+    // Iniciar la conexión WebSocket
+    connectWebSocket();
+});
+</script>
+<script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+{% endblock %}

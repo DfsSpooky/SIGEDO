@@ -1021,3 +1021,10 @@ class ActivoDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
     template_name = 'inventario/confirmar_eliminacion_activo.html'
     success_url = reverse_lazy('inventario:lista')
     permission_required = 'core.delete_activo'
+
+@login_required
+def calendario_view(request):
+    """
+    Muestra la página del calendario de horarios del docente.
+    """
+    return render(request, 'calendario.html')

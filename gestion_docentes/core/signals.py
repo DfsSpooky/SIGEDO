@@ -1,12 +1,12 @@
 import logging
 from django.db import transaction
-from django.db.models.signals import pre_save, post_save
+from django.db.models.signals import pre_save, post_save, post_delete
 from django.dispatch import receiver
 from django.urls import reverse
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from functools import partial
-from .models import Documento, Notificacion, SolicitudIntercambio, Curso, Anuncio, Docente, VersionDocumento, Justificacion
+from .models import Documento, Notificacion, SolicitudIntercambio, Curso, Anuncio, Docente, VersionDocumento, Justificacion, BloqueHorario
 
 logger = logging.getLogger(__name__)
 
@@ -166,3 +166,46 @@ def notificar_nueva_solicitud_intercambio(sender, instance, created, **kwargs):
         )
         payload = {'type': 'send.notification', 'message': { 'id': notificacion.id, 'mensaje': notificacion.mensaje, 'url': notificacion.url, 'leido': notificacion.leido, 'fecha_creacion': notificacion.fecha_creacion.isoformat() }}
         transaction.on_commit(partial(do_broadcast, destinatario.id, payload))
+
+
+# --- Señales para el Calendario en Tiempo Real ---
+
+def broadcast_horario_update(docente_id):
+    """
+    Helper function to broadcast a schedule update message to a user's calendar channel.
+    """
+    try:
+        channel_layer = get_channel_layer()
+        if channel_layer and docente_id:
+            logger.info(f"Broadcasting schedule update to user {docente_id}.")
+            async_to_sync(channel_layer.group_send)(
+                f'horario_{docente_id}',
+                {
+                    'type': 'horario.update',
+                    'message': 'Tu horario ha sido actualizado.'
+                }
+            )
+        else:
+            logger.warning(f"Channel layer not available or no docente_id provided for schedule update.")
+    except Exception as e:
+        logger.error(f"Failed to broadcast schedule update for user {docente_id}: {e}", exc_info=True)
+
+
+@receiver(post_save, sender=BloqueHorario)
+def notificar_cambio_horario_on_save(sender, instance, **kwargs):
+    """
+    Notifica al docente cuando un bloque de su horario es creado o modificado.
+    """
+    if instance.curso and instance.curso.docente:
+        # Usamos on_commit para asegurar que la transacción se haya completado
+        # antes de enviar la notificación. Esto evita race conditions.
+        transaction.on_commit(partial(broadcast_horario_update, instance.curso.docente.id))
+
+
+@receiver(post_delete, sender=BloqueHorario)
+def notificar_cambio_horario_on_delete(sender, instance, **kwargs):
+    """
+    Notifica al docente cuando un bloque de su horario es eliminado.
+    """
+    if instance.curso and instance.curso.docente:
+        transaction.on_commit(partial(broadcast_horario_update, instance.curso.docente.id))

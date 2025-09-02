@@ -28,4 +28,7 @@ urlpatterns = [
     path('notificaciones/json/', views.notificaciones_json, name='notificaciones_json'),
     path('notificaciones/<int:notificacion_id>/marcar-leida/', views.marcar_notificacion_como_leida, name='marcar_notificacion_leida'),
     path('notificaciones/marcar-todas-leidas/', views.marcar_todas_como_leidas, name='marcar_todas_leidas'),
+
+    # --- URL para el Calendario del Docente ---
+    path('horario-docente/', views.api_horario_docente, name='horario_docente'),
 ]

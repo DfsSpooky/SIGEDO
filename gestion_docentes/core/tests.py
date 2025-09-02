@@ -1,7 +1,7 @@
-from django.test import TestCase, Client
+from django.test import TestCase, Client, TransactionTestCase
 from django.urls import reverse
 from django.contrib.auth import authenticate
-from .models import PersonalDocente, Notificacion, TipoDocumento, Documento, Anuncio, Semestre, ConfiguracionInstitucion, Curso, Asistencia, AsistenciaDiaria, Carrera, Justificacion, TipoJustificacion
+from .models import PersonalDocente, Notificacion, TipoDocumento, Documento, Anuncio, Semestre, ConfiguracionInstitucion, Curso, Asistencia, AsistenciaDiaria, Carrera, Justificacion, TipoJustificacion, DiaEspecial
 from .utils.encryption import encrypt_id, decrypt_id
 from .backends import DniOrUsernameBackend
 import re
@@ -937,3 +937,96 @@ class HorarioFlexibleTest(TestCase):
         self.assertIn('excede las horas semanales', response.json()['message'])
 
         self.assertEqual(BloqueHorario.objects.count(), 0)
+
+
+from channels.testing import WebsocketCommunicator
+from channels.layers import get_channel_layer
+from .consumers import CalendarConsumer
+
+class CalendarRealtimeTest(TransactionTestCase):
+    def setUp(self):
+        self.client = Client()
+        self.docente = PersonalDocente.objects.create_user(
+            username='calendar_user', password='password', dni='98765432'
+        )
+        self.semestre = Semestre.objects.create(
+            nombre="Semestre Calendario",
+            fecha_inicio=date(2023, 1, 1),
+            fecha_fin=date(2023, 6, 30),
+            estado='ACTIVO'
+        )
+        self.carrera = Carrera.objects.create(nombre="Ingenieria de Calendarios")
+        self.curso = Curso.objects.create(
+            nombre="Curso de Calendario",
+            docente=self.docente,
+            semestre=self.semestre,
+            carrera=self.carrera
+        )
+        self.franja = FranjaHoraria.objects.create(turno='MANANA', hora_inicio=time(8, 0), hora_fin=time(8, 50))
+        DiaEspecial.objects.create(fecha=date(2023, 5, 1), motivo="Feriado", tipo='FERIADO', semestre=self.semestre)
+        self.api_url = reverse('api:horario_docente')
+
+    def test_api_horario_docente_authenticated(self):
+        """Test that an authenticated user can get their schedule data."""
+        self.client.login(username='calendar_user', password='password')
+        bloque = BloqueHorario.objects.create(
+            curso=self.curso, dia='Lunes', franja_inicio=self.franja, duracion_bloques=2
+        )
+        response = self.client.get(self.api_url)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data), 2) # 1 bloque + 1 dia especial
+
+        # Check recurring event
+        bloque_event = next(item for item in data if item["id"] == f"bloque_{bloque.id}")
+        self.assertEqual(bloque_event['title'], 'Curso de Calendario')
+        self.assertEqual(bloque_event['daysOfWeek'], [1]) # Monday
+        self.assertEqual(bloque_event['startRecur'], '2023-01-01')
+
+        # Check special day event
+        especial_event = next(item for item in data if "especial" in item["id"])
+        self.assertEqual(especial_event['title'], 'Feriado')
+        self.assertEqual(especial_event['display'], 'background')
+
+    def test_api_horario_docente_unauthenticated(self):
+        """Test that an unauthenticated user cannot access the endpoint."""
+        response = self.client.get(self.api_url)
+        self.assertEqual(response.status_code, 403) # DRF's default for unauthenticated
+
+    async def test_calendar_consumer_auth(self):
+        """Test that the CalendarConsumer handles authenticated connections."""
+        communicator = WebsocketCommunicator(CalendarConsumer.as_asgi(), "/ws/calendar/")
+        communicator.scope['user'] = self.docente
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+        await communicator.disconnect()
+
+    async def test_calendar_consumer_unauth(self):
+        """Test that the CalendarConsumer closes connections for unauthenticated users."""
+        from django.contrib.auth.models import AnonymousUser
+        communicator = WebsocketCommunicator(CalendarConsumer.as_asgi(), "/ws/calendar/")
+        communicator.scope['user'] = AnonymousUser()
+        connected, _ = await communicator.connect()
+        self.assertFalse(connected)
+
+    @patch('core.signals.broadcast_horario_update')
+    def test_post_save_signal_sends_update(self, mock_broadcast):
+        """Test that saving a BloqueHorario triggers the broadcast function."""
+        bloque = BloqueHorario.objects.create(
+            curso=self.curso, dia='Lunes', franja_inicio=self.franja, duracion_bloques=2
+        )
+        mock_broadcast.assert_called_once_with(self.docente.id)
+
+        bloque.save()
+        self.assertEqual(mock_broadcast.call_count, 2)
+
+    @patch('core.signals.broadcast_horario_update')
+    def test_post_delete_signal_sends_update(self, mock_broadcast):
+        """Test that deleting a BloqueHorario triggers the broadcast function."""
+        bloque = BloqueHorario.objects.create(
+            curso=self.curso, dia='Lunes', franja_inicio=self.franja, duracion_bloques=2
+        )
+        mock_broadcast.reset_mock()
+
+        bloque.delete()
+        mock_broadcast.assert_called_once_with(self.docente.id)

@@ -77,3 +77,35 @@ class KioskConsumer(AsyncWebsocketConsumer):
             'data': message_data
         }))
         print(f"Sent message to {self.channel_name}: {message_data}")
+
+
+class CalendarConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        self.user = self.scope["user"]
+        if not self.user.is_authenticated:
+            await self.close()
+            return
+
+        self.room_group_name = f'horario_{self.user.id}'
+
+        await self.channel_layer.group_add(
+            self.room_group_name,
+            self.channel_name
+        )
+
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        await self.channel_layer.group_discard(
+            self.room_group_name,
+            self.channel_name
+        )
+
+    async def horario_update(self, event):
+        """
+        Envía un mensaje al cliente indicando que el horario ha sido actualizado.
+        """
+        await self.send(text_data=json.dumps({
+            'type': 'horario.update',
+            'message': event.get('message', 'Tu horario ha sido actualizado.')
+        }))
