@@ -13,8 +13,7 @@ from .models import (
     Documento, Asistencia, SolicitudIntercambio,
     PersonalDocente, Administrador, AsistenciaDiaria,
     ConfiguracionInstitucion, Semestre, FranjaHoraria, DiaEspecial, VersionDocumento,
-    Notificacion, Anuncio, TipoJustificacion, Justificacion,
-    Activo, TipoActivo, Reserva
+    Notificacion, Anuncio, TipoJustificacion, Justificacion
 )
 
 # --- CONFIGURACIÓN DE ADMINS ---
@@ -305,45 +304,6 @@ class JustificacionAdmin(ModelAdmin):
     def acciones(self, obj):
         change_url = reverse(f'admin:{obj._meta.app_label}_{obj._meta.model_name}_change', args=[obj.pk])
         return format_html(f'<a href="{change_url}" class="button">Revisar</a>')
-
-@admin.register(TipoActivo)
-class TipoActivoAdmin(ModelAdmin):
-    list_display = ('nombre', 'acciones')
-    list_display_links = None
-    search_fields = ('nombre',)
-    search_as_command = True
-    @admin.display(description="Acciones")
-    def acciones(self, obj):
-        change_url = reverse(f'admin:{obj._meta.app_label}_{obj._meta.model_name}_change', args=[obj.pk])
-        return format_html(f'<a href="{change_url}" class="button">Editar</a>')
-
-@admin.register(Activo)
-class ActivoAdmin(ModelAdmin):
-    list_display = ('nombre', 'codigo_patrimonial', 'tipo', 'estado', 'asignado_a', 'acciones')
-    list_display_links = None
-    list_filter = ('estado', 'tipo')
-    search_fields = ('nombre', 'codigo_patrimonial', 'asignado_a__first_name', 'asignado_a__last_name', 'asignado_a__username')
-    search_as_command = True
-    autocomplete_fields = ('asignado_a', 'tipo')
-    @admin.display(description="Acciones")
-    def acciones(self, obj):
-        change_url = reverse(f'admin:{obj._meta.app_label}_{obj._meta.model_name}_change', args=[obj.pk])
-        return format_html(f'<a href="{change_url}" class="button">Editar</a>')
-
-@admin.register(Reserva)
-class ReservaAdmin(ModelAdmin):
-    list_display = ('id', 'activo', 'docente', 'fecha_reserva', 'franja_horaria_inicio', 'franja_horaria_fin', 'estado', 'acciones')
-    list_display_links = None
-    list_filter = ('estado', 'fecha_reserva')
-    search_fields = ('activo__nombre', 'docente__username', 'docente__first_name')
-    search_as_command = True
-    autocomplete_fields = ('activo', 'docente', 'franja_horaria_inicio', 'franja_horaria_fin')
-    readonly_fields = ('fecha_creacion', 'fecha_confirmacion', 'fecha_finalizacion')
-    list_per_page = 20
-    @admin.display(description="Acciones")
-    def acciones(self, obj):
-        change_url = reverse(f'admin:{obj._meta.app_label}_{obj._meta.model_name}_change', args=[obj.pk])
-        return format_html(f'<a href="{change_url}" class="button">Ver</a>')
 
 @admin.register(Asistencia)
 class AsistenciaAdmin(ModelAdmin):

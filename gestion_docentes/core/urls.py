@@ -1,5 +1,5 @@
 from django.urls import path, include
-from . import views, urls_inventario, urls_reservas
+from . import views
 from django.contrib.auth import views as auth_views
 from .utils import exports
 
@@ -21,10 +21,10 @@ urlpatterns = [
     path('justificaciones/solicitar/', views.solicitar_justificacion, name='solicitar_justificacion'),
 
     # --- Inventario ---
-    path('inventario/', include(urls_inventario)),
+    path('inventario/', include('apps.inventario.urls')),
 
     # --- Reservas de Equipos ---
-    path('reservas/', include(urls_reservas)),
+    path('reservas/', include('apps.reservas.urls')),
 
     # --- Custom Login/Logout Views ---
     path('accounts/login/', views.custom_login_view, name='login'),
