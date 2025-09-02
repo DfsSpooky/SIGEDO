@@ -4,8 +4,8 @@
     <h1 class="text-2xl font-bold mb-4">Registrar Asistencia</h1>
     {% if error %}
         <p class="text-red-500">{{ error }}</p>
-    {% elif curso_actual %}
-        <p class="mb-4">Curso actual: {{ curso_actual.nombre }} ({{ curso_actual.horario_inicio|time:"H:i" }} - {{ curso_actual.horario_fin|time:"H:i" }})</p>
+    {% elif bloque_actual %}
+        <p class="mb-4">Curso actual: {{ bloque_actual.curso.nombre }} ({{ bloque_actual.horario_inicio|time:"H:i" }} - {{ bloque_actual.horario_fin|time:"H:i" }})</p>
         
         {% if asistencia %}
             <div class="mb-4 p-4 border rounded {% if asistencia.hora_salida %}bg-green-100 border-green-300{% elif asistencia.hora_entrada %}bg-yellow-100 border-yellow-300{% endif %}">
@@ -25,10 +25,7 @@
             {% endif %}
         </form>
 
-        {% if proximo_curso %}
-            <p class="mt-4">Próximo curso: {{ proximo_curso.nombre }} a las {{ proximo_curso.horario_inicio|time:"H:i" }}</p>
-        {% endif %}
-
+        {# La lógica para proximo_curso fue movida al dashboard, esta parte ya no es necesaria aquí #}
     {% else %}
         <p>No hay cursos programados en este momento.</p>
     {% endif %}
