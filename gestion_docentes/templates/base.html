@@ -1,5 +1,7 @@
-{% load static %} <!DOCTYPE html>
-<html lang="es" data-theme="winter"> <head>
+{% load static %}
+<!DOCTYPE html>
+<html lang="es" data-theme="light-theme">
+<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Dashboard{% endblock %} | {{ configuracion.nombre_institucion|default:"Sistema de Gestión" }}</title>
@@ -7,39 +9,80 @@
     <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.2/dist/full.min.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
+        :root, [data-theme] {
+            --rounded-box: 1rem;
+            --rounded-btn: 0.5rem;
+            --rounded-badge: 1.9rem;
+        }
+
+        [data-theme="light-theme"] {
+            --primary: #3B82F6; /* blue-500 */
+            --primary-content: #FFFFFF;
+            --secondary: #F3F4F6; /* gray-100 */
+            --accent: #10B981; /* emerald-500 */
+            --neutral: #3D4451; /* gray-700 */
+            --base-100: #FFFFFF;
+            --base-200: #F9FAFB; /* gray-50 */
+            --base-300: #F3F4F6; /* gray-100 */
+            --base-content: #1f2937; /* gray-800 */
+            --info: #2563EB;
+            --success: #16A34A;
+            --warning: #FBBF24;
+            --error: #DC2626;
+        }
+
+        [data-theme="dark-theme"] {
+            --primary: #3B82F6; /* blue-500 */
+            --primary-content: #FFFFFF;
+            --secondary: #1F2937; /* gray-800 */
+            --accent: #10B981; /* emerald-500 */
+            --neutral: #D1D5DB; /* gray-300 */
+            --base-100: #111827; /* gray-900 */
+            --base-200: #1F2937; /* gray-800 */
+            --base-300: #374151; /* gray-700 */
+            --base-content: #F9FAFB; /* gray-50 */
+            --info: #3B82F6;
+            --success: #22C55E;
+            --warning: #F59E0B;
+            --error: #EF4444;
+        }
+
         body {
             font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
-        /* Scrollbar estilizado (sin cambios, ya está bien) */
+
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: hsl(var(--b2)); }
         ::-webkit-scrollbar-thumb { background-color: hsl(var(--b3)); border-radius: 4px; }
 
-        /* Animación para la entrada del contenido principal */
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
         .animate-fade-in {
-            animation: fadeIn 0.5s ease-out forwards;
+            animation: fadeIn 0.3s ease-out forwards;
         }
 
-        /* Animación para la salida de las alertas */
-        @keyframes fadeOut {
-            from { opacity: 1; transform: translateX(0); }
-            to { opacity: 0; transform: translateX(20px); }
-        }
-        .animate-fade-out {
-            animation: fadeOut 0.5s ease-in forwards;
+        .sidebar-link-active {
+            background-color: hsl(var(--primary) / 0.1);
+            color: hsl(var(--primary));
+            font-weight: 600;
         }
     </style>
+    <script>
+        // Aplica el tema guardado en localStorage antes de que se pinte el DOM
+        (function() {
+            const theme = localStorage.getItem('theme') || 'light-theme';
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
 </head>
 <body class="bg-base-200">
 
@@ -48,17 +91,16 @@
         
         <div class="drawer-content flex flex-col bg-base-200">
 
-            <div class="navbar bg-base-100/80 backdrop-blur-md sticky top-0 z-30 shadow-sm border-b border-base-300/50">
-                <!-- Hamburger y Título para móvil -->
+            <div class="navbar bg-base-100/80 backdrop-blur-md sticky top-0 z-30 border-b border-base-300/50">
                 <div class="navbar-start">
                     <div class="lg:hidden">
                         <label for="my-drawer-2" class="btn btn-square btn-ghost">
-                            <i class="fas fa-bars text-xl"></i>
+                            <i data-lucide="menu" class="w-6 h-6"></i>
                         </label>
                     </div>
-                    <div class="text-sm breadcrumbs hidden lg:flex">
+                    <div class="text-sm breadcrumbs hidden lg:flex items-center">
                         <ul>
-                          <li><a><i class="fas fa-home mr-2"></i> Inicio</a></li> 
+                          <li><a><i data-lucide="home" class="w-4 h-4 mr-2"></i>Inicio</a></li>
                           <li><a>{% block breadcrumb %}{% endblock %}</a></li>
                         </ul>
                     </div>
@@ -68,13 +110,17 @@
                     <a href="{% url 'dashboard' %}" class="btn btn-ghost text-lg">{{ configuracion.nombre_dashboard|default:"Gestión Docente" }}</a>
                 </div>
 
-                <!-- Iconos de la derecha -->
                 <div class="navbar-end gap-2">
-                    <!-- Notification Dropdown -->
+                    <label class="swap swap-rotate btn btn-ghost btn-circle" data-testid="theme-switcher">
+                        <input type="checkbox" class="theme-controller" id="theme-toggle" />
+                        <i data-lucide="sun" class="swap-off w-6 h-6"></i>
+                        <i data-lucide="moon" class="swap-on w-6 h-6"></i>
+                    </label>
+
                     <div class="dropdown dropdown-end">
                         <label tabindex="0" class="btn btn-ghost btn-circle">
                             <div class="indicator">
-                                <i class="fas fa-bell text-xl"></i>
+                                <i data-lucide="bell" class="w-6 h-6"></i>
                                 <span id="notification-badge" class="badge badge-sm badge-primary indicator-item" style="display: none;">0</span>
                             </div>
                         </label>
@@ -83,7 +129,7 @@
                                 <h3 class="card-title">Notificaciones</h3>
                                 <div id="notification-list" class="max-h-96 overflow-y-auto space-y-2 mt-2">
                                     <div id="no-notifications-placeholder" class="text-center py-8">
-                                        <i class="fas fa-bell-slash fa-2x text-base-content/30"></i>
+                                        <i data-lucide="bell-off" class="w-10 h-10 mx-auto text-base-content/30"></i>
                                         <p class="mt-2 text-sm">No tienes notificaciones nuevas.</p>
                                     </div>
                                 </div>
@@ -94,7 +140,6 @@
                         </div>
                     </div>
 
-                    <!-- User Profile Dropdown -->
                     <div class="dropdown dropdown-end">
                         <label tabindex="0" class="btn btn-ghost btn-circle avatar">
                             <div class="w-10 rounded-full ring-2 ring-offset-2 ring-offset-base-100 ring-transparent hover:ring-primary transition-shadow duration-300">
@@ -104,12 +149,12 @@
                         <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52">
                             <li class="p-2 font-semibold">{{ user.first_name }}</li>
                             <div class="divider my-0"></div>
-                            <li><a href="{% url 'perfil' %}" class="transition-colors duration-200"><i class="fas fa-user-circle fa-fw"></i> Mi Perfil</a></li>
+                            <li><a href="{% url 'perfil' %}"><i data-lucide="user-circle" class="w-4 h-4 mr-2"></i> Mi Perfil</a></li>
                             <li>
                                 <form method="post" action="{% url 'logout' %}" class="w-full">
                                     {% csrf_token %}
-                                    <button type="submit" class="w-full text-left p-2 hover:bg-error hover:text-error-content rounded-lg transition-colors duration-200">
-                                        <i class="fas fa-sign-out-alt fa-fw"></i>Cerrar Sesión
+                                    <button type="submit" class="w-full text-left p-2 hover:bg-error hover:text-error-content rounded-lg transition-colors duration-200 flex items-center">
+                                        <i data-lucide="log-out" class="w-4 h-4 mr-2"></i>Cerrar Sesión
                                     </button>
                                 </form>
                             </li>
@@ -119,20 +164,17 @@
             </div>
             
             <main class="flex-1 p-6 lg:p-8 animate-fade-in">
-                
                 {% if messages %}
                 <div id="message-container" class="fixed top-24 right-5 z-50 w-full max-w-sm space-y-3">
                     {% for message in messages %}
-                    <div class="alert shadow-lg text-white animate-fade-in {% if message.tags == 'success' %}bg-success{% elif message.tags == 'error' %}bg-error{% elif message.tags == 'warning' %}bg-warning{% else %}bg-info{% endif %}">
+                    <div class="alert shadow-lg text-white {% if message.tags == 'success' %}bg-success{% elif message.tags == 'error' %}bg-error{% else %}bg-info{% endif %}">
                         <div class="flex items-center w-full">
-                            {% if message.tags == 'success' %}<i class="fas fa-check-circle"></i>{% elif message.tags == 'error' %}<i class="fas fa-times-circle"></i>{% elif message.tags == 'warning' %}<i class="fas fa-exclamation-triangle"></i>{% else %}<i class="fas fa-info-circle"></i>{% endif %}
                             <span class="flex-grow mx-3">{{ message }}</span>
-                            <button type="button" class="ml-auto" onclick="this.closest('.alert').remove()"><i class="fas fa-times text-sm"></i></button>
+                            <button type="button" class="ml-auto" onclick="this.closest('.alert').remove()"><i data-lucide="x" class="w-4 h-4"></i></button>
                         </div>
                     </div>
                     {% endfor %}
                 </div>
-                
                 <script>
                     document.addEventListener('DOMContentLoaded', function() {
                         const messageContainer = document.getElementById('message-container');
@@ -140,77 +182,98 @@
                             setTimeout(() => {
                                 const alerts = messageContainer.querySelectorAll('.alert');
                                 alerts.forEach(alert => {
-                                    // 1. Añade la clase para la animación de salida
-                                    alert.classList.add('animate-fade-out');
-                                    // 2. Espera a que termine la animación para eliminar el elemento
-                                    alert.addEventListener('animationend', () => alert.remove());
+                                    alert.style.transition = 'opacity 0.5s ease-out, transform 0.5s ease-out';
+                                    alert.style.opacity = '0';
+                                    alert.style.transform = 'translateX(20px)';
+                                    setTimeout(() => alert.remove(), 500);
                                 });
-                                // Opcional: eliminar el contenedor si se queda vacío
-                                setTimeout(() => {
-                                    if (!messageContainer.children.length) {
-                                        messageContainer.remove();
-                                    }
-                                }, 500); // 500ms es la duración de la animación
                             }, 5000);
                         }
                     });
                 </script>
                 {% endif %}
 
-                {% block content %}
-                {% endblock %}
+                {% block content %}{% endblock %}
             </main>
         </div> 
         
-        <div class="drawer-side">
+        <div class="drawer-side border-r border-base-300/50">
             <label for="my-drawer-2" aria-label="close sidebar" class="drawer-overlay"></label> 
-            <ul class="menu p-4 w-72 min-h-full bg-base-100 text-base-content">
-                <li class="text-2xl font-bold p-4 mb-4">
-                    <a href="{% url 'dashboard' %}" class="hover:text-primary transition-colors duration-300">
+            <ul class="menu p-4 w-72 min-h-full bg-base-100 text-base-content space-y-2">
+                <li class="px-4 pt-2 pb-4">
+                    <a href="{% url 'dashboard' %}" class="text-xl font-bold flex items-center gap-3 hover:text-primary transition-colors duration-300">
                         {% if configuracion.logo %}
-                            <img src="{{ configuracion.logo.url }}" alt="Logo" class="h-8 w-8 mr-2 object-contain">
+                            <img src="{{ configuracion.logo.url }}" alt="Logo" class="h-8 w-auto">
                         {% else %}
-                            <i class="fas fa-university text-primary"></i>
+                            <i data-lucide="shield-check" class="w-8 h-8 text-primary"></i>
                         {% endif %}
-                        {{ configuracion.nombre_dashboard|default:"Gestión Docente" }}
+                        <span class="opacity-90">{{ configuracion.nombre_dashboard|default:"Gestión Docente" }}</span>
                     </a>
                 </li>
                 
-                <li class="menu-title"><span class="opacity-60">Principal</span></li>
-                <li><a href="{% url 'dashboard' %}" class="group transition-all duration-300"><i class="fas fa-tachometer-alt fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Dashboard</a></li>
-                <li><a href="{% url 'calendario' %}" class="group transition-all duration-300"><i class="fas fa-calendar-alt fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Mi Calendario</a></li>
-                <li><a href="{% url 'ver_anuncios' %}" class="group transition-all duration-300"><i class="fas fa-bullhorn fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Anuncios</a></li>
-                <li><a href="{% url 'perfil' %}" class="group transition-all duration-300"><i class="fas fa-user-circle fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Mi Perfil</a></li>
-                <li><a href="{% url 'lista_documentos' %}" class="group transition-all duration-300"><i class="fas fa-file-alt fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Mis Documentos</a></li>
-                <li><a href="{% url 'lista_justificaciones' %}" class="group transition-all duration-300"><i class="fas fa-calendar-check fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Mis Justificaciones</a></li>
-                <li><a href="{% url 'reservas:disponibilidad' %}" class="group transition-all duration-300"><i class="fas fa-bookmark fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Reserva de Equipos</a></li>
+                <li class="menu-title"><span class="opacity-60 text-xs">Principal</span></li>
+                <li><a href="{% url 'dashboard' %}" class="flex items-center gap-3"><i data-lucide="layout-dashboard" class="w-5 h-5"></i> Dashboard</a></li>
+                <li><a href="{% url 'calendario' %}" class="flex items-center gap-3"><i data-lucide="calendar" class="w-5 h-5"></i> Mi Calendario</a></li>
+                <li><a href="{% url 'ver_anuncios' %}" class="flex items-center gap-3"><i data-lucide="megaphone" class="w-5 h-5"></i> Anuncios</a></li>
+                <li><a href="{% url 'perfil' %}" class="flex items-center gap-3"><i data-lucide="user" class="w-5 h-5"></i> Mi Perfil</a></li>
+                <li><a href="{% url 'lista_documentos' %}" class="flex items-center gap-3"><i data-lucide="files" class="w-5 h-5"></i> Mis Documentos</a></li>
+                <li><a href="{% url 'lista_justificaciones' %}" class="flex items-center gap-3"><i data-lucide="calendar-check" class="w-5 h-5"></i> Mis Justificaciones</a></li>
+                <li><a href="{% url 'reservas:disponibilidad' %}" class="flex items-center gap-3"><i data-lucide="bookmark" class="w-5 h-5"></i> Reserva de Equipos</a></li>
 
                 {% if user.is_staff %}
-                <li class="menu-title"><span class="opacity-60 pt-4">Administración</span></li>
+                <li class="menu-title pt-4"><span class="opacity-60 text-xs">Administración</span></li>
                 {% if perms.core.view_planificador %}
-                <li><a href="{% url 'planificador_horarios' %}" class="group transition-all duration-300"><i class="fas fa-calendar-alt fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Planificador</a></li>
+                <li><a href="{% url 'planificador_horarios' %}" class="flex items-center gap-3"><i data-lucide="calendar-plus" class="w-5 h-5"></i> Planificador</a></li>
                 {% endif %}
-                <li><a href="{% url 'lista_credenciales' %}" class="group transition-all duration-300"><i class="fas fa-id-card fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Credenciales</a></li>
+                <li><a href="{% url 'lista_credenciales' %}" class="flex items-center gap-3"><i data-lucide="contact" class="w-5 h-5"></i> Credenciales</a></li>
                 {% if perms.core.view_reporte %}
-                <li><a href="{% url 'reporte_asistencia' %}" class="group transition-all duration-300"><i class="fas fa-chart-bar fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Reportes</a></li>
+                <li><a href="{% url 'reporte_asistencia' %}" class="flex items-center gap-3"><i data-lucide="bar-chart-3" class="w-5 h-5"></i> Reportes</a></li>
                 {% endif %}
                 {% if perms.core.change_justificacion %}
-                <li><a href="{% url 'lista_justificaciones' %}" class="group transition-all duration-300"><i class="fas fa-check-double fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Gestionar Justificaciones</a></li>
+                <li><a href="{% url 'lista_justificaciones' %}" class="flex items-center gap-3"><i data-lucide="check-check" class="w-5 h-5"></i> Gestionar Justificaciones</a></li>
                 {% endif %}
-                <li><a href="/admin" target="_blank" class="group transition-all duration-300"><i class="fas fa-cogs fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Panel de Admin</a></li>
+                <li><a href="/admin" target="_blank" class="flex items-center gap-3"><i data-lucide="settings" class="w-5 h-5"></i> Panel de Admin</a></li>
                 {% endif %}
 
-                <li class="menu-title"><span class="opacity-60 pt-4">Vistas Públicas</span></li>
-                <li><a href="{% url 'kiosco_page' %}" target="_blank" class="group transition-all duration-300"><i class="fas fa-qrcode fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Kiosco</a></li>
-                <li><a href="{% url 'vista_publica_horarios' %}" class="group transition-all duration-300"><i class="fas fa-clock fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i> Horarios Públicos</a></li>
+                <li class="menu-title pt-4"><span class="opacity-60 text-xs">Vistas Públicas</span></li>
+                <li><a href="{% url 'kiosco_page' %}" target="_blank" class="flex items-center gap-3"><i data-lucide="qr-code" class="w-5 h-5"></i> Kiosco</a></li>
+                <li><a href="{% url 'vista_publica_horarios' %}" class="flex items-center gap-3"><i data-lucide="clock" class="w-5 h-5"></i> Horarios Públicos</a></li>
             </ul>
         </div>
     </div>
+
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        lucide.createIcons();
+
+        // Theme switcher logic
+        document.addEventListener('DOMContentLoaded', function() {
+            const toggle = document.getElementById('theme-toggle');
+            const html = document.documentElement;
+
+            // Set initial state of the toggle
+            if (html.getAttribute('data-theme') === 'dark-theme') {
+                toggle.checked = true;
+            }
+
+            toggle.addEventListener('change', function() {
+                if (this.checked) {
+                    html.setAttribute('data-theme', 'dark-theme');
+                    localStorage.setItem('theme', 'dark-theme');
+                } else {
+                    html.setAttribute('data-theme', 'light-theme');
+                    localStorage.setItem('theme', 'light-theme');
+                }
+            });
+        });
+    </script>
 
     {% block extra_js %}{% endblock %}
 
     {% if user.is_authenticated %}
     <script>
+    // This script remains largely unchanged as it controls notification logic, not styling.
+    // I have only updated the placeholder icon to use Lucide.
     document.addEventListener('DOMContentLoaded', function() {
         const notificationBadge = document.getElementById('notification-badge');
         const notificationList = document.getElementById('notification-list');

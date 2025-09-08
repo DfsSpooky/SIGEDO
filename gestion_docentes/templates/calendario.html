@@ -2,58 +2,61 @@
 
 {% block title %}Mi Calendario de Horarios{% endblock %}
 
-{% block breadcrumb %}
-    <a href="{% url 'dashboard' %}">Dashboard</a> / Mi Calendario
-{% endblock %}
+{% block breadcrumb %}Mi Calendario{% endblock %}
 
 {% block content %}
-<div class="card bg-base-100 shadow-xl">
+<div class="card bg-base-100 shadow-sm border border-base-300/50">
     <div class="card-body">
-        <h2 class="card-title text-2xl mb-4">Mi Calendario de Horarios</h2>
+        <div class="mb-4">
+            <h1 class="text-3xl font-bold text-base-content">Mi Calendario</h1>
+            <p class="text-base-content/70 mt-1">Aquí puedes ver todos tus cursos y horarios programados.</p>
+        </div>
         <div id="calendar" class="transition-opacity duration-500 opacity-0"></div>
     </div>
 </div>
 
 <style>
-    /* Estilos para personalizar FullCalendar para que coincida con DaisyUI */
+    /* Estilos para personalizar FullCalendar para que coincida con la nueva estética */
     #calendar {
         opacity: 1 !important; /* Forzar la visibilidad una vez cargado */
     }
     .fc {
-        /* Fuente y color de texto base */
         font-family: 'Inter', sans-serif;
-        color: hsl(var(--bc) / var(--tw-text-opacity, 1));
+        color: hsl(var(--bc)); /* Color de texto base */
     }
     .fc .fc-toolbar-title {
         color: hsl(var(--bc));
-        font-weight: 700;
+        font-weight: 600;
+        font-size: 1.25em;
     }
     .fc .fc-button-primary {
         background-color: hsl(var(--p));
         border-color: hsl(var(--p));
         color: hsl(var(--pc));
+        transition: background-color 0.2s;
     }
     .fc .fc-button-primary:hover {
-        background-color: hsl(var(--pf));
-        border-color: hsl(var(--pf));
+        background-color: hsl(var(--pf, hsl(var(--p) / 0.8)));
+        border-color: hsl(var(--pf, hsl(var(--p) / 0.8)));
     }
     .fc .fc-button-primary:disabled {
         background-color: hsl(var(--p));
         border-color: hsl(var(--p));
-        opacity: 0.5;
+        opacity: 0.4;
     }
     .fc .fc-daygrid-day.fc-day-today {
-        background-color: hsl(var(--a) / 0.1);
+        background-color: hsl(var(--p) / 0.05);
     }
-    .fc .fc-daygrid-day-number {
+    .fc .fc-daygrid-day-number, .fc .fc-col-header-cell-cushion {
         color: hsl(var(--bc));
     }
     .fc-event {
         background-color: hsl(var(--b2));
-        border-color: hsl(var(--b3));
+        border: 1px solid hsl(var(--b3));
         color: hsl(var(--bc));
-        padding: 4px;
-        font-size: 0.8em;
+        padding: 4px 6px;
+        font-size: 0.8rem;
+        border-radius: var(--rounded-btn);
     }
     .fc-event-main {
         overflow: hidden;
@@ -62,42 +65,56 @@
     .fc-h-event {
         border: 1px solid hsl(var(--b3));
     }
+    .fc-v-event {
+        box-shadow: none;
+    }
+    .fc .fc-timegrid-slot-label {
+        border-color: hsl(var(--b3));
+    }
+    .fc .fc-timegrid-slot-lane {
+        border-color: hsl(var(--b3));
+    }
+    .fc .fc-scrollgrid, .fc .fc-theme-standard td, .fc .fc-theme-standard th {
+        border-color: hsl(var(--b3));
+    }
 </style>
 {% endblock %}
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const calendarEl = document.getElementById('calendar');
 
     const calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: 'timeGridWeek', // Vista semanal por defecto
+        initialView: 'timeGridWeek',
         headerToolbar: {
             left: 'prev,next today',
             center: 'title',
             right: 'dayGridMonth,timeGridWeek,timeGridDay'
         },
-        locale: 'es', // Establecer el idioma a español
-        slotMinTime: '07:00:00', // Hora de inicio del calendario
-        slotMaxTime: '22:00:00', // Hora de fin del calendario
-        allDaySlot: false, // No mostrar el slot de "todo el día"
-
-        // Los eventos se obtendrán de la API
+        locale: 'es',
+        slotMinTime: '07:00:00',
+        slotMaxTime: '22:00:00',
+        allDaySlot: false,
         events: "{% url 'api:horario_docente' %}",
 
-        // Mostrar un spinner mientras se cargan los eventos
+        eventDidMount: function(info) {
+            // Tooltip para eventos
+            info.el.setAttribute('data-tip', info.event.title);
+            info.el.classList.add('tooltip', 'tooltip-bottom');
+        },
+
         loading: function(isLoading) {
             if (isLoading) {
-                // Podríamos mostrar un spinner aquí
                 calendarEl.classList.add('opacity-50');
             } else {
                 calendarEl.classList.remove('opacity-50');
             }
         },
 
-        // Forzar la transición de opacidad
         viewDidMount: function() {
             setTimeout(() => {
                 calendarEl.style.opacity = '1';
@@ -122,7 +139,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.type === 'horario.update') {
                 console.log('Actualización de horario recibida:', data.message);
 
-                // Opcional: Mostrar una notificación Toast no intrusiva
                 const Toast = Swal.mixin({
                     toast: true,
                     position: 'top-end',
@@ -139,7 +155,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     title: 'Tu horario ha sido actualizado'
                 });
 
-                // Recargar los eventos del calendario
                 calendar.refetchEvents();
             }
         };
@@ -157,9 +172,7 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
 
-    // Iniciar la conexión WebSocket
     connectWebSocket();
 });
 </script>
-<script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 {% endblock %}
