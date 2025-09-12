@@ -1,0 +1,13 @@
+{% extends "admin/change_list.html" %}
+{% load i18n %}
+
+{% block content_title %}
+    {{ block.super }}
+    <div class="mt-4">
+        <input type="text" id="admin-list-search"
+               onkeyup="filterAdminTable()"
+               placeholder='{% trans "Buscar en esta página..." %}'
+               class="input input-bordered w-full max-w-xs"
+               aria-label="Search">
+    </div>
+{% endblock %}
