@@ -13,8 +13,9 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import os
 import sys
 from pathlib import Path
-from django.urls import reverse_lazy
+
 from django.templatetags.static import static
+from django.urls import reverse_lazy
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -27,82 +28,81 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY')
+SECRET_KEY = os.environ.get("SECRET_KEY")
 
 # Key for encrypting IDs
-ID_ENCRYPTION_KEY = os.environ.get('ID_ENCRYPTION_KEY', '').encode()
+ID_ENCRYPTION_KEY = os.environ.get("ID_ENCRYPTION_KEY", "").encode()
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 't')
+DEBUG = os.environ.get("DEBUG", "False").lower() in ("true", "1", "t")
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost').split(',')
+ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost").split(",")
 # ... cerca de ALLOWED_HOSTS ...
 
-CSRF_TRUSTED_ORIGINS = ['https://aquienpasco.lat', 'https://www.aquienpasco.lat']
+CSRF_TRUSTED_ORIGINS = ["https://aquienpasco.lat", "https://www.aquienpasco.lat"]
 
 # Settings for running behind a reverse proxy like Nginx
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
 
 
 # Application definition
 
 INSTALLED_APPS = [
-    'daphne',
-    'channels',
-    'unfold',
-    'unfold.contrib.forms',
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    'rest_framework',
-    'core',
-    'tailwind',
-    
+    "daphne",
+    "channels",
+    "unfold",
+    "unfold.contrib.forms",
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "rest_framework",
+    "core",
+    "tailwind",
 ]
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.locale.LocaleMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = 'gestion_docentes.urls'
+ROOT_URLCONF = "gestion_docentes.urls"
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
-                'core.context_processors.unread_notifications_context',
-                'core.context_processors.site_configuration_context',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [BASE_DIR / "templates"],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+                "core.context_processors.unread_notifications_context",
+                "core.context_processors.site_configuration_context",
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'gestion_docentes.wsgi.application'
-ASGI_APPLICATION = 'gestion_docentes.asgi.application'
+WSGI_APPLICATION = "gestion_docentes.wsgi.application"
+ASGI_APPLICATION = "gestion_docentes.asgi.application"
 
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [(os.environ.get('REDIS_HOST'), os.environ.get('REDIS_PORT'))],
+            "hosts": [(os.environ.get("REDIS_HOST"), os.environ.get("REDIS_PORT"))],
         },
     },
 }
@@ -110,38 +110,30 @@ CHANNEL_LAYERS = {
 # If in DEBUG mode, override channel layer to use in-memory for local development
 # This avoids needing a Redis server running locally.
 if DEBUG:
-    CHANNEL_LAYERS = {
-        "default": {
-            "BACKEND": "channels.layers.InMemoryChannelLayer"
-        }
-    }
+    CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
 
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('POSTGRES_DB'),
-        'USER': os.environ.get('POSTGRES_USER'),
-        'PASSWORD': os.environ.get('POSTGRES_PASSWORD'),
-        'HOST': os.environ.get('POSTGRES_HOST'),
-        'PORT': os.environ.get('POSTGRES_PORT'),
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.environ.get("POSTGRES_DB"),
+        "USER": os.environ.get("POSTGRES_USER"),
+        "PASSWORD": os.environ.get("POSTGRES_PASSWORD"),
+        "HOST": os.environ.get("POSTGRES_HOST"),
+        "PORT": os.environ.get("POSTGRES_PORT"),
     }
 }
 
 # Use in-memory SQLite database and an in-memory channel layer for tests
-if 'test' in sys.argv:
-    DATABASES['default'] = {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': ':memory:',
+if "test" in sys.argv:
+    DATABASES["default"] = {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": ":memory:",
     }
-    CHANNEL_LAYERS = {
-        "default": {
-            "BACKEND": "channels.layers.InMemoryChannelLayer"
-        }
-    }
+    CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
 
 
 # Password validation
@@ -149,32 +141,32 @@ if 'test' in sys.argv:
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
 
 
 AUTHENTICATION_BACKENDS = [
-    'core.backends.DniOrUsernameBackend',
-    'django.contrib.auth.backends.ModelBackend', # Mantenemos el backend por defecto como fallback
+    "core.backends.DniOrUsernameBackend",
+    "django.contrib.auth.backends.ModelBackend",  # Mantenemos el backend por defecto como fallback
 ]
 
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'es-pe'
+LANGUAGE_CODE = "es-pe"
 
-TIME_ZONE = 'America/Lima'
+TIME_ZONE = "America/Lima"
 
 USE_I18N = True
 
@@ -184,14 +176,14 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_DIRS = [BASE_DIR / "static"]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 UNFOLD = {
     "SITE_HEADER": "Gestión de Docentes",
@@ -342,7 +334,9 @@ UNFOLD = {
                     {
                         "title": "Solicitudes de Intercambio",
                         "icon": "swap_horiz",
-                        "link": reverse_lazy("admin:core_solicitudintercambio_changelist"),
+                        "link": reverse_lazy(
+                            "admin:core_solicitudintercambio_changelist"
+                        ),
                         "badge": "core.badge_callbacks.solicitudes_intercambio_badge_callback",
                     },
                 ],
@@ -371,7 +365,9 @@ UNFOLD = {
                     {
                         "title": "Configuración de la Institución",
                         "icon": "settings_applications",
-                        "link": reverse_lazy("admin:core_configuracioninstitucion_changelist"),
+                        "link": reverse_lazy(
+                            "admin:core_configuracioninstitucion_changelist"
+                        ),
                     },
                 ],
             },
@@ -380,11 +376,11 @@ UNFOLD = {
 }
 
 
-AUTH_USER_MODEL = 'core.Docente'
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+AUTH_USER_MODEL = "core.Docente"
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
 
-LOGIN_REDIRECT_URL = 'dashboard'
-LOGOUT_REDIRECT_URL = 'login'
+LOGIN_REDIRECT_URL = "dashboard"
+LOGOUT_REDIRECT_URL = "login"
 
-X_FRAME_OPTIONS = 'SAMEORIGIN'
+X_FRAME_OPTIONS = "SAMEORIGIN"

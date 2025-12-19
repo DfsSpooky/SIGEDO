@@ -1,12 +1,14 @@
-from django.contrib.auth.backends import ModelBackend
 from django.contrib.auth import get_user_model
+from django.contrib.auth.backends import ModelBackend
 from django.db.models import Q
+
 
 class DniOrUsernameBackend(ModelBackend):
     """
     Backend de autenticación personalizado que permite a los usuarios
     iniciar sesión utilizando su nombre de usuario o su número de DNI.
     """
+
     def authenticate(self, request, username=None, password=None, **kwargs):
         UserModel = get_user_model()
         try:

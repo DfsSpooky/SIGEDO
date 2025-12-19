@@ -42,3 +42,6 @@ gunicorn
 psycopg2-binary
 channels_redis
 python-dotenv
+black
+isort
+flake8
