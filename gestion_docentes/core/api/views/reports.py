@@ -5,9 +5,9 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.templatetags.static import static
 from django.utils import timezone
 
-from ..models import Asistencia, Docente
-from ..utils.reports import _generar_datos_reporte_asistencia
-from ..utils.responses import (
+from core.models import Asistencia, Docente
+from core.utils.reports import _generar_datos_reporte_asistencia
+from core.utils.responses import (
     not_found_response,
     server_error_response,
     success_response,
