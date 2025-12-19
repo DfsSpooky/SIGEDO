@@ -46,3 +46,6 @@ black
 isort
 flake8
 icalendar
+djangorestframework-simplejwt
+qrcode
+pillow

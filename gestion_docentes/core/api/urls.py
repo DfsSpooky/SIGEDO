@@ -1,4 +1,8 @@
 from django.urls import path
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+)
 
 from . import views
 
@@ -72,4 +76,7 @@ urlpatterns = [
         views.export_schedule_ics,
         name="export_my_schedule_ics",
     ),
+    # --- Autenticación JWT ---
+    path("token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
 ]

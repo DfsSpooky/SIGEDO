@@ -5,7 +5,7 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.core.files.base import ContentFile
 from django.utils import timezone
-from rest_framework import status
+from rest_framework import status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -30,6 +30,7 @@ class TeacherInfoView(APIView):
     API View para obtener la información de un docente y sus cursos del día.
     Reemplaza la función original get_teacher_info con una vista basada en clases de DRF.
     """
+    permission_classes = [permissions.AllowAny]
 
     def post(self, request, *args, **kwargs):
         qr_id = request.data.get("qrId")
@@ -115,6 +116,7 @@ class MarkAttendanceView(APIView):
     API View para marcar la asistencia de un docente.
     Reemplaza la función mark_attendance_kiosk.
     """
+    permission_classes = [permissions.AllowAny]
 
     def post(self, request, *args, **kwargs):
         serializer = MarkAttendanceSerializer(data=request.data)
@@ -278,6 +280,7 @@ class RegistrarAsistenciaRfidView(APIView):
     API View para registrar la asistencia diaria de un docente mediante RFID.
     Reemplaza la función registrar_asistencia_rfid.
     """
+    permission_classes = [permissions.AllowAny]
 
     def post(self, request, *args, **kwargs):
         serializer = RegistrarAsistenciaRfidSerializer(data=request.data)
