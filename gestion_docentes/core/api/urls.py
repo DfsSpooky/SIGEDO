@@ -62,4 +62,14 @@ urlpatterns = [
     ),
     # --- URL para el Calendario del Docente ---
     path("horario-docente/", views.api_horario_docente, name="horario_docente"),
+    path(
+        "exportar-horario/<int:docente_id>/",
+        views.export_schedule_ics,
+        name="export_schedule_ics",
+    ),
+    path(
+        "exportar-horario/mis-horarios/",
+        views.export_schedule_ics,
+        name="export_my_schedule_ics",
+    ),
 ]
