@@ -1,148 +1,285 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}
-    {% if is_admin_view %}
-        Gestionar Justificaciones
-    {% else %}
-        Mis Solicitudes de Justificación
-    {% endif %}
-{% endblock %}
-
-{% block breadcrumb %}
-    Justificaciones
-{% endblock %}
+{% block title %}Justificaciones{% endblock %}
+{% block breadcrumb %}Justificaciones{% endblock %}
 
 {% block content %}
-<div class="container mx-auto p-4 lg:p-8 space-y-8">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
 
-    <!-- Header -->
-    <div class="flex flex-col md:flex-row justify-between md:items-center gap-4">
-        <div>
-            <h1 class="text-3xl md:text-4xl font-bold text-base-content">
-                {% if is_admin_view %}
-                    <i class="fas fa-inbox mr-3 text-primary"></i>Bandeja de Justificaciones
-                {% else %}
-                    <i class="fas fa-file-alt mr-3 text-primary"></i>Mis Solicitudes de Justificación
-                {% endif %}
-            </h1>
-            <p class="text-base-content/70 mt-1">
-                {% if is_admin_view %}
-                    Revisa y gestiona las solicitudes de ausencia de los docentes.
-                {% else %}
-                    Aquí puedes solicitar justificaciones por ausencia y ver el historial de tus solicitudes.
-                {% endif %}
-            </p>
-        </div>
-        <a href="{% url 'solicitar_justificacion' %}" class="btn btn-primary btn-md">
-            <i class="fas fa-plus mr-2"></i>Nueva Solicitud
-        </a>
-    </div>
+{{ justificaciones_data|json_script:"justificaciones-json" }}
+{{ stats|json_script:"stats-json" }}
 
-    <!-- Admin View: Tabs -->
-    {% if is_admin_view %}
-    <div role="tablist" class="tabs tabs-bordered">
-        <a role="tab" class="tab tab-active" data-tab="pendientes">
-            <i class="fas fa-hourglass-half mr-2"></i>
-            Pendientes
-            <div class="badge badge-warning ml-2">{{ justificaciones.pending_count }}</div>
-        </a>
-        <a role="tab" class="tab" data-tab="aprobadas">
-            <i class="fas fa-check-circle mr-2"></i>
-            Aprobadas
-        </a>
-        <a role="tab" class="tab" data-tab="rechazadas">
-            <i class="fas fa-times-circle mr-2"></i>
-            Rechazadas
-        </a>
-    </div>
-    {% endif %}
+<script id="config-data" type="application/json">
+    {
+        "isAdmin": {% if is_admin %}true{% else %}false{% endif %},
+        "canManage": {% if can_manage %}true{% else %}false{% endif %},
+        "csrfToken": "{{ csrf_token }}"
+    }
+</script>
 
-    <!-- Content Area -->
-    <div class="space-y-6">
-        {% if is_admin_view %}
-            <!-- Admin: Tab Content -->
-            <div id="tab-content-pendientes" class="tab-content active">
-                {% with justificaciones_list=justificaciones.pending %}
-                    {% include 'partials/justificacion_card.html' %}
-                {% endwith %}
-            </div>
-            <div id="tab-content-aprobadas" class="tab-content">
-                {% with justificaciones_list=justificaciones.approved %}
-                    {% include 'partials/justificacion_card.html' %}
-                {% endwith %}
-            </div>
-            <div id="tab-content-rechazadas" class="tab-content">
-                {% with justificaciones_list=justificaciones.rejected %}
-                    {% include 'partials/justificacion_card.html' %}
-                {% endwith %}
-            </div>
-        {% else %}
-            <!-- Teacher View: Simple List -->
-            <div class="bg-base-100 shadow-xl rounded-lg">
-                <div class="overflow-x-auto">
-                    <table class="table w-full">
-                        <thead class="bg-base-200">
-                            <tr>
-                                <th>Tipo</th>
-                                <th>Fechas</th>
-                                <th>Estado</th>
-                                <th>Documento</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for justificacion in justificaciones %}
-                            <tr>
-                                <td class="font-medium">{{ justificacion.tipo.nombre }}</td>
-                                <td>{{ justificacion.fecha_inicio|date:"d/m/Y" }} - {{ justificacion.fecha_fin|date:"d/m/Y" }}</td>
-                                <td>
-                                    <span class="badge
-                                        {% if justificacion.estado == 'APROBADO' %}badge-success
-                                        {% elif justificacion.estado == 'RECHAZADO' %}badge-error
-                                        {% else %}badge-warning{% endif %}">
-                                        {{ justificacion.get_estado_display }}
+<div id="react-justificaciones-root" class="min-h-screen bg-gray-50/50 p-6"></div>
+
+{% verbatim %}
+<script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    // --- Iconos ---
+    const Icon = ({ name, size = 18, className }) => {
+        const icons = {
+            'file-text': <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>,
+            'plus': <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
+            'check': <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="20 6 9 17 4 12"/></svg>,
+            'x': <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
+            'clock': <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+            'calendar': <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>,
+            'paperclip': <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>,
+            'search': <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        };
+        return icons[name] || null;
+    };
+
+    // --- Configuración de Estados ---
+    const STATUS_STYLES = {
+        'PENDIENTE': { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200', icon: 'clock', label: 'Pendiente' },
+        'APROBADO': { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200', icon: 'check', label: 'Aprobado' },
+        'RECHAZADO': { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', icon: 'x', label: 'Rechazado' }
+    };
+
+    const JustificacionesApp = () => {
+        const [data, setData] = useState([]);
+        const [stats, setStats] = useState({});
+        const [config, setConfig] = useState({});
+        const [filterStatus, setFilterStatus] = useState('ALL'); // ALL, PENDIENTE, APROBADO, RECHAZADO
+        const [searchTerm, setSearchTerm] = useState('');
+        const [selectedItem, setSelectedItem] = useState(null); // Para el modal de acción
+
+        useEffect(() => {
+            try {
+                const items = JSON.parse(document.getElementById('justificaciones-json').textContent);
+                const statistics = JSON.parse(document.getElementById('stats-json').textContent);
+                const conf = JSON.parse(document.getElementById('config-data').textContent);
+                
+                setData(items);
+                setStats(statistics);
+                setConfig(conf);
+                
+                // Si es admin, mostrar pendientes por defecto
+                if (conf.isAdmin) setFilterStatus('PENDIENTE');
+            } catch (e) {
+                console.error("Error loading data", e);
+            }
+        }, []);
+
+        const filteredData = useMemo(() => {
+            return data.filter(item => {
+                const matchesStatus = filterStatus === 'ALL' || item.estado === filterStatus;
+                const matchesSearch = item.docente_nombre.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                                      item.tipo.toLowerCase().includes(searchTerm.toLowerCase());
+                return matchesStatus && matchesSearch;
+            });
+        }, [data, filterStatus, searchTerm]);
+
+        const handleAction = (id, action) => {
+            // Creamos un formulario dinámico para enviar el POST (más seguro y estándar en Django que fetch JSON manual sin DRF)
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = ''; // Misma URL
+            
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrfmiddlewaretoken';
+            csrfInput.value = config.csrfToken;
+            form.appendChild(csrfInput);
+
+            const idInput = document.createElement('input');
+            idInput.type = 'hidden';
+            idInput.name = 'justificacion_id';
+            idInput.value = id;
+            form.appendChild(idInput);
+
+            const actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'accion';
+            actionInput.value = action;
+            form.appendChild(actionInput);
+
+            document.body.appendChild(form);
+            form.submit();
+        };
+
+        return (
+            <div className="max-w-7xl mx-auto space-y-6 animate-fade-in-up">
+                
+                {/* Header */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                            <Icon name="file-text" className="text-blue-600" />
+                            {config.isAdmin ? 'Gestión de Justificaciones' : 'Mis Solicitudes'}
+                        </h1>
+                        <p className="text-gray-500 text-sm mt-1">
+                            {config.isAdmin 
+                                ? 'Revisa y gestiona las ausencias de los docentes.' 
+                                : 'Historial de tus solicitudes de licencia o permiso.'}
+                        </p>
+                    </div>
+                    
+                    {!config.isAdmin && (
+                        <a href="/solicitar_justificacion/" className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-medium shadow-md transition-all hover:shadow-lg transform hover:-translate-y-0.5">
+                            <Icon name="plus" size={18} />
+                            Nueva Solicitud
+                        </a>
+                    )}
+                </div>
+
+                {/* Tabs & Filters */}
+                <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-white p-2 rounded-xl shadow-sm border border-gray-100">
+                    <div className="flex bg-gray-100 p-1 rounded-lg w-full sm:w-auto overflow-x-auto">
+                        {['ALL', 'PENDIENTE', 'APROBADO', 'RECHAZADO'].map(status => (
+                            <button
+                                key={status}
+                                onClick={() => setFilterStatus(status)}
+                                className={`px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
+                                    filterStatus === status 
+                                    ? 'bg-white text-blue-600 shadow-sm' 
+                                    : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                            >
+                                {status === 'ALL' ? 'Todas' : STATUS_STYLES[status].label}
+                                {status !== 'ALL' && stats[status.toLowerCase() + 's'] > 0 && (
+                                    <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${
+                                        filterStatus === status ? 'bg-blue-100 text-blue-700' : 'bg-gray-200'
+                                    }`}>
+                                        {stats[status.toLowerCase() + 's']}
                                     </span>
-                                </td>
-                                <td>
-                                    {% if justificacion.documento_adjunto %}
-                                        <a href="{{ justificacion.documento_adjunto.url }}" target="_blank" class="link link-primary">Ver Adjunto</a>
-                                    {% else %}
-                                        <span class="text-base-content/50">N/A</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="4" class="text-center py-8 text-base-content/60">
-                                    No has realizado ninguna solicitud de justificación todavía.
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="relative w-full sm:w-64">
+                        <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                        <input 
+                            type="text" 
+                            placeholder="Buscar por nombre o tipo..." 
+                            className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                </div>
+
+                {/* Lista de Tarjetas */}
+                <div className="grid grid-cols-1 gap-4">
+                    {filteredData.length > 0 ? (
+                        filteredData.map(item => {
+                            const style = STATUS_STYLES[item.estado];
+                            return (
+                                <div key={item.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow flex flex-col md:flex-row gap-6">
+                                    
+                                    {/* Info Principal */}
+                                    <div className="flex-1 space-y-3">
+                                        <div className="flex items-start justify-between">
+                                            <div className="flex items-center gap-3">
+                                                {config.isAdmin && (
+                                                    <img 
+                                                        src={item.docente_avatar || `https://ui-avatars.com/api/?name=${item.docente_nombre}&background=random`} 
+                                                        className="w-10 h-10 rounded-full bg-gray-200 object-cover" 
+                                                        alt="Avatar" 
+                                                    />
+                                                )}
+                                                <div>
+                                                    <h3 className="font-bold text-gray-900">{item.tipo}</h3>
+                                                    {config.isAdmin && <p className="text-sm text-gray-500">{item.docente_nombre}</p>}
+                                                </div>
+                                            </div>
+                                            <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 border ${style.bg} ${style.text} ${style.border}`}>
+                                                <Icon name={style.icon} size={12} />
+                                                {style.label}
+                                            </span>
+                                        </div>
+                                        
+                                        <p className="text-gray-600 text-sm bg-gray-50 p-3 rounded-lg border border-gray-100 italic">
+                                            "{item.motivo}"
+                                        </p>
+
+                                        <div className="flex flex-wrap gap-4 text-xs text-gray-500">
+                                            <div className="flex items-center gap-1.5">
+                                                <Icon name="calendar" size={14} />
+                                                <span className="font-medium text-gray-700">
+                                                    {item.fecha_inicio} - {item.fecha_fin}
+                                                </span>
+                                                <span className="bg-gray-100 px-1.5 rounded text-gray-600">
+                                                    {item.dias_duracion} días
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <Icon name="clock" size={14} />
+                                                Solicitado: {item.fecha_solicitud}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Acciones y Adjuntos */}
+                                    <div className="flex flex-row md:flex-col justify-between items-center md:items-end gap-3 md:border-l md:border-gray-100 md:pl-6 md:w-48">
+                                        {item.adjunto_url ? (
+                                            <a 
+                                                href={item.adjunto_url} 
+                                                target="_blank"
+                                                className="flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors"
+                                            >
+                                                <Icon name="paperclip" size={14} />
+                                                Ver Adjunto
+                                            </a>
+                                        ) : (
+                                            <span className="text-gray-400 text-xs italic">Sin adjuntos</span>
+                                        )}
+
+                                        {config.isAdmin && config.canManage && item.estado === 'PENDIENTE' && (
+                                            <div className="flex gap-2 w-full mt-2">
+                                                <button 
+                                                    onClick={() => handleAction(item.id, 'aprobar')}
+                                                    className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 py-2 rounded-lg text-xs font-bold transition-colors flex justify-center items-center gap-1"
+                                                >
+                                                    <Icon name="check" size={14} /> Aprobar
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleAction(item.id, 'rechazar')}
+                                                    className="flex-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 py-2 rounded-lg text-xs font-bold transition-colors flex justify-center items-center gap-1"
+                                                >
+                                                    <Icon name="x" size={14} /> Rechazar
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })
+                    ) : (
+                        <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-gray-300">
+                            <Icon name="search" size={32} className="mx-auto text-gray-300 mb-2" />
+                            <p className="text-gray-500">No se encontraron justificaciones.</p>
+                        </div>
+                    )}
                 </div>
             </div>
-        {% endif %}
-    </div>
-</div>
+        );
+    };
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const tabs = document.querySelectorAll('[role="tablist"] [role="tab"]');
-    const tabContents = document.querySelectorAll('.tab-content');
-
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            // Deactivate all tabs and content
-            tabs.forEach(t => t.classList.remove('tab-active'));
-            tabContents.forEach(c => c.classList.remove('active'));
-
-            // Activate the clicked tab and its content
-            tab.classList.add('tab-active');
-            const contentId = `tab-content-${tab.dataset.tab}`;
-            document.getElementById(contentId).classList.add('active');
-        });
-    });
-});
+    const root = ReactDOM.createRoot(document.getElementById('react-justificaciones-root'));
+    root.render(<JustificacionesApp />);
 </script>
+{% endverbatim %}
+
+<style>
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-fade-in { animation: fadeIn 0.2s ease-out; }
+    .animate-fade-in-up { animation: fadeInUp 0.4s ease-out; }
+</style>
 {% endblock %}

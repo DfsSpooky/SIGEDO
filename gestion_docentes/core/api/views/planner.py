@@ -8,7 +8,7 @@ from django.db.models import Q
 from django.views.decorators.csrf import csrf_exempt
 
 from core.models import BloqueHorario, Curso, Especialidad, FranjaHoraria, Semestre
-from ..utils.responses import (
+from core.utils.responses import (
     error_response,
     not_found_response,
     server_error_response,

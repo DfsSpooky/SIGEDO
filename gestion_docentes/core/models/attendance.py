@@ -32,6 +32,28 @@ class Asistencia(models.Model):
     def __str__(self):
         return f"Asistencia {self.docente} - {self.curso} ({self.fecha})"
 
+    def clean(self):
+        """
+        Validación de Anti-Passback:
+        Evita marcar entrada si ya hay una asistencia abierta para el mismo docente en el mismo día
+        (aunque en un modelo real esto podría ser más flexible si da clases en diferentes sedes,
+        aquí asumimos control estricto de cierre).
+        """
+        # Si es un registro nuevo (no tiene ID aún) y tiene hora_entrada
+        if not self.pk and self.hora_entrada:
+            # Buscar si existe alguna asistencia del mismo día para este docente que NO tenga hora de salida
+            asistencia_abierta = Asistencia.objects.filter(
+                docente=self.docente,
+                fecha=self.fecha,
+                hora_salida__isnull=True
+            ).exclude(pk=self.pk).exists()
+
+            if asistencia_abierta:
+                raise ValidationError(
+                    "El docente ya tiene una asistencia abierta (sin salida marcada) para hoy. "
+                    "Debe marcar salida antes de registrar una nueva entrada."
+                )
+
     def es_tardanza(self):
         """
         Determina si la marca de entrada de esta asistencia se considera tardanza.

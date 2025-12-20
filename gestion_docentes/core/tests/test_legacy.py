@@ -8,24 +8,28 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import make_aware
 
-from .backends import DniOrUsernameBackend
-from .models import (
+from core.backends import DniOrUsernameBackend
+from core.models import (
     Anuncio,
     Asistencia,
     AsistenciaDiaria,
+    BloqueHorario,
     Carrera,
     ConfiguracionInstitucion,
     Curso,
     DiaEspecial,
+    Docente as PersonalDocente,
     Documento,
+    Especialidad,
+    FranjaHoraria,
+    Grupo,
     Justificacion,
     Notificacion,
-    PersonalDocente,
     Semestre,
     TipoDocumento,
     TipoJustificacion,
 )
-from .utils.encryption import decrypt_id, encrypt_id
+from core.utils.encryption import decrypt_id, encrypt_id
 
 
 class CredentialEncryptionTest(TestCase):
@@ -895,9 +899,6 @@ class DniOrUsernameBackendTest(TestCase):
         self.assertIsNone(user)
 
 
-from .models import BloqueHorario, Especialidad, FranjaHoraria, Grupo
-
-
 class HorarioFlexibleTest(TestCase):
     def setUp(self):
         """Set up a test environment for flexible scheduling."""
@@ -1130,7 +1131,7 @@ class HorarioFlexibleTest(TestCase):
 from channels.layers import get_channel_layer
 from channels.testing import WebsocketCommunicator
 
-from .consumers import CalendarConsumer
+from core.consumers import CalendarConsumer
 
 
 class CalendarRealtimeTest(TransactionTestCase):
@@ -1190,7 +1191,8 @@ class CalendarRealtimeTest(TransactionTestCase):
     def test_api_horario_docente_unauthenticated(self):
         """Test that an unauthenticated user cannot access the endpoint."""
         response = self.client.get(self.api_url)
-        self.assertEqual(response.status_code, 403)  # DRF's default for unauthenticated
+        # JWT returns 401 for unauthenticated, DRF standard is sometimes 403. Accepting both.
+        self.assertIn(response.status_code, [401, 403])
 
     async def test_calendar_consumer_auth(self):
         """Test that the CalendarConsumer handles authenticated connections."""
