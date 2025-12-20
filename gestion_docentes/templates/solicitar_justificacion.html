@@ -4,305 +4,139 @@
 {% block title %}Nueva Solicitud de Justificación{% endblock %}
 
 {% block breadcrumb %}
-    <a href="{% url 'lista_justificaciones' %}" class="hover:underline">Justificaciones</a>
-    <span class="mx-2">/</span>
-    <span>Nueva Solicitud</span>
+    <a href="{% url 'lista_justificaciones' %}" class="hover:underline text-gray-500">Justificaciones</a>
+    <span class="mx-2 text-gray-400">/</span>
+    <span class="text-gray-800">Nueva Solicitud</span>
 {% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto">
-    <form id="justification-form" method="post" enctype="multipart/form-data" class="card bg-base-100 shadow-xl overflow-hidden">
-        {% csrf_token %}
-        <div class="card-body p-6 md:p-10">
-            <div class="text-center mb-8">
-                <h1 class="text-4xl font-bold">Solicitud de Justificación</h1>
-                <p class="text-base-content/70 mt-2">Completa tu solicitud en 3 sencillos pasos.</p>
+<div class="max-w-3xl mx-auto animate-fade-in-up">
+
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+        <div class="flex items-center gap-4 mb-8">
+            <div class="bg-blue-50 text-blue-600 p-3 rounded-xl">
+                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>
             </div>
-
-            <ul id="steps-indicator" class="steps w-full mb-10">
-                <li class="step step-primary">Detalles</li>
-                <li class="step">Periodo</li>
-                <li class="step">Sustento</li>
-            </ul>
-
-            <div id="steps-container">
-
-                <div id="step-1" class="step-content">
-                    <div class="mb-6">
-                        <label class="label" for="{{ form.tipo.id_for_label }}">
-                            <span class="label-text text-lg font-semibold">¿Cuál es el tipo de justificación?</span>
-                        </label>
-                        {{ form.tipo }}
-                    </div>
-                    <div>
-                        <label class="label" for="{{ form.motivo.id_for_label }}">
-                            <span class="label-text text-lg font-semibold">Describe el motivo de tu ausencia</span>
-                        </label>
-                        {{ form.motivo }}
-                        <p class="text-sm text-base-content/60 mt-1">Sé breve y conciso. Esta información es confidencial.</p>
-                    </div>
-                </div>
-
-                <div id="step-2" class="step-content hidden">
-                    <p class="text-center text-lg font-semibold mb-6">¿Durante qué fechas te ausentarás?</p>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="form-control">
-                            <label class="label" for="{{ form.fecha_inicio.id_for_label }}">
-                                <span class="label-text font-semibold">Fecha de Inicio</span>
-                            </label>
-                            {{ form.fecha_inicio }}
-                            <p class="text-sm text-base-content/60 mt-1">El primer día de tu ausencia.</p>
-                        </div>
-                        <div class="form-control">
-                            <label class="label" for="{{ form.fecha_fin.id_for_label }}">
-                                <span class="label-text font-semibold">Fecha de Fin</span>
-                            </label>
-                            {{ form.fecha_fin }}
-                            <p class="text-sm text-base-content/60 mt-1">Si es un solo día, usa la misma fecha.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="step-3" class="step-content hidden">
-                    <p class="text-center text-lg font-semibold mb-6">¿Tienes algún documento de respaldo?</p>
-                    <div class="mt-2 flex justify-center rounded-lg border border-dashed border-base-content/30 px-6 py-10">
-                        <div class="text-center">
-                            <i class="fas fa-cloud-upload-alt fa-3x text-base-content/40"></i>
-                            <div class="mt-4 flex text-sm leading-6 text-base-content/60">
-                                <label for="{{ form.documento_adjunto.id_for_label }}" class="relative cursor-pointer rounded-md font-semibold text-primary focus-within:outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 hover:text-primary-focus">
-                                    <span>Sube un archivo</span>
-                                    {{ form.documento_adjunto }}
-                                </label>
-                                <p class="pl-1">o arrástralo aquí</p>
-                            </div>
-                            <p class="text-xs leading-5 text-base-content/60">PDF, PNG, JPG hasta 5MB</p>
-                            <p id="file-name-display" class="text-sm font-semibold text-success mt-2"></p>
-                        </div>
-                    </div>
-                     <p class="text-sm text-center text-base-content/60 mt-4">Adjuntar un documento es opcional, pero muy recomendado.</p>
-                </div>
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">Solicitud de Justificación</h1>
+                <p class="text-gray-500 text-sm">Completa el formulario para registrar tu ausencia.</p>
             </div>
         </div>
 
-        <div class="bg-base-200 p-4">
-             {% if form.errors %}
-                <div role="alert" class="alert alert-error mb-4">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    <span><strong>¡Error!</strong> Por favor, regresa y corrige los campos marcados.</span>
+        <form method="post" enctype="multipart/form-data" class="space-y-6">
+            {% csrf_token %}
+
+            {% if form.errors %}
+                <div class="bg-red-50 text-red-700 p-4 rounded-lg text-sm border border-red-200 flex items-start gap-2">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mt-0.5 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+                    <div>
+                        <p class="font-bold">Por favor corrige los siguientes errores:</p>
+                        <ul class="list-disc list-inside mt-1">
+                            {% for field in form %}
+                                {% for error in field.errors %}
+                                    <li>{{ field.label }}: {{ error }}</li>
+                                {% endfor %}
+                            {% endfor %}
+                            {% for error in form.non_field_errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
                 </div>
             {% endif %}
 
-            <div id="navigation-buttons" class="flex justify-between items-center">
-                <button type="button" id="prev-btn" class="btn btn-ghost">
-                    <i class="fas fa-arrow-left mr-2"></i> Anterior
-                </button>
-                <button type="button" id="next-btn" class="btn btn-primary">
-                    Siguiente <i class="fas fa-arrow-right ml-2"></i>
-                </button>
-                <button type="submit" id="submit-btn" class="btn btn-primary btn-wide hidden">
-                    <i class="fas fa-paper-plane mr-2"></i> Enviar Solicitud
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Tipo de Justificación -->
+                <div class="space-y-2">
+                    <label for="{{ form.tipo.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                        Tipo de Justificación
+                    </label>
+                    <div class="relative">
+                        {{ form.tipo }}
+                    </div>
+                </div>
+
+                <!-- Fechas -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-2">
+                        <label for="{{ form.fecha_inicio.id_for_label }}" class="block text-sm font-medium text-gray-700">Desde</label>
+                        {{ form.fecha_inicio }}
+                    </div>
+                    <div class="space-y-2">
+                        <label for="{{ form.fecha_fin.id_for_label }}" class="block text-sm font-medium text-gray-700">Hasta</label>
+                        {{ form.fecha_fin }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Motivo -->
+            <div class="space-y-2">
+                <label for="{{ form.motivo.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                    Motivo detallado
+                </label>
+                {{ form.motivo }}
+                <p class="text-xs text-gray-500">Explica brevemente la razón de tu solicitud.</p>
+            </div>
+
+            <!-- Archivo Adjunto -->
+            <div class="space-y-2">
+                <label class="block text-sm font-medium text-gray-700">Documento de Respaldo (Opcional)</label>
+                <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-xl hover:bg-gray-50 transition-colors cursor-pointer group relative">
+                    <div class="space-y-1 text-center">
+                        <svg class="mx-auto h-12 w-12 text-gray-400 group-hover:text-blue-500 transition-colors" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <div class="text-sm text-gray-600">
+                            <label for="{{ form.documento_adjunto.id_for_label }}" class="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none">
+                                <span>Sube un archivo</span>
+                                {{ form.documento_adjunto }}
+                            </label>
+                            <p class="pl-1 inline">o arrástralo y suéltalo</p>
+                        </div>
+                        <p class="text-xs text-gray-500">PDF, PNG, JPG hasta 5MB</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-4 flex items-center justify-end gap-3">
+                <a href="{% url 'lista_justificaciones' %}" class="px-5 py-2.5 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors">
+                    Cancelar
+                </a>
+                <button type="submit" class="px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" x2="11" y1="2" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                    Enviar Solicitud
                 </button>
             </div>
-        </div>
-    </form>
+        </form>
+    </div>
 </div>
-{% endblock %}
 
-{% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Form elements
-    const form = document.getElementById('justification-form');
-    const tipoField = form.querySelector('[name=tipo]');
-    const motivoField = form.querySelector('[name=motivo]');
-    const fechaInicioField = form.querySelector('[name=fecha_inicio]');
-    const fechaFinField = form.querySelector('[name=fecha_fin]');
-    const fileInput = document.getElementById('{{ form.documento_adjunto.id_for_label }}');
-    const fileUploadBox = fileInput ? fileInput.closest('.border-dashed') : null;
-    const fileNameDisplay = document.getElementById('file-name-display');
-
-    // Navigation
-    const steps = Array.from(document.querySelectorAll('.step-content'));
-    const stepIndicators = Array.from(document.querySelectorAll('#steps-indicator .step'));
-    const originalStepText = stepIndicators.map(s => s.textContent.trim()); // Store original text
-    const prevBtn = document.getElementById('prev-btn');
-    const nextBtn = document.getElementById('next-btn');
-    const submitBtn = document.getElementById('submit-btn');
-
-    let currentStep = 0;
-
-    // --- UTILITY FUNCTIONS ---
-    const applyStyles = () => {
-        const addClasses = (selector, classes) => {
-            document.querySelectorAll(selector).forEach(el => el.classList.add(...classes));
-        };
-        addClasses('select', ['select', 'select-bordered', 'w-full']);
-        addClasses('textarea', ['textarea', 'textarea-bordered', 'w-full', 'h-32']);
-        addClasses('input[type="date"]', ['input', 'input-bordered', 'w-full']);
-        if (fileInput) fileInput.classList.add('hidden-file-input');
-    };
-
-    const showError = (field, message) => {
-        clearError(field);
-        field.classList.add('input-error', 'select-error', 'textarea-error');
-        const error = document.createElement('p');
-        error.className = 'text-error text-sm mt-1';
-        error.textContent = message;
-        field.parentElement.appendChild(error);
-    };
-
-    const clearError = (field) => {
-        field.classList.remove('input-error', 'select-error', 'textarea-error');
-        const oldError = field.parentElement.querySelector('.text-error');
-        if (oldError) {
-            oldError.remove();
-        }
-    };
-
-    // --- VALIDATION LOGIC ---
-    const validateStep1 = () => {
-        let isValid = true;
-        clearError(tipoField);
-        clearError(motivoField);
-
-        if (!tipoField.value) {
-            showError(tipoField, 'Debes seleccionar un tipo de justificación.');
-            isValid = false;
-        }
-        if (motivoField.value.trim() === '') {
-            showError(motivoField, 'Debes describir el motivo.');
-            isValid = false;
-        }
-        return isValid;
-    };
-
-    const validateStep2 = () => {
-        let isValid = true;
-        clearError(fechaInicioField);
-        clearError(fechaFinField);
-
-        if (!fechaInicioField.value) {
-            showError(fechaInicioField, 'La fecha de inicio es obligatoria.');
-            isValid = false;
-        }
-        if (!fechaFinField.value) {
-            showError(fechaFinField, 'La fecha de fin es obligatoria.');
-            isValid = false;
-        }
-
-        if (isValid && fechaInicioField.value > fechaFinField.value) {
-            showError(fechaFinField, 'La fecha de fin no puede ser anterior a la de inicio.');
-            isValid = false;
-        }
-        return isValid;
-    };
-
-    // --- STEP NAVIGATION ---
-    const showStep = (stepIndex) => {
-        steps.forEach((step, index) => {
-            step.classList.toggle('hidden', index !== stepIndex);
-            if (index === stepIndex) step.classList.add('animate-fade-in');
-        });
-
-        stepIndicators.forEach((indicator, index) => {
-            indicator.classList.remove('step-primary');
-            indicator.innerHTML = originalStepText[index]; // Reset text first
-            if (index < stepIndex) {
-                indicator.classList.add('step-primary');
-                indicator.innerHTML = `<i class="fas fa-check"></i>`;
-            } else if (index === stepIndex) {
-                indicator.classList.add('step-primary');
+    // Script simple para estilos de inputs y manejo de archivo
+    document.addEventListener('DOMContentLoaded', () => {
+        // Aplicar clases Tailwind a los inputs generados por Django
+        const inputs = document.querySelectorAll('input[type="text"], input[type="date"], select, textarea');
+        inputs.forEach(input => {
+            if (!input.classList.contains('hidden')) {
+                input.classList.add('w-full', 'rounded-lg', 'border-gray-300', 'shadow-sm', 'focus:border-blue-500', 'focus:ring-blue-500', 'text-sm', 'py-2.5');
             }
         });
 
-        currentStep = stepIndex;
-        updateButtons();
-    };
+        // Manejo visual del input file
+        const fileInput = document.querySelector('input[type="file"]');
+        if (fileInput) {
+            fileInput.classList.add('absolute', 'inset-0', 'w-full', 'h-full', 'opacity-0', 'cursor-pointer');
+            fileInput.addEventListener('change', (e) => {
+                const fileName = e.target.files[0]?.name;
+                const container = fileInput.closest('.border-dashed');
+                const textContainer = container.querySelector('.text-sm.text-gray-600');
 
-    const updateButtons = () => {
-        prevBtn.classList.toggle('invisible', currentStep === 0);
-        nextBtn.classList.toggle('hidden', currentStep === steps.length - 1);
-        submitBtn.classList.toggle('hidden', currentStep !== steps.length - 1);
-    };
-
-    nextBtn.addEventListener('click', () => {
-        let isValid = false;
-        if (currentStep === 0) isValid = validateStep1();
-        else if (currentStep === 1) isValid = validateStep2();
-        else isValid = true; // Step 3 is optional
-
-        if (isValid && currentStep < steps.length - 1) {
-            showStep(currentStep + 1);
+                if (fileName) {
+                    textContainer.innerHTML = `<span class="text-green-600 font-bold flex items-center justify-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> ${fileName}</span>`;
+                    container.classList.add('border-green-300', 'bg-green-50');
+                }
+            });
         }
     });
-
-    prevBtn.addEventListener('click', () => {
-        if (currentStep > 0) {
-            showStep(currentStep - 1);
-        }
-    });
-
-    // --- FILE UPLOAD ---
-    const handleFileChange = (files) => {
-        if (files && files.length > 0) {
-            fileNameDisplay.innerHTML = `<i class="fas fa-check-circle text-success mr-2"></i> ${files[0].name}`;
-            const removeBtn = document.createElement('button');
-            removeBtn.type = 'button';
-            removeBtn.className = 'btn btn-xs btn-ghost text-error ml-2';
-            removeBtn.innerHTML = '&times;';
-            removeBtn.onclick = () => {
-                fileInput.value = ''; // Clear the file input
-                fileNameDisplay.textContent = '';
-            };
-            fileNameDisplay.appendChild(removeBtn);
-        } else {
-            fileNameDisplay.textContent = '';
-        }
-    };
-
-    if (fileInput) {
-        fileInput.addEventListener('change', () => handleFileChange(fileInput.files));
-    }
-
-    if (fileUploadBox) {
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            fileUploadBox.addEventListener(eventName, e => {
-                e.preventDefault();
-                e.stopPropagation();
-            }, false);
-        });
-        ['dragenter', 'dragover'].forEach(eventName => {
-            fileUploadBox.addEventListener(eventName, () => fileUploadBox.classList.add('border-primary', 'bg-primary/10'), false);
-        });
-        ['dragleave', 'drop'].forEach(eventName => {
-            fileUploadBox.addEventListener(eventName, () => fileUploadBox.classList.remove('border-primary', 'bg-primary/10'), false);
-        });
-        fileUploadBox.addEventListener('drop', e => {
-            fileInput.files = e.dataTransfer.files;
-            handleFileChange(fileInput.files);
-        }, false);
-    }
-
-    // --- INITIALIZATION ---
-    applyStyles();
-    showStep(0);
-});
-
-// Animation styles
-const style = document.createElement('style');
-style.innerHTML = `
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    .animate-fade-in {
-        animation: fadeIn 0.5s ease-out forwards;
-    }
-    .hidden-file-input {
-        width: 0.1px; height: 0.1px; opacity: 0;
-        overflow: hidden; position: absolute; z-index: -1;
-    }
-`;
-document.head.appendChild(style);
 </script>
 {% endblock %}

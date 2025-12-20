@@ -17,7 +17,7 @@
         },
         "stats": {
             "cursos": "{{ total_cursos|default:'0' }}",
-            "alumnos": "{{ total_alumnos|default:'0' }}",
+            "justificaciones": "{{ total_justificaciones|default:'0' }}",
             "asistenciaPromedio": "{{ asistencia_promedio|default:'0' }}%",
             "alertas": "{{ alertas_count|default:'0' }}"
         },
@@ -161,8 +161,8 @@
                         <div><p className="text-gray-500 text-sm font-medium">Cursos Asignados</p><h3 className="text-2xl font-bold text-gray-800">{data.stats.cursos}</h3></div>
                     </div>
                     <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 transition-transform hover:-translate-y-1">
-                        <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl"><Icon name="users" size={24} /></div>
-                        <div><p className="text-gray-500 text-sm font-medium">Alumnos Totales</p><h3 className="text-2xl font-bold text-gray-800">{data.stats.alumnos}</h3></div>
+                        <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl"><Icon name="file-text" size={24} /></div>
+                        <div><p className="text-gray-500 text-sm font-medium">Justificaciones</p><h3 className="text-2xl font-bold text-gray-800">{data.stats.justificaciones}</h3></div>
                     </div>
                     <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 transition-transform hover:-translate-y-1">
                         <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl"><Icon name="activity" size={24} /></div>
