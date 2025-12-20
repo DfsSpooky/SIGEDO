@@ -1,21 +1,24 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
+from django.db.models import Case, When, Value, IntegerField
 
 from ..forms import DocumentoForm, VersionDocumentoForm
 from ..models import Documento, TipoDocumento, VersionDocumento
 
-
 @login_required
 def subir_documento(request):
-    tipos_documento = TipoDocumento.objects.all()  # Obtenemos todas las categorías
+    # Si recibimos un 'tipo_id' por URL, intentamos pre-seleccionar ese tipo
+    initial_data = {}
+    tipo_preseleccionado = request.GET.get('tipo_id')
+    if tipo_preseleccionado:
+        initial_data = {'tipo_documento': tipo_preseleccionado}
 
     if request.method == "POST":
         form = DocumentoForm(request.POST, request.FILES)
         if form.is_valid():
             documento = form.save(commit=False)
             documento.docente = request.user
-            # El estado por defecto 'RECIBIDO' se asigna desde el modelo
             documento.save()
 
             VersionDocumento.objects.create(
@@ -28,11 +31,12 @@ def subir_documento(request):
             )
             return redirect("lista_documentos")
     else:
-        form = DocumentoForm()
+        form = DocumentoForm(initial=initial_data)
 
     context = {
         "form": form,
-        "tipos_documento": tipos_documento,  # Le pasamos las categorías a la plantilla
+        # Pasamos los tipos para que la plantilla pueda usarlos si es necesario
+        "tipos_documento": TipoDocumento.objects.all(), 
     }
     return render(request, "subir_documento.html", context)
 
@@ -48,7 +52,6 @@ def subir_nueva_version(request, documento_id):
             nueva_version.documento = documento
             nueva_version.save()
 
-            # Opcional: Cambiar el estado del documento a "En Revisión"
             documento.estado = "EN_REVISION"
             documento.save()
 
@@ -65,35 +68,54 @@ def subir_nueva_version(request, documento_id):
 
 @login_required
 def lista_documentos(request):
-    documentos_qs = (
+    # 1. Obtener documentos existentes del docente
+    docs_existentes = (
         Documento.objects.filter(docente=request.user)
+        .select_related("tipo_documento")
         .prefetch_related("versiones")
         .order_by("-fecha_subida")
     )
 
-    # Definir el orden de los estados
-    status_order = ["OBSERVADO", "EN_REVISION", "RECIBIDO", "APROBADO", "VENCIDO"]
+    # 2. Identificar qué Tipos de Documento existen en el sistema pero NO han sido subidos
+    ids_tipos_subidos = docs_existentes.values_list('tipo_documento_id', flat=True)
+    tipos_faltantes = TipoDocumento.objects.exclude(id__in=ids_tipos_subidos)
 
-    # Agrupar documentos por estado
+    # 3. Definir orden de visualización (Pendientes primero es mejor UX)
+    status_order = ["PENDIENTE", "OBSERVADO", "EN_REVISION", "RECIBIDO", "APROBADO", "VENCIDO"]
+    
     documentos_agrupados = {status: [] for status in status_order}
-    for doc in documentos_qs:
+
+    # 4. Agregar los documentos "Reales" a su grupo correspondiente
+    for doc in docs_existentes:
         if doc.estado in documentos_agrupados:
             documentos_agrupados[doc.estado].append(doc)
 
-    # Crear una lista ordenada de tuplas (nombre_visible_estado, lista_documentos)
-    # para pasarla a la plantilla, omitiendo grupos vacíos.
+    # 5. Crear documentos "Ficticios" para los pendientes
+    # Esto permite que la plantilla los trate igual, pero con estado 'PENDIENTE'
+    for tipo in tipos_faltantes:
+        documentos_agrupados["PENDIENTE"].append({
+            "is_dummy": True, # Bandera para el frontend
+            "id": 0,
+            "titulo": f"{tipo.nombre} (No entregado)",
+            "tipo_documento": tipo, # Objeto tipo para acceder a .nombre e .id
+            "fecha_subida": None,
+            "fecha_vencimiento": None,
+            "estado": "PENDIENTE",
+            "versiones": []
+        })
+
+    # 6. Preparar estructura final para la plantilla
     documentos_por_seccion = []
     estado_display_map = dict(Documento.ESTADOS_DOCUMENTO)
+    estado_display_map["PENDIENTE"] = "Pendientes de Entrega" # Etiqueta personalizada
 
     for status_key in status_order:
         if documentos_agrupados[status_key]:
-            documentos_por_seccion.append(
-                {
-                    "estado_key": status_key,
-                    "estado_display": estado_display_map.get(status_key, status_key),
-                    "documentos": documentos_agrupados[status_key],
-                }
-            )
+            documentos_por_seccion.append({
+                "estado_key": status_key,
+                "estado_display": estado_display_map.get(status_key, status_key),
+                "documentos": documentos_agrupados[status_key]
+            })
 
     return render(
         request,
