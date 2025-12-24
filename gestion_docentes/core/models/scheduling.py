@@ -242,23 +242,26 @@ class BloqueHorario(models.Model):
                 )
 
         # 2. Validar conflicto de Grupo + Semestre (Estudiantes)
-        if self.curso.especialidad and self.curso.especialidad.grupo:
-            conflicto_grupo = (
-                BloqueHorario.objects.filter(
-                    curso__especialidad__grupo=self.curso.especialidad.grupo,
-                    curso__semestre_cursado=self.curso.semestre_cursado,
-                    dia=self.dia,
-                    horario_inicio__lt=end_time,
-                    horario_fin__gt=start_time,
-                )
-                .exclude(pk=self.pk)
-                .first()
-            )
+        # Iterar sobre todas las especialidades asociadas al curso
+        if self.curso.pk:  # Solo si el curso ya está guardado (tiene especialidades)
+            for especialidad in self.curso.especialidades.all():
+                if especialidad.grupo:
+                    conflicto_grupo = (
+                        BloqueHorario.objects.filter(
+                            curso__especialidades__grupo=especialidad.grupo,
+                            curso__semestre_cursado=self.curso.semestre_cursado,
+                            dia=self.dia,
+                            horario_inicio__lt=end_time,
+                            horario_fin__gt=start_time,
+                        )
+                        .exclude(pk=self.pk)
+                        .first()
+                    )
 
-            if conflicto_grupo:
-                raise ValidationError(
-                    f"El Grupo {self.curso.especialidad.grupo} (Semestre {self.curso.semestre_cursado}) ya tiene clase asignada en este horario ({conflicto_grupo.curso})."
-                )
+                    if conflicto_grupo:
+                        raise ValidationError(
+                            f"El Grupo {especialidad.grupo} (Semestre {self.curso.semestre_cursado}) de la especialidad {especialidad.nombre} ya tiene clase asignada en este horario ({conflicto_grupo.curso})."
+                        )
 
         # 3. Validar conflicto de Aula
         if self.aula:
@@ -305,17 +308,19 @@ class BloqueHorario(models.Model):
                 )
 
         # 6. Validar Carga Académica Diaria del Grupo (Max 6 horas)
-        if self.curso.especialidad and self.curso.especialidad.grupo:
-            horas_grupo = BloqueHorario.objects.filter(
-                curso__especialidad__grupo=self.curso.especialidad.grupo,
-                curso__semestre_cursado=self.curso.semestre_cursado,
-                dia=self.dia
-            ).exclude(pk=self.pk).aggregate(total=models.Sum("duracion_bloques"))["total"] or 0
+        if self.curso.pk:
+            for especialidad in self.curso.especialidades.all():
+                if especialidad.grupo:
+                    horas_grupo = BloqueHorario.objects.filter(
+                        curso__especialidades__grupo=especialidad.grupo,
+                        curso__semestre_cursado=self.curso.semestre_cursado,
+                        dia=self.dia
+                    ).exclude(pk=self.pk).aggregate(total=models.Sum("duracion_bloques"))["total"] or 0
 
-            if horas_grupo + self.duracion_bloques > 6:
-                raise ValidationError(
-                    f"El grupo {self.curso.especialidad.grupo} excede el límite de 6 horas diarias."
-                )
+                    if horas_grupo + self.duracion_bloques > 6:
+                        raise ValidationError(
+                            f"El grupo {especialidad.grupo} de {especialidad.nombre} excede el límite de 6 horas diarias."
+                        )
 
         # 7. Validar Carga Continua del Docente (Max 4 horas seguidas)
         # Nota: Esta validación es compleja porque requiere analizar la contigüidad.

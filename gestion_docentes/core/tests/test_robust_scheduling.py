@@ -22,11 +22,11 @@ class RobustSchedulingTests(TestCase):
             nombre="Curso Test",
             docente=self.docente,
             carrera=self.carrera,
-            especialidad=self.especialidad,
             semestre=self.semestre,
             semestre_cursado=1,
             horas_academicas_semanales=10 # Sufficient for load tests
         )
+        self.curso.especialidades.add(self.especialidad)
 
         self.franja_8am = FranjaHoraria.objects.create(turno="MANANA", hora_inicio=time(8, 0), hora_fin=time(8, 50))
         self.franja_9am = FranjaHoraria.objects.create(turno="MANANA", hora_inicio=time(8, 50), hora_fin=time(9, 40))
@@ -54,11 +54,12 @@ class RobustSchedulingTests(TestCase):
         )
 
         # Another course trying to use same aula at same time
+        esp2 = Especialidad.objects.create(nombre="Sis2", grupo=Grupo.objects.create(nombre="GB"))
         curso2 = Curso.objects.create(
             nombre="Curso 2", carrera=self.carrera, semestre=self.semestre, semestre_cursado=1,
             docente=Docente.objects.create(username="doc2", dni="22222222"),
-            especialidad=Especialidad.objects.create(nombre="Sis2", grupo=Grupo.objects.create(nombre="GB"))
         )
+        curso2.especialidades.add(esp2)
 
         bloque_conflictivo = BloqueHorario(
             curso=curso2,

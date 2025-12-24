@@ -25,23 +25,23 @@ class SchedulerConflictTests(TestCase):
             nombre="Computación",
             docente=self.docente1,
             carrera=self.carrera,
-            especialidad=self.especialidad,
             semestre=self.semestre,
             semestre_cursado=1,
             tipo_curso="ESPECIALIDAD",
             horas_academicas_semanales=4
         )
+        self.curso_computacion.especialidades.add(self.especialidad)
 
         self.curso_fisica = Curso.objects.create(
             nombre="Educación Física",
             docente=self.docente2,
             carrera=self.carrera,
-            especialidad=self.especialidad,
             semestre=self.semestre,
             semestre_cursado=1,
             tipo_curso="ESPECIALIDAD",
             horas_academicas_semanales=2
         )
+        self.curso_fisica.especialidades.add(self.especialidad)
 
         # Franja Horaria (8:00 - 8:50)
         self.franja_8am = FranjaHoraria.objects.create(
@@ -95,11 +95,11 @@ class SchedulerConflictTests(TestCase):
             nombre="Programación Avanzada",
             docente=self.docente1, # Same teacher as Computacion
             carrera=self.carrera,
-            especialidad=especialidad_b,
             semestre=self.semestre,
             semestre_cursado=3,
             tipo_curso="ESPECIALIDAD"
         )
+        curso_otro.especialidades.add(especialidad_b)
 
         # Assign Computacion to Tuesday 8:00 AM
         BloqueHorario.objects.create(
