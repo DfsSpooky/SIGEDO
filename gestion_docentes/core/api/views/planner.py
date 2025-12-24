@@ -3,6 +3,7 @@ import random
 from collections import defaultdict
 
 from django.contrib.admin.views.decorators import staff_member_required
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
 from django.views.decorators.csrf import csrf_exempt
@@ -46,12 +47,18 @@ def api_asignar_horario(request):
                 f"No se puede asignar: excede las horas semanales del curso ({curso.horas_academicas_semanales})."
             )
 
-        # Aquí iría una validación de conflictos más robusta similar a la del generador automático
-        # Por simplicidad, la omitimos en la asignación manual, pero en un sistema real sería necesaria.
-
-        BloqueHorario.objects.create(
+        # Validación de conflictos usando el método clean() del modelo
+        bloque = BloqueHorario(
             curso=curso, dia=dia, franja_inicio=franja_inicio, duracion_bloques=duracion
         )
+        try:
+            bloque.full_clean()
+        except ValidationError as e:
+            # Extraer el mensaje de error de la excepción
+            error_message = next(iter(e.message_dict.values()))[0] if hasattr(e, 'message_dict') else str(e)
+            return error_response(f"Conflicto de horario: {error_message}")
+
+        bloque.save()
         return success_response(message="Bloque asignado con éxito.")
 
     except Curso.DoesNotExist:
@@ -101,11 +108,15 @@ def api_mover_bloque(request):
         ).get(pk=bloque_id)
         nueva_franja_inicio = FranjaHoraria.objects.get(pk=nueva_franja_id)
 
-        # Aquí debería ir una validación de conflictos completa, similar a la de generar_horario_automatico
-        # Por ahora, se omite por brevedad, pero en un sistema real sería crucial.
-
         bloque.dia = nuevo_dia
         bloque.franja_inicio = nueva_franja_inicio
+
+        try:
+            bloque.full_clean()
+        except ValidationError as e:
+            error_message = next(iter(e.message_dict.values()))[0] if hasattr(e, 'message_dict') else str(e)
+            return error_response(f"No se puede mover: {error_message}")
+
         bloque.save()
 
         return success_response(message="Bloque movido con éxito.")
@@ -156,9 +167,14 @@ def api_ajustar_duracion(request):
                 "La duración excede las horas semanales del curso.", status_code=400
             )
 
-        # Aquí también se necesitaría una validación de conflictos para la nueva duración
-
         bloque.duracion_bloques = nueva_duracion
+
+        try:
+            bloque.full_clean()
+        except ValidationError as e:
+            error_message = next(iter(e.message_dict.values()))[0] if hasattr(e, 'message_dict') else str(e)
+            return error_response(f"No se puede ajustar duración: {error_message}")
+
         bloque.save()
 
         return success_response(message="Duración del bloque actualizada.")

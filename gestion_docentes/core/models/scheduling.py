@@ -62,6 +62,34 @@ class BloqueHorario(models.Model):
     horario_fin = models.TimeField(editable=False)
     dia_semana = models.PositiveSmallIntegerField(editable=False, db_index=True)
 
+    def _calculate_times(self):
+        """
+        Calcula el horario de inicio y fin basado en la franja inicial y la duración.
+        Retorna una tupla (hora_inicio, hora_fin).
+        """
+        if not self.franja_inicio_id:
+            return None, None
+
+        start_time = self.franja_inicio.hora_inicio
+        end_time = self.franja_inicio.hora_fin
+
+        # Optimización: si la duración es 1, no necesitamos consultar la lista de franjas
+        if self.duracion_bloques <= 1:
+            return start_time, end_time
+
+        todas_las_franjas = list(FranjaHoraria.objects.order_by("hora_inicio"))
+        try:
+            start_index = todas_las_franjas.index(self.franja_inicio)
+            end_index = start_index + self.duracion_bloques - 1
+            if end_index < len(todas_las_franjas):
+                end_time = todas_las_franjas[end_index].hora_fin
+            else:
+                end_time = todas_las_franjas[-1].hora_fin
+        except (ValueError, IndexError):
+            pass
+
+        return start_time, end_time
+
     class Meta:
         verbose_name = "Bloque de Horario"
         verbose_name_plural = "Bloques de Horario"
@@ -89,6 +117,50 @@ class BloqueHorario(models.Model):
                     f"El docente {self.curso.docente} no está disponible en el turno de {turno_franja}."
                 )
 
+        # Validación de cruces de horarios
+        start_time, end_time = self._calculate_times()
+        if not start_time or not end_time:
+            # Si no se pueden calcular los tiempos (ej. falta franja_inicio), salimos.
+            # La validación de campos obligatorios se hace en otra parte.
+            return
+
+        # 1. Validar conflicto de Docente
+        if self.curso.docente:
+            conflicto_docente = (
+                BloqueHorario.objects.filter(
+                    curso__docente=self.curso.docente,
+                    dia=self.dia,
+                    horario_inicio__lt=end_time,
+                    horario_fin__gt=start_time,
+                )
+                .exclude(pk=self.pk)
+                .first()
+            )
+
+            if conflicto_docente:
+                raise ValidationError(
+                    f"El docente {self.curso.docente} ya tiene clase asignada en este horario ({conflicto_docente.curso})."
+                )
+
+        # 2. Validar conflicto de Grupo + Semestre (Estudiantes)
+        if self.curso.especialidad and self.curso.especialidad.grupo:
+            conflicto_grupo = (
+                BloqueHorario.objects.filter(
+                    curso__especialidad__grupo=self.curso.especialidad.grupo,
+                    curso__semestre_cursado=self.curso.semestre_cursado,
+                    dia=self.dia,
+                    horario_inicio__lt=end_time,
+                    horario_fin__gt=start_time,
+                )
+                .exclude(pk=self.pk)
+                .first()
+            )
+
+            if conflicto_grupo:
+                raise ValidationError(
+                    f"El Grupo {self.curso.especialidad.grupo} (Semestre {self.curso.semestre_cursado}) ya tiene clase asignada en este horario ({conflicto_grupo.curso})."
+                )
+
     def save(self, *args, **kwargs):
         # Salvaguarda para ignorar la creación de bloques vacíos desde el admin inline
         if not self.franja_inicio_id:
@@ -97,18 +169,15 @@ class BloqueHorario(models.Model):
         # Actualizar campos denormalizados
         DIAS = {"Lunes": 0, "Martes": 1, "Miércoles": 2, "Jueves": 3, "Viernes": 4}
         self.dia_semana = DIAS.get(self.dia)
-        self.horario_inicio = self.franja_inicio.hora_inicio
 
-        # Calcular la hora de fin
-        todas_las_franjas = list(FranjaHoraria.objects.order_by("hora_inicio"))
-        try:
-            start_index = todas_las_franjas.index(self.franja_inicio)
-            end_index = start_index + self.duracion_bloques - 1
-            if end_index < len(todas_las_franjas):
-                self.horario_fin = todas_las_franjas[end_index].hora_fin
-            else:
-                self.horario_fin = todas_las_franjas[-1].hora_fin
-        except (ValueError, IndexError):
+        # Usar el método centralizado para calcular tiempos
+        start_time, end_time = self._calculate_times()
+        if start_time and end_time:
+            self.horario_inicio = start_time
+            self.horario_fin = end_time
+        else:
+             # Fallback en caso de error (no debería ocurrir si franja_inicio existe)
+            self.horario_inicio = self.franja_inicio.hora_inicio
             self.horario_fin = self.franja_inicio.hora_fin
 
         super().save(*args, **kwargs)
