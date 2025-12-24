@@ -5,7 +5,7 @@ from collections import defaultdict
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.views.decorators.csrf import csrf_exempt
 
 from core.models import (
@@ -640,7 +640,10 @@ def generar_horario_automatico(request):
             Curso.objects.filter(semestre=semestre_activo, docente__isnull=False)
             .select_related("docente")
             .prefetch_related("especialidades__grupo")
-            .order_by("-horas_academicas_semanales")  # Priorizar cursos con más horas
+            .annotate(num_especialidades=Count("especialidades"))
+            .order_by(
+                "-num_especialidades", "-horas_academicas_semanales"
+            )  # Priorizar cursos más restrictivos (compartidos) y luego más horas
         )
         franjas_horarias = list(FranjaHoraria.objects.order_by("hora_inicio"))
         dias_semana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
