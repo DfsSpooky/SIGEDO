@@ -1,879 +1,231 @@
 {% extends 'planificador_base.html' %}
+{% load static %}
 {% load template_extras %}
-{% block title %}Planificador de Horarios{% endblock %}
-{% block breadcrumb %}Planificador{% endblock %}
+
+{% block title %}Planificador Académico Pro{% endblock %}
 
 {% block content %}
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <style>
-    /* =================================================================
-    Modern Planner Theme - Inspired by GitHub Primer
-    ================================================================= */
-    .planner-modern {
-        /* Color Palette */
-        --pm-bg: #ffffff;
-        --pm-surface: #f6f8fa;
-        --pm-border: #d1d5da;
-        --pm-text-primary: #24292e;
-        --pm-text-secondary: #586069;
-        --pm-text-link: #0366d6;
-        --pm-button-bg: #2ea44f;
-        --pm-button-text: #ffffff;
-        --pm-button-hover-bg: #2c974b;
-
-        /* Course Colors */
-        --pm-course-general-bg: #f1f8ff;
-        --pm-course-general-text: #0366d6;
-        --pm-course-especialidad-bg: #fffbdd;
-        --pm-course-especialidad-text: #5c5923;
-
-        /* Status Colors */
-        --pm-conflict-outline: #d73a49;
-        --pm-conflict-bg: rgba(215, 58, 73, 0.1);
-        --pm-pending-text: #0366d6; /* High-contrast blue for pending hours */
-
-        /* Other */
-        --pm-shadow: none;
-        --pm-border-radius: 6px;
+    /* --- TEMA PRO: Tipografía y Fondo --- */
+    .planner-font { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    
+    /* Fondo sutil para toda la card */
+    .bg-gradient-planner {
+        background: linear-gradient(to bottom right, #ffffff, #f8fafc);
+    }
+    
+    /* --- TARJETAS CON EFECTO GLASSMORPHISM --- */
+    .course-card {
+        position: relative;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+        z-index: 1;
+        border: 1px solid rgba(255, 255, 255, 0.6);
+    }
+    
+    /* Efecto "Levitar" al pasar el mouse */
+    .course-card:hover {
+        transform: translateY(-2px) scale(1.02);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        z-index: 50; /* Traer al frente */
     }
 
-    .drop-zone.conflict-cell { background-color: hsla(var(--er)/.2) !important; outline: 2px dashed hsl(var(--er)); cursor: not-allowed; }
-    .drop-zone:not(:has(.cursor-grab)):hover { @apply bg-base-200; }
-
-    /* Unassigned Course Item Styling */
-    .planner-modern .unassigned-course-item {
-        background-color: var(--pm-bg);
-        border: 1px solid var(--pm-border);
-        border-radius: var(--pm-border-radius);
-        padding: 0.5rem 0.75rem;
-        margin-bottom: 0.5rem;
-        transition: box-shadow 0.2s ease-in-out, border-color 0.2s ease-in-out;
-        cursor: grab;
+    /* Colores específicos por tipo (Más suaves y profesionales) */
+    .card-general {
+        background: linear-gradient(135deg, rgba(239, 246, 255, 0.95), rgba(219, 234, 254, 0.9));
+        border-left: 3px solid #3b82f6; /* Azul */
     }
-    .planner-modern .unassigned-course-item:hover {
-        box-shadow: 0 2px 5px rgba(0,0,0,0.08);
-        border-color: var(--pm-text-link);
+    .card-especialidad {
+        background: linear-gradient(135deg, rgba(254, 252, 232, 0.95), rgba(254, 249, 195, 0.9));
+        border-left: 3px solid #eab308; /* Amarillo */
     }
-    .planner-modern .unassigned-course-item .course-name {
-        color: var(--pm-text-primary);
-        font-weight: 600;
-        margin-bottom: 0.1rem;
-    }
-    .planner-modern .unassigned-course-item .course-teacher {
-        color: var(--pm-text-secondary);
-        font-size: 0.75rem;
-    }
-    .planner-modern .unassigned-course-item .course-pending-hours {
-        color: var(--pm-pending-text);
-        font-weight: 600;
-        margin-top: 0.35rem;
-        font-size: 0.75rem;
-    }
-
-    /* Main Schedule Table Styling */
-    .planner-modern .table th {
-        background-color: var(--pm-surface);
-        border-bottom: 1px solid var(--pm-border);
-        font-weight: 600;
-        color: var(--pm-text-primary);
-        text-align: center;
-    }
-    .planner-modern .table td {
-        border-color: var(--pm-border);
-        transition: background-color 0.2s ease;
-    }
-    .planner-modern .drop-zone:not(:has(.cursor-grab)):hover {
-        background-color: var(--pm-course-general-bg);
-    }
-
-    /* Assigned Course Item Styling */
-    .planner-modern .assigned-course-item {
-        border: 1px solid transparent;
-        border-radius: var(--pm-border-radius);
-        padding: 0.25rem 0.5rem;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-    }
-    .planner-modern .assigned-course-item[data-course-type='GENERAL'] {
-        background-color: var(--pm-course-general-bg);
-        color: var(--pm-course-general-text);
-        border-color: rgba(3, 102, 214, 0.3);
-    }
-    .planner-modern .cell-general {
-        background-color: rgba(241, 248, 255, 0.5) !important;
-    }
-    .planner-modern .assigned-course-item[data-course-type='ESPECIALIDAD'] {
-        background-color: var(--pm-course-especialidad-bg);
-        color: var(--pm-course-especialidad-text);
-        border-color: rgba(186, 148, 46, 0.3);
-    }
-    .planner-modern .cell-especialidad {
-        background-color: rgba(255, 251, 221, 0.5) !important;
-    }
-
-    .planner-modern .assigned-course-item .font-bold {
-        font-weight: 600;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .planner-modern .assigned-course-item .text-xs {
-        font-size: 0.75rem;
+    .card-gestion {
+        background: #f1f5f9;
+        border: 1px dashed #94a3b8;
         opacity: 0.9;
     }
 
-    /* Controls and Interactive Elements Styling */
-    .planner-modern .btn {
-        border-radius: var(--pm-border-radius);
-        border: 1px solid var(--pm-border);
-        font-weight: 600;
-        transition: background-color 0.2s;
+    /* --- TOOLTIP FLOTANTE (Rico en detalles) --- */
+    .course-tooltip {
+        visibility: hidden;
+        opacity: 0;
+        position: absolute;
+        bottom: 110%; /* Aparece arriba de la tarjeta */
+        left: 50%;
+        transform: translateX(-50%) translateY(5px);
+        background-color: #1e293b; /* Slate 800 */
+        color: #f8fafc;
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-size: 11px;
+        width: max-content;
+        max-width: 220px;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+        pointer-events: none;
+        transition: all 0.2s ease-out;
+        z-index: 100;
     }
-    .planner-modern .btn:hover {
-        border-color: #a0a7b0;
+    /* La flechita del tooltip */
+    .course-tooltip::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        margin-left: -5px;
+        border-width: 5px;
+        border-style: solid;
+        border-color: #1e293b transparent transparent transparent;
     }
-    .planner-modern .btn-primary {
-        background-color: var(--pm-button-bg);
-        color: var(--pm-button-text);
-        border-color: rgba(0,0,0,0.1);
-    }
-    .planner-modern .btn-primary:hover {
-        background-color: var(--pm-button-hover-bg);
-        border-color: rgba(0,0,0,0.1);
-    }
-    .planner-modern .select {
-        border-color: var(--pm-border);
-        border-radius: var(--pm-border-radius);
-    }
-
-    /* Schedule Tabs Styling (Corrected for <a> tags) */
-    .planner-modern .tabs-lifted {
-        border-bottom: 1px solid var(--pm-border);
-        margin-bottom: 1rem;
-    }
-    .planner-modern .tabs-lifted .tab {
-        border: none;
-        border-bottom: 2px solid transparent;
-        border-radius: 0;
-        margin-bottom: -1px;
-        padding: 0.5rem 1rem;
-        color: var(--pm-text-secondary);
-        transition: color 0.2s, border-color 0.2s;
-    }
-    .planner-modern .tabs-lifted .tab:hover {
-        color: var(--pm-text-primary);
-    }
-    .planner-modern .tabs-lifted .tab.tab-active {
-        color: var(--pm-text-primary);
-        font-weight: 600;
-        border-bottom-color: var(--pm-text-link);
+    .course-card:hover .course-tooltip {
+        visibility: visible;
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
     }
 
-    /* Tab Content Panes */
-    .tab-pane {
-        display: none;
-    }
-    .tab-pane.active {
-        display: block;
-    }
-
-
-    /* Sidebar Tabs */
-    .planner-modern .tabs-boxed {
-        background-color: #eef1f4;
-        border-radius: var(--pm-border-radius);
-        padding: 0.25rem;
-    }
-    .planner-modern .tabs-boxed .tab {
-        color: var(--pm-text-secondary);
-    }
-    .planner-modern .tabs-boxed .tab-active {
-        background-color: var(--pm-bg);
-        color: var(--pm-text-primary);
-        font-weight: 600;
-        border-radius: var(--pm-border-radius);
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    /* --- SMART HIGHLIGHTING (Conflictos) --- */
+    /* Patrón de rayas rojas sutiles y elegantes para zonas prohibidas */
+    .conflict-zone {
+        background-image: repeating-linear-gradient(
+            45deg,
+            rgba(239, 68, 68, 0.05),
+            rgba(239, 68, 68, 0.05) 10px,
+            rgba(239, 68, 68, 0.1) 10px,
+            rgba(239, 68, 68, 0.1) 20px
+        ) !important;
+        background-color: rgba(254, 242, 242, 0.6) !important;
+        cursor: not-allowed;
+        box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.15);
     }
 
-    /* Search Input */
-    .planner-modern #course-search-input {
-        border-color: var(--pm-border);
-        border-radius: var(--pm-border-radius);
-    }
-    .planner-modern #course-search-input:focus {
-        border-color: var(--pm-text-link);
-        box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.2);
-        outline: none;
-    }
-
-    /* Trash Zone */
-    .planner-modern #trash-zone {
-        border-color: var(--pm-border);
-        color: var(--pm-text-secondary);
-        border-radius: var(--pm-border-radius);
-    }
-
-    /* Layout & Hierarchy Styling */
-    .planner-modern {
-        background-color: var(--pm-bg);
-        border: 1px solid var(--pm-border);
-        box-shadow: var(--pm-shadow);
-    }
-    .planner-modern .card-body {
-        padding: 1rem;
-    }
-
-    /* Header */
-    .planner-modern .planner-header {
-        background-color: var(--pm-surface);
-        padding: 1rem;
-        margin: -1rem -1rem 1rem -1rem; /* Extend to edges of card-body padding */
-        border-bottom: 1px solid var(--pm-border);
-    }
-    .planner-modern .planner-header h1 {
-        font-size: 1.25rem;
-        font-weight: 600;
-    }
-
-    /* Main Grid Layout */
-    .planner-modern .planner-main-grid {
-        gap: 1.5rem;
-    }
-
-    /* Sidebar */
-    .planner-modern .planner-sidebar {
-        background-color: var(--pm-surface);
-        border: 1px solid var(--pm-border);
-        border-radius: var(--pm-border-radius);
-        padding: 1rem;
-    }
-    .planner-modern .planner-sidebar h3 {
-        font-size: 1rem;
-        font-weight: 600;
-        border-bottom: 1px solid var(--pm-border);
-        padding-bottom: 0.75rem;
-        margin-bottom: 0.75rem;
-    }
-    .planner-modern .planner-sidebar .divider {
-        border-color: var(--pm-border);
-    }
-
-    /* Schedule Table Container */
-    .planner-modern .schedule-container {
-        border: 1px solid var(--pm-border);
-        border-radius: var(--pm-border-radius);
-        overflow: hidden;
-    }
-    .planner-modern #trash-zone.sortable-drag-over {
-        border-color: var(--pm-conflict-outline);
-        color: var(--pm-conflict-outline);
-        background-color: var(--pm-conflict-bg);
-    }
-
-    .sortable-ghost { @apply bg-primary/30 border-2 border-primary opacity-70 rounded-lg; }
-    .droppable-cell.sortable-drag-over { @apply bg-primary/10; }
-    #trash-zone.sortable-drag-over { @apply bg-error/20 ring-2 ring-error; transform: scale(1.05); }
-    .skeleton-loader { @apply animate-pulse bg-base-200 rounded-lg; }
-    .tab-content { display: none; }
-    .tab-content.active { display: block; }
-
-    /* SweetAlert2 Button Fix */
-    .swal2-confirm {
-        background-color: #22c55e !important;
-        color: white !important;
-        border-radius: var(--rounded-btn, 0.5rem);
-        padding: 0.75rem 1.5rem;
-    }
-    .swal2-cancel {
-        background-color: #ef4444 !important;
-        color: white !important;
-        border-radius: var(--rounded-btn, 0.5rem);
-        padding: 0.75rem 1.5rem;
-    }
-    .swal2-confirm:hover, .swal2-cancel:hover {
-        opacity: 0.9;
-    }
+    /* Tablas más limpias */
+    th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 700; }
+    td.drop-zone { transition: background-color 0.15s ease; }
+    td.drop-zone:hover { background-color: #f8fafc; } /* Hover suave en celdas vacías */
 </style>
 
-<div class="card bg-base-100 shadow-xl planner-modern">
-    <div class="card-body">
-        <!-- Step 1: Selection -->
-        <div class="planner-header flex flex-wrap justify-between items-center">
+<div class="card bg-base-100 shadow-xl planner-font max-w-[1800px] mx-auto bg-gradient-planner">
+    <div class="card-body p-4">
+        
+        <div class="flex flex-wrap justify-between items-center mb-4 pb-2 border-b border-gray-100">
             <div>
-                <h1 class="card-title">Planificador de Horarios</h1>
-                <p class="text-base-content/70">Semestre Activo: <span class="font-semibold text-primary">{{ semestre_activo.nombre }}</span></p>
+                <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shadow-sm">
+                        <i class="far fa-calendar-alt"></i>
+                    </div>
+                    Planificador Académico
+                </h1>
+                <p class="text-xs text-slate-400 ml-10">Semestre Activo: <span class="font-medium text-slate-600">{{ semestre_activo.nombre }}</span></p>
             </div>
             
-            <div class="flex items-center gap-4 p-2 bg-base-200 rounded-box">
-                <button id="global-auto-assign-btn" class="btn btn-primary btn-sm">
-                    <i class="fas fa-globe-americas"></i>
-                    Generar Horario Global
-                </button>
-                <div class="divider divider-horizontal"></div>
-                <div class="form-control">
-                    <label class="label pb-1"><span class="label-text">Especialidad:</span></label>
-                    <select id="especialidad" class="select select-bordered select-sm">
-                        <option value="" disabled selected>-- Seleccione --</option>
+            <div class="flex items-center gap-2">
+                <div class="join shadow-sm">
+                    <select id="especialidad" class="select select-bordered select-sm join-item w-52 text-xs">
+                        <option value="" disabled selected>-- Seleccionar Especialidad --</option>
                         {% for esp in especialidades %}
                         <option value="{{ esp.id }}" {% if especialidad_seleccionada_id == esp.id|stringformat:"s" %}selected{% endif %}>{{ esp.nombre }}</option>
                         {% endfor %}
                     </select>
-                </div>
-                 <div class="form-control">
-                    <label class="label pb-1"><span class="label-text">Semestre:</span></label>
-                    <select id="semestre_cursado" class="select select-bordered select-sm">
-                        <option value="" disabled selected>-- Seleccione --</option>
+                    <select id="semestre_cursado" class="select select-bordered select-sm join-item w-28 text-xs">
+                        <option value="" disabled selected>-- Ciclo --</option>
                         {% for sem_num in semestres_validos %}
-                        <option value="{{ sem_num }}" {% if semestre_seleccionado == sem_num|stringformat:"s" %}selected{% endif %}>Semestre {{ sem_num|roman }}</option>
+                        <option value="{{ sem_num }}" {% if semestre_seleccionado == sem_num|stringformat:"s" %}selected{% endif %}>{{ sem_num|roman }}</option>
                         {% endfor %}
                     </select>
                 </div>
+                <button id="auto-assign-btn" class="btn btn-primary btn-sm shadow-sm gap-2">
+                    <i class="fas fa-magic"></i> Auto-Asignar
+                </button>
             </div>
         </div>
 
-        <!-- Step 2: Workspace (hidden by default) -->
-        <div id="planner-body" class="hidden">
-            <div class="planner-main-grid grid grid-cols-1 lg:grid-cols-4 mt-4">
-                
-                <main class="lg:col-span-3">
-                    <div role="tablist" class="tabs tabs-lifted" id="schedule-tabs-container">
-                        <a role="tab" class="tab tab-active" data-tab-target="#schedule-morning">Turno Mañana</a>
-                        <a role="tab" class="tab" data-tab-target="#schedule-afternoon">Turno Tarde</a>
+        <div id="planner-body" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-200px)]">
+            
+            <main class="lg:col-span-10 flex flex-col h-full bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+                <div class="flex border-b border-slate-100 bg-slate-50/50">
+                    <button class="tab-btn flex-1 py-3 text-xs font-bold uppercase tracking-wider text-blue-600 border-b-2 border-blue-600 transition-colors bg-white" data-target="#container-manana">
+                        <i class="fas fa-sun mr-2 text-amber-500"></i> Turno Mañana
+                    </button>
+                    <button class="tab-btn flex-1 py-3 text-xs font-bold uppercase tracking-wider text-slate-400 hover:text-blue-500 hover:bg-white transition-all" data-target="#container-tarde">
+                        <i class="fas fa-moon mr-2 text-indigo-500"></i> Turno Tarde
+                    </button>
+                </div>
+
+                <div id="container-manana" class="flex-grow overflow-auto relative custom-scrollbar">
+                    <table class="w-full table-fixed border-collapse">
+                        <thead class="bg-slate-50 sticky top-0 z-20 shadow-sm">
+                            <tr>
+                                <th class="w-16 p-3 border-b border-r border-slate-100 bg-slate-50">Hora</th>
+                                {% for dia in dias_semana %}
+                                <th class="p-3 border-b border-r border-slate-100 bg-slate-50">{{ dia }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody id="schedule-grid-manana" class="bg-white"></tbody>
+                    </table>
+                </div>
+
+                <div id="container-tarde" class="hidden flex-grow overflow-auto relative custom-scrollbar">
+                    <table class="w-full table-fixed border-collapse">
+                        <thead class="bg-slate-50 sticky top-0 z-20 shadow-sm">
+                            <tr>
+                                <th class="w-16 p-3 border-b border-r border-slate-100 bg-slate-50">Hora</th>
+                                {% for dia in dias_semana %}
+                                <th class="p-3 border-b border-r border-slate-100 bg-slate-50">{{ dia }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody id="schedule-grid-tarde" class="bg-white"></tbody>
+                    </table>
+                </div>
+            </main>
+            
+            <aside class="lg:col-span-2 flex flex-col h-full gap-4">
+                <div class="relative">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <input type="text" id="course-search-input" placeholder="Filtrar cursos..." class="input input-sm input-bordered w-full pl-8 text-xs rounded-lg bg-white shadow-sm">
+                </div>
+
+                <div id="unassigned-courses-container" class="flex-grow overflow-y-auto pr-2 custom-scrollbar space-y-3">
                     </div>
 
-                    <div id="schedule-morning" class="tab-pane active">
-                        <div class="schedule-container">
-                            <table class="table table-fixed w-full">
-                                <thead>
-                                    <tr>
-                                        <th class="w-32">Horas</th>
-                                        {% for dia in dias_semana %}<th>{{ dia }}</th>{% endfor %}
-                                    </tr>
-                                </thead>
-                                <tbody id="schedule-grid-manana">
-                                    <!-- Mañana Grid will be populated by JS -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <div id="schedule-afternoon" class="tab-pane">
-                        <div class="schedule-container">
-                            <table class="table table-fixed w-full">
-                                <thead>
-                                    <tr>
-                                        <th class="w-32">Horas</th>
-                                        {% for dia in dias_semana %}<th>{{ dia }}</th>{% endfor %}
-                                    </tr>
-                                </thead>
-                                <tbody id="schedule-grid-tarde">
-                                    <!-- Tarde Grid will be populated by JS -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </main>
-                
-                <aside class="lg:col-span-1">
-                    <div class="planner-sidebar h-full space-y-4 sticky top-24">
-                        <div role="tablist" class="tabs tabs-boxed">
-                            <a role="tab" class="tab tab-active" data-tab="manual">Manual</a>
-                            <a role="tab" class="tab" data-tab="auto">Automático</a>
-                        </div>
-
-                        <!-- Manual Assignment Tab -->
-                        <div id="tab-manual" class="tab-content active space-y-4">
-                            <h3 class="font-bold text-lg">Cursos por Asignar</h3>
-                            <p class="text-xs text-base-content/60 -mt-3">Arrastra un curso al horario para asignarlo.</p>
-                            <input type="text" id="course-search-input" placeholder="Buscar curso..." class="input input-bordered input-sm w-full">
-                            <div id="unassigned-courses-container" class="space-y-2 max-h-96 overflow-y-auto pr-2">
-                                <!-- Unassigned courses will be populated by JS -->
-                            </div>
-                            <div class="divider"></div>
-                            <div id="trash-zone" class="p-4 text-center border-2 border-dashed border-base-300 rounded-box bg-base-200 text-base-content/70 min-h-[80px] flex flex-col justify-center items-center transition-all duration-300">
-                                <i class="fas fa-trash-alt text-2xl mb-2"></i>
-                                <p class="font-semibold text-sm">Arrastra aquí para desasignar</p>
-                            </div>
-                        </div>
-
-                        <!-- Automatic Generator Tab -->
-                        <div id="tab-auto" class="tab-content space-y-4">
-                            <h3 class="font-bold text-lg">Generador Automático</h3>
-                            <p class="text-xs text-base-content/60 -mt-3">Asigna automáticamente los cursos pendientes.</p>
-                            <button id="auto-assign-btn" class="btn btn-primary w-full">
-                                <i class="fas fa-magic"></i>
-                                Generar Horario
-                            </button>
-                            <div class="divider"></div>
-                            <h4 class="font-semibold">Registro de Actividad</h4>
-                            <div id="auto-assign-log" class="text-xs p-2 bg-base-200 rounded-md h-48 overflow-y-auto font-mono">
-                                Presiona "Generar Horario" para iniciar...
-                            </div>
-                        </div>
-                    </div>
-                </aside>
-            </div>
+                <div id="trash-zone" class="mt-auto p-6 border-2 border-dashed border-red-200 bg-red-50 text-red-400 text-center rounded-xl cursor-pointer hover:bg-red-100 hover:border-red-300 hover:text-red-500 transition-all group">
+                    <i class="fas fa-trash-alt text-2xl mb-2 group-hover:scale-110 transition-transform"></i>
+                    <div class="text-[10px] font-bold uppercase tracking-wider">Arrastrar aquí para quitar</div>
+                </div>
+            </aside>
         </div>
 
-        <!-- Placeholder when no selection is made -->
-        <div id="planner-placeholder" class="text-center py-20 text-base-content/50">
-            <i class="fas fa-drafting-compass fa-4x mb-4"></i>
-            <p class="text-xl font-semibold">Selecciona una especialidad y un semestre para comenzar a planificar.</p>
+        <div id="planner-placeholder" class="text-center py-24 opacity-60">
+            <div class="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-cubes text-4xl text-slate-300"></i>
+            </div>
+            <h3 class="text-lg font-medium text-slate-600">Comienza tu planificación</h3>
+            <p class="text-sm text-slate-400">Selecciona una Especialidad y un Ciclo arriba.</p>
         </div>
     </div>
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    // ... (selectors and initial data setup remain the same)
-    const selectors = {
-        especialidad: '#especialidad',
-        semestre: '#semestre_cursado',
-        plannerBody: '#planner-body',
-        placeholder: '#planner-placeholder',
-        gridManana: '#schedule-grid-manana',
-        gridTarde: '#schedule-grid-tarde',
-        unassignedContainer: '#unassigned-courses-container',
-        trash: '#trash-zone',
-        searchInput: '#course-search-input',
-        autoAssignBtn: '#auto-assign-btn',
-        autoAssignLog: '#auto-assign-log',
-        sidebarTabs: '.planner-sidebar .tabs .tab', // More specific selector for sidebar
-        scheduleTabsContainer: '#schedule-tabs-container', // Container for the main schedule tabs
-        globalAutoAssignBtn: '#global-auto-assign-btn'
+    window.plannerConfig = {
+        csrfToken: '{{ csrf_token }}',
+        franjasManana: {{ franjas_manana_json|safe }},
+        franjasTarde: {{ franjas_tarde_json|safe }},
+        diasSemana: {{ dias_semana_json|safe }},
+        urls: {
+            // CORRECCIÓN: Usamos el namespace 'api:' y los nombres cortos definidos en urls.py
+            getData: "{% url 'api:get_cursos_no_asignados' %}",
+            assign: "{% url 'api:asignar_horario' %}",
+            deassign: "{% url 'api:desasignar_horario' %}",
+            move: "{% url 'api:mover_bloque' %}",
+            duration: "{% url 'api:ajustar_duracion' %}",
+            conflicts: "{% url 'api:get_teacher_conflicts' %}",
+            autoAssign: "{% url 'api:auto_asignar' %}"
+        }
     };
-    const DOMElements = Object.fromEntries(Object.entries(selectors).map(([key, selector]) => [key, document.querySelector(selector)]));
-    const franjasManana = {{ franjas_manana_json|safe }};
-    const franjasTarde = {{ franjas_tarde_json|safe }};
-    const diasSemana = {{ dias_semana_json|safe }};
-    const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, timerProgressBar: true });
-
-    // --- API & UTILITY FUNCTIONS (no changes) ---
-    async function callApi(url, method = 'GET', body = null) {
-        const options = { method, headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' } };
-        if (body) options.body = JSON.stringify(body);
-        const response = await fetch(url, options);
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.message || data.error || 'Error en el servidor');
-        return data;
-    }
-    function log(message) {
-        DOMElements.autoAssignLog.innerHTML += `<div>[${new Date().toLocaleTimeString()}] ${message}</div>`;
-        DOMElements.autoAssignLog.scrollTop = DOMElements.autoAssignLog.scrollHeight;
-    }
-
-    // --- RENDERING FUNCTIONS (UPDATED) ---
-    function createCourseElement(curso, isAssigned = false) {
-        const div = document.createElement('div');
-        div.className = `relative p-2 rounded-lg text-sm transition-all duration-300 cursor-grab active:cursor-grabbing border h-full flex flex-col`;
-
-        let blockClasses = '';
-        let cellClasses = '';
-
-        if (isAssigned) {
-            div.classList.add('group', 'assigned-course-item');
-            div.dataset.bloqueId = curso.bloque_id;
-            div.dataset.cursoId = curso.curso_id;
-            div.dataset.duracion = curso.duracion_bloques;
-            div.dataset.fullData = JSON.stringify(curso);
-            div.dataset.courseType = curso.tipo_curso; // Atributo para styling via CSS
-
-            let icon = '';
-            if (curso.tipo_curso === 'GENERAL') {
-                cellClasses = 'cell-general';
-                icon = '<i class="fas fa-globe-americas fa-fw mr-2"></i>';
-            } else {
-                cellClasses = 'cell-especialidad';
-                icon = '<i class="fas fa-graduation-cap fa-fw mr-2"></i>';
-            }
-
-            const allFranjas = [...franjasManana, ...franjasTarde];
-            const startFranjaIndex = allFranjas.findIndex(f => f.id === curso.franja_id_inicio);
-            let timeText = '';
-            if (startFranjaIndex !== -1) {
-                const endFranjaIndex = startFranjaIndex + curso.duracion_bloques - 1;
-                if (endFranjaIndex < allFranjas.length) {
-                    timeText = `${allFranjas[startFranjaIndex].hora_inicio.slice(0,5)} - ${allFranjas[endFranjaIndex].hora_fin.slice(0,5)}`;
-                }
-            }
-
-            div.innerHTML = `
-                <div class="flex-grow">
-                    <p class="font-bold truncate pr-4">${curso.nombre}</p>
-                    <p class="text-xs opacity-70 truncate">${curso.docente_nombre}</p>
-                </div>
-                <div class="mt-2 text-xs opacity-80">
-                    <div class="flex items-center">${icon} ${curso.tipo_curso}</div>
-                    <div class="font-mono mt-1"><i class="far fa-clock fa-fw mr-2 opacity-60"></i>${timeText} (${curso.duracion_bloques}h)</div>
-                </div>
-            `;
-
-            const controlsDiv = document.createElement('div');
-            controlsDiv.className = 'absolute top-1 right-1 flex flex-col items-center space-y-1 opacity-0 group-hover:opacity-100 transition-opacity';
-            const createControlButton = (iconClass, colorClass, title, onClick) => {
-                const button = document.createElement('button');
-                button.className = `btn btn-xs btn-square bg-base-100/50 backdrop-blur-sm border-0 text-${colorClass}/80 hover:bg-base-100 hover:text-${colorClass}`;
-                button.innerHTML = `<i class="fas ${iconClass}"></i>`;
-                button.title = title;
-                button.addEventListener('click', (e) => { e.stopPropagation(); onClick(e); });
-                return button;
-            };
-            controlsDiv.appendChild(createControlButton('fa-plus', 'success', 'Aumentar duración', () => handleDurationChange(div.dataset.bloqueId, 'increase')));
-            controlsDiv.appendChild(createControlButton('fa-minus', 'warning', 'Disminuir duración', () => handleDurationChange(div.dataset.bloqueId, 'decrease')));
-            controlsDiv.appendChild(createControlButton('fa-times', 'error', 'Eliminar bloque', () => {
-                Swal.fire({
-                    title: '¿Eliminar este bloque?', text: `Se eliminará el bloque de ${curso.duracion_bloques} hora(s) para "${curso.nombre}".`,
-                    icon: 'warning', showCancelButton: true, confirmButtonText: 'Sí, eliminar', cancelButtonText: 'No'
-                }).then(result => result.isConfirmed && handleDeassign(div));
-            }));
-            div.appendChild(controlsDiv);
-        } else {
-            div.dataset.cursoId = curso.id;
-            div.dataset.fullData = JSON.stringify(curso);
-            div.dataset.duracion = Math.min(2, curso.horas_pendientes);
-            div.classList.add('unassigned-course-item'); // Clase específica para el nuevo estilo
-            div.innerHTML = `
-                <p class="course-name">${curso.nombre}</p>
-                <p class="course-teacher">${curso.docente_nombre}</p>
-                <p class="course-pending-hours">${curso.horas_pendientes} de ${curso.horas_totales}h pendientes</p>
-            `;
-        }
-        // The old logic for adding blockClasses is now removed.
-        return { element: div, cellClasses: cellClasses.split(' ') };
-    }
-
-    function renderPlanner(plannerData) {
-        const renderGrid = (container, franjas) => {
-            container.innerHTML = '';
-            franjas.forEach(franja => {
-                const row = document.createElement('tr');
-                row.innerHTML = `<td class="text-center text-xs font-medium text-base-content/60 align-top h-24 p-1 border-r border-base-300">${franja.hora_inicio.slice(0,5)} - ${franja.hora_fin.slice(0,5)}</td>`;
-                diasSemana.forEach(dia => {
-                    row.innerHTML += `<td class="p-1 border-t border-r border-base-300 align-top relative drop-zone transition-colors duration-300" data-dia="${dia}" data-franja-id="${franja.id}"></td>`;
-                });
-                container.appendChild(row);
-            });
-        };
-        renderGrid(DOMElements.gridManana, franjasManana);
-        renderGrid(DOMElements.gridTarde, franjasTarde);
-
-        DOMElements.unassignedContainer.innerHTML = '';
-        const { generales, especialidad } = plannerData.cursos_pendientes;
-        const createAccordion = (title, courses, id) => {
-            const collapseDiv = document.createElement('div');
-            collapseDiv.className = 'collapse collapse-arrow bg-base-200/50';
-            collapseDiv.innerHTML = `<input type="checkbox" checked /><div class="collapse-title text-md font-medium">${title} (${courses.length})</div><div class="collapse-content"><div id="${id}" class="space-y-2 pt-2"></div></div>`;
-            const courseList = collapseDiv.querySelector(`#${id}`);
-            if (courses.length > 0) {
-                courses.forEach(curso => courseList.appendChild(createCourseElement(curso, false).element));
-            } else {
-                courseList.innerHTML = '<p class="text-xs text-base-content/50 p-2">No hay cursos pendientes.</p>';
-            }
-            return collapseDiv;
-        };
-        DOMElements.unassignedContainer.appendChild(createAccordion('Generales Pendientes', generales, 'unassigned-generales'));
-        DOMElements.unassignedContainer.appendChild(createAccordion('Especialidad Pendientes', especialidad, 'unassigned-especialidad'));
-
-        plannerData.cursos_asignados.forEach(bloque => {
-            if (!bloque.franja_id_inicio) return;
-            const cell = document.querySelector(`td[data-dia="${bloque.dia}"][data-franja-id="${bloque.franja_id_inicio}"]`);
-            if (cell) {
-                const { element, cellClasses } = createCourseElement(bloque, true);
-                cell.appendChild(element);
-                cell.classList.add(...cellClasses);
-
-                if (bloque.duracion_bloques > 1) {
-                    applyVisualSpan(cell, bloque.duracion_bloques, cellClasses);
-                }
-            }
-        });
-        initializeDragAndDrop();
-    }
-
-    // --- DRAG AND DROP LOGIC (UPDATED) ---
-    let sortableInstances = [];
-    function initializeDragAndDrop() {
-        sortableInstances.forEach(s => s.destroy());
-        sortableInstances = [];
-        const sharedConfig = { group: 'shared', animation: 150 };
-        
-        const onAdd = async (evt) => {
-            const { item, to, from } = evt;
-            revertVisualSpan(from);
-
-            // --- INICIO DE VALIDACIÓN PERSONALIZADA ---
-            const cursoData = JSON.parse(item.dataset.fullData);
-            const targetFranjaId = parseInt(to.dataset.franjaId, 10);
-
-            const isTarde = franjasTarde.some(f => f.id === targetFranjaId);
-            const targetTurno = isTarde ? 'TARDE' : 'MANANA';
-
-            // Regla 1: Semestres 1-4 solo pueden ir en la mañana, salvo excepción.
-            if (cursoData.semestre_cursado <= 4 && targetTurno === 'TARDE' && !cursoData.excepcion_horario) {
-                Toast.fire({ icon: 'error', title: 'Horario no permitido', text: 'Los cursos de semestres inferiores solo pueden llevarse en el turno de mañana.' });
-                await loadPlannerData();
-                return;
-            }
-
-            // Regla 2: Semestres 5-10 solo pueden ir en la tarde.
-            if (cursoData.semestre_cursado >= 5 && targetTurno === 'MANANA') {
-                Toast.fire({ icon: 'error', title: 'Horario no permitido', text: 'Los cursos de semestres superiores solo pueden llevarse en el turno de tarde.' });
-                await loadPlannerData();
-                return;
-            }
-            // --- FIN DE VALIDACIÓN PERSONALIZADA ---
-
-
-            // Si el movimiento no es válido según la validación del cliente, recargar para restaurar el estado.
-            if (to.classList.contains('conflict-cell') || to.querySelector('[data-bloque-id]')) {
-                Toast.fire({ icon: 'error', title: 'No se puede asignar en este espacio ocupado o en conflicto.' });
-                await loadPlannerData(); // Recargar para restaurar elestado visual original.
-                return;
-            }
-
-            try {
-                const isExistingBlock = item.dataset.bloqueId;
-                const payload = isExistingBlock ? {
-                    bloque_id: item.dataset.bloqueId,
-                    dia: to.dataset.dia,
-                    franja_id: to.dataset.franjaId,
-                } : {
-                    curso_id: item.dataset.cursoId,
-                    dia: to.dataset.dia,
-                    franja_id: to.dataset.franjaId,
-                    duracion: parseInt(item.dataset.duracion, 10)
-                };
-                const url = isExistingBlock ? '/api/mover-bloque/' : '/api/asignar-horario/';
-                const data = await callApi(url, 'POST', payload);
-                Toast.fire({ icon: 'success', title: data.message });
-                await loadPlannerData();
-            } catch (error) {
-                Toast.fire({ icon: 'error', title: `Error: ${error.message}` });
-                await loadPlannerData(); // En caso de error del servidor, recargar también.
-            }
-        };
-
-        const onStart = (evt) => highlightConflicts(evt.item);
-        const onEnd = () => clearConflicts();
-        sortableInstances.push(new Sortable(document.getElementById('unassigned-generales'), sharedConfig));
-        sortableInstances.push(new Sortable(document.getElementById('unassigned-especialidad'), sharedConfig));
-        document.querySelectorAll('.drop-zone').forEach(zone => sortableInstances.push(new Sortable(zone, { ...sharedConfig, onAdd, onStart, onEnd })));
-        sortableInstances.push(new Sortable(DOMElements.trash, { ...sharedConfig, onAdd: (evt) => handleDeassign(evt.item) }));
-    }
-
-    async function handleDeassign(courseElement) {
-        const bloqueId = courseElement.dataset.bloqueId;
-        if (!bloqueId) {
-            courseElement.remove(); // Handles unassigned courses dragged to trash
-            return;
-        }
-
-        // Clean up cell style only if the element comes from a schedule cell
-        const fromCell = courseElement.parentElement;
-        if (fromCell && fromCell.classList.contains('drop-zone')) {
-            revertVisualSpan(fromCell);
-        }
-
-        try {
-            await callApi('/api/desasignar-horario/', 'POST', { bloque_id: bloqueId });
-            Toast.fire({ icon: 'info', title: 'Bloque de horario eliminado' });
-            courseElement.remove(); // Explicitly remove the element from the DOM
-            await loadPlannerData(); // Reload to update the 'unassigned' list and hours
-        } catch (error) {
-            Toast.fire({ icon: 'error', title: `Error al eliminar: ${error.message}` });
-            // If deletion fails, reload the planner to restore the block to its original cell
-            await loadPlannerData();
-        }
-    }
-
-    // --- HELPER FUNCTIONS (UPDATED) ---
-    function getCellColorClasses(cell) {
-        return Array.from(cell.classList).filter(c => c.startsWith('bg-'));
-    }
-
-    function applyVisualSpan(cell, duration, colorClasses) {
-        if (!cell || duration < 2) return;
-        cell.setAttribute('rowspan', duration);
-        let currentRow = cell.parentElement;
-        for (let i = 1; i < duration; i++) {
-            currentRow = currentRow.nextElementSibling;
-            if (currentRow) {
-                const cellToModify = currentRow.querySelector(`[data-dia="${cell.dataset.dia}"]`);
-                if (cellToModify) {
-                    cellToModify.style.display = 'none';
-                    cellToModify.classList.add(...colorClasses); // Also color hidden cells
-                }
-            }
-        }
-    }
-
-    function revertVisualSpan(cell) {
-        if (!cell) return;
-        const duration = parseInt(cell.getAttribute('rowspan') || '1', 10);
-        const colorClasses = getCellColorClasses(cell);
-        cell.classList.remove(...colorClasses);
-        cell.setAttribute('rowspan', 1);
-
-        if (duration > 1) {
-            let currentRow = cell.parentElement;
-            for (let i = 1; i < duration; i++) {
-                currentRow = currentRow.nextElementSibling;
-                if (currentRow) {
-                    const cellToShow = currentRow.querySelector(`[data-dia="${cell.dataset.dia}"]`);
-                    if (cellToShow) {
-                        cellToShow.style.display = '';
-                        cellToShow.classList.remove(...colorClasses);
-                    }
-                }
-            }
-        }
-    }
-
-    // --- CONFLICTS & DURATION (UPDATED FOR DETAILED REASONS) ---
-    async function highlightConflicts(item) {
-        clearConflicts();
-        const cursoId = item.dataset.cursoId;
-        const data = await callApi(`/api/get-teacher-conflicts/?curso_id=${cursoId}`);
-        if (data.conflicts) {
-            data.conflicts.forEach(c => {
-                const cell = document.querySelector(`td[data-dia="${c.dia}"][data-franja-id="${c.franja_id}"]`);
-                if (cell) {
-                    cell.classList.add('conflict-cell');
-                    cell.setAttribute('title', c.razon); // Usar el atributo 'title' para tooltips nativos del navegador
-                }
-            });
-        }
-    }
-    function clearConflicts() {
-        document.querySelectorAll('.conflict-cell').forEach(c => {
-            c.classList.remove('conflict-cell');
-            c.removeAttribute('title');
-        });
-    }
-    async function handleDurationChange(bloqueId, action) {
-        try {
-            const payload = { bloque_id: bloqueId, accion: action };
-            const data = await callApi('/api/ajustar-duracion/', 'POST', payload);
-            Toast.fire({ icon: 'success', title: data.message });
-            await loadPlannerData();
-        } catch (error) {
-            Toast.fire({ icon: 'error', title: `Error: ${error.message}` });
-        }
-    }
-
-    // --- EVENT HANDLERS & INITIALIZATION (no changes) ---
-    async function loadPlannerData() {
-        const especialidadId = DOMElements.especialidad.value;
-        const semestreNum = DOMElements.semestre.value;
-        if (!especialidadId || !semestreNum) {
-            DOMElements.plannerBody.classList.add('hidden');
-            DOMElements.placeholder.classList.remove('hidden');
-            return;
-        }
-        DOMElements.plannerBody.classList.remove('hidden');
-        DOMElements.placeholder.classList.add('hidden');
-        const skeletonRow = `<tr><td colspan="${diasSemana.length + 1}"><div class="skeleton-loader h-48 w-full"></div></td></tr>`;
-        DOMElements.gridManana.innerHTML = skeletonRow;
-        DOMElements.gridTarde.innerHTML = skeletonRow;
-        DOMElements.unassignedContainer.innerHTML = '<div class="skeleton-loader h-16 w-full"></div>';
-        try {
-            const response = await callApi(`/api/get-cursos-no-asignados/?especialidad_id=${especialidadId}&semestre_cursado=${semestreNum}`);
-            if (response.status === 'success') {
-                renderPlanner(response.data);
-            } else { throw new Error(response.message || 'El servidor devolvió una respuesta inesperada.'); }
-        } catch (error) {
-            Swal.fire({ icon: 'error', title: 'Error al cargar datos', text: error.message });
-        }
-    }
-    async function handleAutoAssign() {
-        const especialidadId = DOMElements.especialidad.value;
-        const semestreNum = DOMElements.semestre.value;
-        if (!especialidadId || !semestreNum) return Toast.fire({ icon: 'warning', title: 'Selecciona especialidad y semestre primero.' });
-        DOMElements.autoAssignBtn.classList.add('btn-disabled', 'loading');
-        log('Iniciando proceso de asignación automática...');
-        try {
-            const data = await callApi('/api/auto-asignar/', 'POST', { especialidad_id: especialidadId, semestre_cursado: semestreNum });
-            log(data.message);
-            log('Actualizando la interfaz...');
-            renderPlanner(data.plannerData);
-            Toast.fire({ icon: 'success', title: 'Proceso completado!' });
-        } catch (error) {
-            log(`ERROR: ${error.message}`);
-            Swal.fire({ icon: 'error', title: 'Error en Auto-Asignación', text: error.message });
-        } finally {
-            DOMElements.autoAssignBtn.classList.remove('btn-disabled', 'loading');
-        }
-    }
-    async function handleGlobalAutoAssign() {
-        Swal.fire({
-            title: '¿Generar Horario Global?',
-            text: "¡Atención! Esta acción borrará y regenerará TODOS los horarios para el semestre activo. Este proceso puede tardar unos minutos y no se puede deshacer.",
-            icon: 'warning', showCancelButton: true, confirmButtonText: 'Sí, ¡generar ahora!', cancelButtonText: 'Cancelar', reverseButtons: true
-        }).then(async (result) => {
-            if (result.isConfirmed) {
-                const btn = DOMElements.globalAutoAssignBtn;
-                btn.classList.add('loading', 'btn-disabled');
-                Swal.fire({ title: 'Procesando...', text: 'Generando horarios. Por favor, espera.', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-                try {
-                    const data = await callApi('/api/generar-horario-automatico/', 'POST');
-                    Swal.close();
-                    Swal.fire({ title: '¡Proceso Finalizado!', text: data.message, icon: 'success' });
-                    loadPlannerData();
-                } catch (error) {
-                    Swal.fire({ title: 'Error', text: `Ocurrió un error: ${error.message}`, icon: 'error' });
-                } finally {
-                    btn.classList.remove('loading', 'btn-disabled');
-                }
-            }
-        });
-    }
-    DOMElements.especialidad.addEventListener('change', loadPlannerData);
-    DOMElements.semestre.addEventListener('change', loadPlannerData);
-    DOMElements.autoAssignBtn.addEventListener('click', handleAutoAssign);
-    DOMElements.globalAutoAssignBtn.addEventListener('click', handleGlobalAutoAssign);
-    DOMElements.searchInput.addEventListener('input', (e) => {
-        const searchTerm = e.target.value.toLowerCase();
-        document.querySelectorAll('#unassigned-courses-container > .collapse .p-2.rounded-lg').forEach(card => {
-            card.style.display = card.textContent.toLowerCase().includes(searchTerm) ? '' : 'none';
-        });
-    });
-    // Logic for Sidebar Tabs (Manual/Auto)
-    const sidebarTabs = document.querySelectorAll(selectors.sidebarTabs);
-    sidebarTabs.forEach(tab => {
-        tab.addEventListener('click', (e) => {
-            e.preventDefault();
-            sidebarTabs.forEach(t => t.classList.remove('tab-active'));
-            tab.classList.add('tab-active');
-
-            // This logic correctly toggles the sidebar content
-            document.querySelectorAll('#tab-manual, #tab-auto').forEach(c => c.classList.remove('active'));
-            document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
-        });
-    });
-
-    // New logic for Schedule Tabs (Mañana/Tarde)
-    DOMElements.scheduleTabsContainer.addEventListener('click', (e) => {
-        if (e.target.matches('.tab')) {
-            e.preventDefault();
-
-            DOMElements.scheduleTabsContainer.querySelectorAll('.tab').forEach(tab => tab.classList.remove('tab-active'));
-            e.target.classList.add('tab-active');
-
-            document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
-            const targetPane = document.querySelector(e.target.dataset.tabTarget);
-            if (targetPane) {
-                targetPane.classList.add('active');
-            }
-        }
-    });
-    if (DOMElements.especialidad.value && DOMElements.semestre.value) {
-        loadPlannerData();
-    }
-});
 </script>
-
+<script src="{% static 'js/planificador.js' %}"></script>
 {% endblock %}
