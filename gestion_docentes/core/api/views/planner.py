@@ -443,6 +443,9 @@ def api_auto_asignar(request):
         carga_docente = defaultdict(lambda: defaultdict(int)) # {docente_id: {dia: horas}}
         carga_grupo = defaultdict(lambda: defaultdict(int))   # {(grupo_id, semestre): {dia: horas}}
 
+        # Estructura para tracking de indices ocupados por docente (para compactacion)
+        docente_occupied_indices = defaultdict(lambda: defaultdict(set)) # {docente_id: {dia: {indices}}}
+
         todos_los_bloques = BloqueHorario.objects.filter(
             curso__semestre=semestre_activo
         ).select_related("curso__docente").prefetch_related("curso__especialidades__grupo")
@@ -453,6 +456,9 @@ def api_auto_asignar(request):
                 # Tracking de carga horaria
                 if bloque.curso.docente:
                      carga_docente[bloque.curso.docente.id][bloque.dia] += bloque.duracion_bloques
+                     # Tracking de indices ocupados para compactacion
+                     for i in range(bloque.duracion_bloques):
+                         docente_occupied_indices[bloque.curso.docente.id][bloque.dia].add(franja_idx + i)
 
                 # Iterar sobre especialidades para tracking de grupo
                 for especialidad in bloque.curso.especialidades.all():
@@ -491,6 +497,7 @@ def api_auto_asignar(request):
                         horarios_ocupados["docente"].add(
                             (bloque.docente.id, bloque.dia, franja_ocupada.id)
                         )
+                        docente_occupied_indices[bloque.docente.id][bloque.dia].add(franja_idx + i)
              except ValueError:
                 continue
 
@@ -541,7 +548,33 @@ def api_auto_asignar(request):
                     if grupo_excede_limite:
                         continue
 
-                    for i in range(len(franjas_horarias) - duracion_a_intentar + 1):
+                    # Compactación: Ordenar indices 'i' posibles basados en cercanía a bloques existentes
+                    posibles_indices = list(range(len(franjas_horarias) - duracion_a_intentar + 1))
+
+                    if docente and docente_occupied_indices[docente.id][dia]:
+                        occupied = docente_occupied_indices[docente.id][dia]
+
+                        def calculate_gap_score(start_index):
+                            # Indices que ocuparía el nuevo bloque
+                            new_indices = set(range(start_index, start_index + duracion_a_intentar))
+
+                            # Calcular distancia mínima a cualquier bloque ocupado
+                            min_dist = float('inf')
+                            for occ in occupied:
+                                for new in new_indices:
+                                    dist = abs(occ - new)
+                                    if dist < min_dist:
+                                        min_dist = dist
+
+                            # Score 0 si es adyacente (distancia 1). Score alto si está lejos.
+                            # min_dist = 1 means adjacent (e.g. 2 and 3). Gap = 0.
+                            if min_dist == 1:
+                                return 0 # Perfecto, pegado
+                            return min_dist # Cuanto más lejos, peor score
+
+                        posibles_indices.sort(key=calculate_gap_score)
+
+                    for i in posibles_indices:
                         franja_inicio = franjas_horarias[i]
                         franjas_del_bloque = franjas_horarias[
                             i : i + duracion_a_intentar
@@ -590,6 +623,10 @@ def api_auto_asignar(request):
                         # Actualizar tracking de carga
                         if docente:
                              carga_docente[docente.id][dia] += duracion_a_intentar
+                             # Actualizar indices ocupados para compactacion
+                             for idx_offset in range(duracion_a_intentar):
+                                 docente_occupied_indices[docente.id][dia].add(i + idx_offset)
+
                         if semestre_cursado:
                             for grupo in grupos:
                                 key_grupo = (grupo.id, semestre_cursado)
