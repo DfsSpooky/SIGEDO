@@ -6,13 +6,13 @@ from .notifications import (
     notificaciones_json,
 )
 from .planner import (
-    api_ajustar_duracion,
-    api_asignar_horario,
-    api_auto_asignar,
-    api_desasignar_horario,
+    AjustarDuracionView,
+    AsignarHorarioView,
+    AutoAsignarView,
+    DesasignarHorarioView,
+    MoverBloqueView,
     api_get_cursos_no_asignados,
     api_get_teacher_conflicts,
-    api_mover_bloque,
     generar_horario_automatico,
 )
 from .schedules import export_schedule_ics
