@@ -508,7 +508,14 @@ def api_auto_asignar(request):
                     grupos.append(especialidad.grupo)
 
             semestre_cursado = curso.semestre_cursado
-            random.shuffle(dias_semana)
+            # Sort days based on teacher load (ascending) to balance workload
+            if docente:
+                dias_semana_ordenados = sorted(
+                    dias_semana, key=lambda d: carga_docente[docente.id][d]
+                )
+            else:
+                dias_semana_ordenados = list(dias_semana)
+                random.shuffle(dias_semana_ordenados)
 
             while horas_pendientes > 0:
                 bloque_asignado_en_iteracion = False
@@ -518,7 +525,7 @@ def api_auto_asignar(request):
                 if not duracion_a_intentar:
                     break
 
-                for dia in dias_semana:
+                for dia in dias_semana_ordenados:
                     # Validar límites diarios antes de intentar buscar hueco
                     if docente and carga_docente[docente.id][dia] + duracion_a_intentar > 8:
                         continue
@@ -686,9 +693,17 @@ def generar_horario_automatico(request):
             # Estrategia de división de bloques: intentar con bloques más grandes primero
             posibles_duraciones = [3, 2, 1]
 
-            random.shuffle(
-                dias_semana
-            )  # Aleatorizar el día de inicio para variar los horarios
+            # Estrategia de Balanceo de Carga:
+            # Ordenar los días según la carga actual del docente (menos carga primero)
+            # para intentar distribuir las horas equitativamente.
+            if docente:
+                dias_semana_ordenados = sorted(
+                    dias_semana, key=lambda d: carga_docente[docente.id][d]
+                )
+            else:
+                # Si no hay docente (raro pero posible), aleatorizar para evitar sesgos
+                dias_semana_ordenados = list(dias_semana)
+                random.shuffle(dias_semana_ordenados)
 
             while horas_pendientes > 0:
                 bloque_asignado_en_iteracion = False
@@ -700,7 +715,7 @@ def generar_horario_automatico(request):
                 if not duracion_a_intentar:
                     break  # No se pueden asignar las horas restantes con las duraciones posibles
 
-                for dia in dias_semana:
+                for dia in dias_semana_ordenados:
                     # Validar límites diarios antes de intentar buscar hueco
                     if docente and carga_docente[docente.id][dia] + duracion_a_intentar > 8:
                         continue
