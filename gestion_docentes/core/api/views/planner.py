@@ -349,6 +349,9 @@ def _get_planner_data(especialidad_id, semestre_cursado):
                     "tipo_curso": curso.tipo_curso,
                     "semestre_cursado": curso.semestre_cursado,
                     "excepcion_horario": curso.excepcion_horario,
+                    "especialidades_nombres": [
+                        e.nombre for e in curso.especialidades.all()
+                    ],
                 }
                 if curso.tipo_curso == "GENERAL":
                     cursos_pendientes_generales.append(curso_data)
@@ -373,6 +376,9 @@ def _get_planner_data(especialidad_id, semestre_cursado):
                         "tipo_curso": curso.tipo_curso,
                         "semestre_cursado": curso.semestre_cursado,
                         "excepcion_horario": curso.excepcion_horario,
+                        "especialidades_nombres": [
+                            e.nombre for e in curso.especialidades.all()
+                        ],
                     }
                 )
 
