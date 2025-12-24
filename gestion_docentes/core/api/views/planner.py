@@ -8,7 +8,7 @@ from django.db import models
 from django.db.models import Q
 from django.views.decorators.csrf import csrf_exempt
 
-from core.models import BloqueHorario, Curso, Especialidad, FranjaHoraria, Semestre
+from core.models import Aula, BloqueHorario, Curso, Especialidad, FranjaHoraria, Semestre
 from core.utils.responses import (
     error_response,
     not_found_response,
@@ -28,12 +28,21 @@ def api_asignar_horario(request):
         curso_id = data.get("curso_id")
         franja_id = data.get("franja_id")
         dia = data.get("dia")
+        aula_id = data.get("aula_id")  # Optional
+
         # La duración del bloque ahora debe ser enviada desde el frontend.
         # Asumimos un valor por defecto si no se envía, para compatibilidad temporal.
         duracion = data.get("duracion", 2)
 
         curso = Curso.objects.get(pk=curso_id)
         franja_inicio = FranjaHoraria.objects.get(pk=franja_id)
+
+        aula = None
+        if aula_id:
+            try:
+                aula = Aula.objects.get(pk=aula_id)
+            except Aula.DoesNotExist:
+                return error_response(f"El aula con ID {aula_id} no existe.")
 
         # Validar que no se excedan las horas semanales del curso
         horas_asignadas = (
@@ -49,7 +58,7 @@ def api_asignar_horario(request):
 
         # Validación de conflictos usando el método clean() del modelo
         bloque = BloqueHorario(
-            curso=curso, dia=dia, franja_inicio=franja_inicio, duracion_bloques=duracion
+            curso=curso, dia=dia, franja_inicio=franja_inicio, duracion_bloques=duracion, aula=aula
         )
         try:
             bloque.full_clean()
