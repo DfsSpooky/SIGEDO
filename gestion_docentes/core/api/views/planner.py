@@ -3,11 +3,20 @@ import random
 from collections import defaultdict
 
 from django.contrib.admin.views.decorators import staff_member_required
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
 from django.views.decorators.csrf import csrf_exempt
 
-from core.models import BloqueHorario, Curso, Especialidad, FranjaHoraria, Semestre
+from core.models import (
+    Aula,
+    BloqueHorario,
+    BloqueNoLectivo,
+    Curso,
+    Especialidad,
+    FranjaHoraria,
+    Semestre,
+)
 from core.utils.responses import (
     error_response,
     not_found_response,
@@ -27,12 +36,21 @@ def api_asignar_horario(request):
         curso_id = data.get("curso_id")
         franja_id = data.get("franja_id")
         dia = data.get("dia")
+        aula_id = data.get("aula_id")  # Optional
+
         # La duración del bloque ahora debe ser enviada desde el frontend.
         # Asumimos un valor por defecto si no se envía, para compatibilidad temporal.
         duracion = data.get("duracion", 2)
 
         curso = Curso.objects.get(pk=curso_id)
         franja_inicio = FranjaHoraria.objects.get(pk=franja_id)
+
+        aula = None
+        if aula_id:
+            try:
+                aula = Aula.objects.get(pk=aula_id)
+            except Aula.DoesNotExist:
+                return error_response(f"El aula con ID {aula_id} no existe.")
 
         # Validar que no se excedan las horas semanales del curso
         horas_asignadas = (
@@ -46,12 +64,18 @@ def api_asignar_horario(request):
                 f"No se puede asignar: excede las horas semanales del curso ({curso.horas_academicas_semanales})."
             )
 
-        # Aquí iría una validación de conflictos más robusta similar a la del generador automático
-        # Por simplicidad, la omitimos en la asignación manual, pero en un sistema real sería necesaria.
-
-        BloqueHorario.objects.create(
-            curso=curso, dia=dia, franja_inicio=franja_inicio, duracion_bloques=duracion
+        # Validación de conflictos usando el método clean() del modelo
+        bloque = BloqueHorario(
+            curso=curso, dia=dia, franja_inicio=franja_inicio, duracion_bloques=duracion, aula=aula
         )
+        try:
+            bloque.full_clean()
+        except ValidationError as e:
+            # Extraer el mensaje de error de la excepción
+            error_message = next(iter(e.message_dict.values()))[0] if hasattr(e, 'message_dict') else str(e)
+            return error_response(f"Conflicto de horario: {error_message}")
+
+        bloque.save()
         return success_response(message="Bloque asignado con éxito.")
 
     except Curso.DoesNotExist:
@@ -101,11 +125,15 @@ def api_mover_bloque(request):
         ).get(pk=bloque_id)
         nueva_franja_inicio = FranjaHoraria.objects.get(pk=nueva_franja_id)
 
-        # Aquí debería ir una validación de conflictos completa, similar a la de generar_horario_automatico
-        # Por ahora, se omite por brevedad, pero en un sistema real sería crucial.
-
         bloque.dia = nuevo_dia
         bloque.franja_inicio = nueva_franja_inicio
+
+        try:
+            bloque.full_clean()
+        except ValidationError as e:
+            error_message = next(iter(e.message_dict.values()))[0] if hasattr(e, 'message_dict') else str(e)
+            return error_response(f"No se puede mover: {error_message}")
+
         bloque.save()
 
         return success_response(message="Bloque movido con éxito.")
@@ -156,9 +184,14 @@ def api_ajustar_duracion(request):
                 "La duración excede las horas semanales del curso.", status_code=400
             )
 
-        # Aquí también se necesitaría una validación de conflictos para la nueva duración
-
         bloque.duracion_bloques = nueva_duracion
+
+        try:
+            bloque.full_clean()
+        except ValidationError as e:
+            error_message = next(iter(e.message_dict.values()))[0] if hasattr(e, 'message_dict') else str(e)
+            return error_response(f"No se puede ajustar duración: {error_message}")
+
         bloque.save()
 
         return success_response(message="Duración del bloque actualizada.")
@@ -393,16 +426,28 @@ def api_auto_asignar(request):
                 message="Todos los cursos para esta selección ya están completamente asignados.",
             )
 
-        # 2. Construir el mapa de horarios ocupados de TODO el semestre
+        # 2. Construir el mapa de horarios ocupados y cargas horarias
         franjas_horarias = list(FranjaHoraria.objects.order_by("hora_inicio"))
         horarios_ocupados = defaultdict(set)
+
+        # Estructuras para tracking de carga horaria
+        carga_docente = defaultdict(lambda: defaultdict(int)) # {docente_id: {dia: horas}}
+        carga_grupo = defaultdict(lambda: defaultdict(int))   # {(grupo_id, semestre): {dia: horas}}
 
         todos_los_bloques = BloqueHorario.objects.filter(
             curso__semestre=semestre_activo
         ).select_related("curso__docente", "curso__especialidad__grupo")
+
         for bloque in todos_los_bloques:
             try:
                 franja_idx = franjas_horarias.index(bloque.franja_inicio)
+                # Tracking de carga horaria
+                if bloque.curso.docente:
+                     carga_docente[bloque.curso.docente.id][bloque.dia] += bloque.duracion_bloques
+                if bloque.curso.especialidad and bloque.curso.especialidad.grupo:
+                    key_grupo = (bloque.curso.especialidad.grupo.id, bloque.curso.semestre_cursado)
+                    carga_grupo[key_grupo][bloque.dia] += bloque.duracion_bloques
+
                 for i in range(bloque.duracion_bloques):
                     franja_ocupada = franjas_horarias[franja_idx + i]
                     if bloque.curso.docente:
@@ -419,7 +464,21 @@ def api_auto_asignar(request):
                             )
                         )
             except ValueError:
-                continue  # La franja de inicio del bloque no está en la lista (caso raro)
+                continue
+
+        # Cargar Bloques No Lectivos
+        bloques_no_lectivos = BloqueNoLectivo.objects.select_related("docente")
+        for bloque in bloques_no_lectivos:
+             try:
+                franja_idx = franjas_horarias.index(bloque.franja_inicio)
+                for i in range(bloque.duracion_bloques):
+                    if franja_idx + i < len(franjas_horarias):
+                        franja_ocupada = franjas_horarias[franja_idx + i]
+                        horarios_ocupados["docente"].add(
+                            (bloque.docente.id, bloque.dia, franja_ocupada.id)
+                        )
+             except ValueError:
+                continue
 
         # 3. Lógica de asignación (similar a la global, pero no destructiva)
         cursos_asignados_ahora = 0
@@ -446,6 +505,14 @@ def api_auto_asignar(request):
                     break
 
                 for dia in dias_semana:
+                    # Validar límites diarios antes de intentar buscar hueco
+                    if docente and carga_docente[docente.id][dia] + duracion_a_intentar > 8:
+                        continue
+                    if grupo and semestre_cursado:
+                        key_grupo = (grupo.id, semestre_cursado)
+                        if carga_grupo[key_grupo][dia] + duracion_a_intentar > 6:
+                            continue
+
                     for i in range(len(franjas_horarias) - duracion_a_intentar + 1):
                         franja_inicio = franjas_horarias[i]
                         franjas_del_bloque = franjas_horarias[
@@ -485,6 +552,14 @@ def api_auto_asignar(request):
                             franja_inicio=franja_inicio,
                             duracion_bloques=duracion_a_intentar,
                         )
+
+                        # Actualizar tracking de carga
+                        if docente:
+                             carga_docente[docente.id][dia] += duracion_a_intentar
+                        if grupo and semestre_cursado:
+                            key_grupo = (grupo.id, semestre_cursado)
+                            carga_grupo[key_grupo][dia] += duracion_a_intentar
+
                         for franja in franjas_del_bloque:
                             horarios_ocupados["docente"].add(
                                 (docente.id, dia, franja.id)
@@ -543,6 +618,24 @@ def generar_horario_automatico(request):
         # Estructura para mantener los horarios ocupados y evitar consultas a la BD en el bucle
         horarios_ocupados = defaultdict(set)  # (tipo, id, dia, franja_id) -> True
 
+        # Estructuras para tracking de carga horaria
+        carga_docente = defaultdict(lambda: defaultdict(int)) # {docente_id: {dia: horas}}
+        carga_grupo = defaultdict(lambda: defaultdict(int))   # {(grupo_id, semestre): {dia: horas}}
+
+        # Pre-cargar Bloques No Lectivos en horarios_ocupados
+        bloques_no_lectivos = BloqueNoLectivo.objects.select_related("docente")
+        for bloque in bloques_no_lectivos:
+             try:
+                franja_idx = franjas_horarias.index(bloque.franja_inicio)
+                for i in range(bloque.duracion_bloques):
+                    if franja_idx + i < len(franjas_horarias):
+                        franja_ocupada = franjas_horarias[franja_idx + i]
+                        horarios_ocupados["docente"].add(
+                            (bloque.docente.id, bloque.dia, franja_ocupada.id)
+                        )
+             except ValueError:
+                continue
+
         cursos_completados = 0
         cursos_no_asignados_completamente = []
 
@@ -575,6 +668,14 @@ def generar_horario_automatico(request):
                     break  # No se pueden asignar las horas restantes con las duraciones posibles
 
                 for dia in dias_semana:
+                    # Validar límites diarios antes de intentar buscar hueco
+                    if docente and carga_docente[docente.id][dia] + duracion_a_intentar > 8:
+                        continue
+                    if grupo and semestre_cursado:
+                        key_grupo = (grupo.id, semestre_cursado)
+                        if carga_grupo[key_grupo][dia] + duracion_a_intentar > 6:
+                            continue
+
                     for i in range(len(franjas_horarias) - duracion_a_intentar + 1):
                         franja_inicio = franjas_horarias[i]
                         franjas_del_bloque = franjas_horarias[
@@ -623,6 +724,13 @@ def generar_horario_automatico(request):
                             franja_inicio=franja_inicio,
                             duracion_bloques=duracion_a_intentar,
                         )
+
+                        # Actualizar tracking de carga
+                        if docente:
+                             carga_docente[docente.id][dia] += duracion_a_intentar
+                        if grupo and semestre_cursado:
+                            key_grupo = (grupo.id, semestre_cursado)
+                            carga_grupo[key_grupo][dia] += duracion_a_intentar
 
                         # Marcar las franjas como ocupadas
                         for franja in franjas_del_bloque:

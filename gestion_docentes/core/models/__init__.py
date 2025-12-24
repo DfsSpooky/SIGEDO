@@ -3,6 +3,13 @@ from .attendance import Asistencia, AsistenciaDiaria, Justificacion, TipoJustifi
 from .communication import Anuncio, Notificacion
 from .documents import Documento, TipoDocumento, VersionDocumento
 from .inventory import Activo, Reserva, TipoActivo
-from .scheduling import BloqueHorario, DiaEspecial, FranjaHoraria, SolicitudIntercambio
+from .scheduling import (
+    Aula,
+    BloqueHorario,
+    BloqueNoLectivo,
+    DiaEspecial,
+    FranjaHoraria,
+    SolicitudIntercambio,
+)
 from .settings import ConfiguracionInstitucion
 from .users import Administrador, Docente, PersonalDocente
