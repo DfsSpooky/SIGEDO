@@ -21,18 +21,18 @@ urlpatterns = [
         name="asistencia_rfid",
     ),
     # --- URLs para el Planificador de Horarios ---
-    path("asignar-horario/", views.api_asignar_horario, name="asignar_horario"),
+    path("asignar-horario/", views.AsignarHorarioView.as_view(), name="asignar_horario"),
     path(
-        "desasignar-horario/", views.api_desasignar_horario, name="desasignar_horario"
+        "desasignar-horario/", views.DesasignarHorarioView.as_view(), name="desasignar_horario"
     ),
     path(
         "get-teacher-conflicts/",
         views.api_get_teacher_conflicts,
         name="get_teacher_conflicts",
     ),
-    path("mover-bloque/", views.api_mover_bloque, name="mover_bloque"),
-    path("ajustar-duracion/", views.api_ajustar_duracion, name="ajustar_duracion"),
-    path("auto-asignar/", views.api_auto_asignar, name="auto_asignar"),
+    path("mover-bloque/", views.MoverBloqueView.as_view(), name="mover_bloque"),
+    path("ajustar-duracion/", views.AjustarDuracionView.as_view(), name="ajustar_duracion"),
+    path("auto-asignar/", views.AutoAsignarView.as_view(), name="auto_asignar"),
     path(
         "generar-horario-automatico/",
         views.generar_horario_automatico,
