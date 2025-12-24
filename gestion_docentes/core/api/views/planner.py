@@ -7,7 +7,14 @@ from django.db import models
 from django.db.models import Q
 from django.views.decorators.csrf import csrf_exempt
 
-from core.models import BloqueHorario, Curso, Especialidad, FranjaHoraria, Semestre
+from core.models import (
+    BloqueHorario,
+    BloqueNoLectivo,
+    Curso,
+    Especialidad,
+    FranjaHoraria,
+    Semestre,
+)
 from core.utils.responses import (
     error_response,
     not_found_response,
@@ -197,7 +204,7 @@ def api_get_teacher_conflicts(request):
             "curso__docente", "curso__especialidad__grupo", "curso__especialidad"
         )
 
-        # 1. Conflictos del propio docente
+        # 1. Conflictos del propio docente (Clases + Gestión)
         if docente:
             bloques_docente = bloques_asignados.filter(curso__docente=docente).exclude(
                 curso=curso_a_asignar
@@ -209,6 +216,22 @@ def api_get_teacher_conflicts(request):
                     key = (bloque.dia, franja_actual.id)
                     if key not in conflictos:
                         conflictos[key] = f"Docente Ocupado: {bloque.curso.nombre}"
+
+            # Conflictos de Gestión (No Lectivos)
+            bloques_gestion = BloqueNoLectivo.objects.filter(
+                docente=docente, semestre=semestre
+            )
+            for bloque in bloques_gestion:
+                try:
+                    franja_idx = todas_las_franjas.index(bloque.franja_inicio)
+                    for i in range(bloque.duracion_bloques):
+                        if franja_idx + i < len(todas_las_franjas):
+                            franja_actual = todas_las_franjas[franja_idx + i]
+                            key = (bloque.dia, franja_actual.id)
+                            if key not in conflictos:
+                                conflictos[key] = f"Ocupado en Gestión: {bloque.motivo}"
+                except ValueError:
+                    pass
 
         # 2. Conflictos del grupo de estudiantes
         if grupo_del_curso and semestre_cursado_a_asignar:
@@ -397,6 +420,7 @@ def api_auto_asignar(request):
         franjas_horarias = list(FranjaHoraria.objects.order_by("hora_inicio"))
         horarios_ocupados = defaultdict(set)
 
+        # Cargar Bloques de Horario (Clases)
         todos_los_bloques = BloqueHorario.objects.filter(
             curso__semestre=semestre_activo
         ).select_related("curso__docente", "curso__especialidad__grupo")
@@ -419,7 +443,24 @@ def api_auto_asignar(request):
                             )
                         )
             except ValueError:
-                continue  # La franja de inicio del bloque no está en la lista (caso raro)
+                continue
+
+        # Cargar Bloques de Gestión (No Lectivos)
+        todos_los_bloques_gestion = BloqueNoLectivo.objects.filter(
+            semestre=semestre_activo
+        )
+        for bloque in todos_los_bloques_gestion:
+            try:
+                franja_idx = franjas_horarias.index(bloque.franja_inicio)
+                for i in range(bloque.duracion_bloques):
+                    if franja_idx + i < len(franjas_horarias):
+                        franja_ocupada = franjas_horarias[franja_idx + i]
+                        if bloque.docente:
+                            horarios_ocupados["docente"].add(
+                                (bloque.docente.id, bloque.dia, franja_ocupada.id)
+                            )
+            except ValueError:
+                continue
 
         # 3. Lógica de asignación (similar a la global, pero no destructiva)
         cursos_asignados_ahora = 0
@@ -542,6 +583,22 @@ def generar_horario_automatico(request):
 
         # Estructura para mantener los horarios ocupados y evitar consultas a la BD en el bucle
         horarios_ocupados = defaultdict(set)  # (tipo, id, dia, franja_id) -> True
+
+        # Pre-cargar Bloques de Gestión (No Lectivos) - Estos son inamovibles y deben respetarse
+        bloques_gestion_existentes = BloqueNoLectivo.objects.filter(
+            semestre=semestre_activo
+        )
+        for bloque in bloques_gestion_existentes:
+            try:
+                franja_idx = franjas_horarias.index(bloque.franja_inicio)
+                for i in range(bloque.duracion_bloques):
+                    if franja_idx + i < len(franjas_horarias):
+                        franja_ocupada = franjas_horarias[franja_idx + i]
+                        horarios_ocupados["docente"].add(
+                            (bloque.docente.id, bloque.dia, franja_ocupada.id)
+                        )
+            except ValueError:
+                pass  # Ignorar si la franja no coincide con las actuales
 
         cursos_completados = 0
         cursos_no_asignados_completamente = []

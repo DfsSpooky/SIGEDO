@@ -257,7 +257,7 @@ class SemestreAdmin(ModelAdmin):
         return format_html(f'<a href="{change_url}" class="button">Editar</a>')
 
 
-from .models import BloqueHorario
+from .models import BloqueHorario, BloqueNoLectivo
 
 
 @admin.register(Curso)
@@ -724,3 +724,29 @@ class SolicitudIntercambioAdmin(ModelAdmin):
 admin.site.register(Grupo)
 admin.site.register(AsistenciaDiaria)
 admin.site.register(BloqueHorario)
+
+
+@admin.register(BloqueNoLectivo)
+class BloqueNoLectivoAdmin(ModelAdmin):
+    list_display = (
+        "docente",
+        "motivo",
+        "dia",
+        "horario_inicio",
+        "horario_fin",
+        "semestre",
+        "acciones",
+    )
+    list_display_links = None
+    list_filter = ("semestre", "docente", "dia")
+    search_fields = ("docente__username", "docente__first_name", "motivo")
+    search_as_command = True
+    autocomplete_fields = ["docente", "semestre"]
+    ordering = ("dia_semana", "horario_inicio")
+
+    @admin.display(description="Acciones")
+    def acciones(self, obj):
+        change_url = reverse(
+            f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change", args=[obj.pk]
+        )
+        return format_html(f'<a href="{change_url}" class="button">Editar</a>')
