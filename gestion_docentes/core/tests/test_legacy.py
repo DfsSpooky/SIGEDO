@@ -948,10 +948,10 @@ class HorarioFlexibleTest(TestCase):
             docente=self.docente,
             semestre=self.semestre,
             carrera=self.carrera,
-            especialidad=self.especialidad,
             semestre_cursado=1,
             horas_academicas_semanales=6,
         )
+        curso.especialidades.add(self.especialidad)
 
         self.assertEqual(BloqueHorario.objects.count(), 0)
 
@@ -982,10 +982,10 @@ class HorarioFlexibleTest(TestCase):
             docente=self.docente,
             semestre=self.semestre,
             carrera=self.carrera,
-            especialidad=self.especialidad,
             semestre_cursado=1,
             horas_academicas_semanales=4,
         )
+        curso.especialidades.add(self.especialidad)
         franja_inicio = FranjaHoraria.objects.filter(turno="MANANA").first()
 
         # 1. Asignar un bloque de 2 horas
@@ -1105,10 +1105,10 @@ class HorarioFlexibleTest(TestCase):
             docente=self.docente,
             semestre=self.semestre,
             carrera=self.carrera,
-            especialidad=self.especialidad,
             semestre_cursado=1,
             horas_academicas_semanales=2,  # Solo 2 horas permitidas
         )
+        curso.especialidades.add(self.especialidad)
         franja_inicio = FranjaHoraria.objects.filter(turno="MANANA").first()
 
         # Intentar asignar un bloque de 3 horas (más de las 2 permitidas)

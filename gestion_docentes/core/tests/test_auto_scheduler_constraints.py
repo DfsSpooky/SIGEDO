@@ -43,11 +43,11 @@ class AutoSchedulerConstraintsTests(TestCase):
             nombre="Curso Pesado",
             docente=self.docente,
             carrera=self.carrera,
-            especialidad=self.especialidad,
             semestre=self.semestre,
             semestre_cursado=1,
             horas_academicas_semanales=10
         )
+        self.curso_pesado.especialidades.add(self.especialidad)
 
         self.factory = RequestFactory()
 

@@ -266,7 +266,7 @@ class CursoAdmin(ModelAdmin):
         "nombre",
         "tipo_curso",
         "docente",
-        "especialidad",
+        "get_especialidades_prettified",
         "semestre",
         "semestre_cursado",
         "acciones",
@@ -275,14 +275,15 @@ class CursoAdmin(ModelAdmin):
     list_filter = (
         "semestre",
         "tipo_curso",
-        "especialidad",
+        "especialidades",
         "semestre_cursado",
         "carrera",
     )
     search_fields = ("nombre", "docente__first_name", "docente__last_name")
     search_as_command = True
     ordering = ("semestre", "semestre_cursado", "nombre")
-    autocomplete_fields = ["docente", "carrera", "especialidad", "semestre"]
+    autocomplete_fields = ["docente", "carrera", "semestre"]
+    filter_horizontal = ("especialidades",)
     fieldsets = (
         (
             "Información General",
@@ -294,7 +295,7 @@ class CursoAdmin(ModelAdmin):
                 "fields": (
                     "docente",
                     "carrera",
-                    "especialidad",
+                    "especialidades",
                     "semestre",
                     "semestre_cursado",
                     "excepcion_horario",
@@ -303,6 +304,14 @@ class CursoAdmin(ModelAdmin):
             },
         ),
     )
+
+    @admin.display(description="Especialidades")
+    def get_especialidades_prettified(self, obj):
+        html = [
+            f'<span class="badge badge-sm badge-outline">{e.nombre}</span>'
+            for e in obj.especialidades.all()
+        ]
+        return format_html(" ".join(html))
 
     @admin.display(description="Acciones")
     def acciones(self, obj):

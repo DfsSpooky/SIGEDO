@@ -555,7 +555,7 @@ def exportar_ficha_docente_pdf(docente, semestre_activo):
         cursos_data = [
             [
                 Paragraph(
-                    f"<b>{c.nombre}</b> ({c.especialidad.nombre if c.especialidad else 'N/A'})",
+                    f"<b>{c.nombre}</b> ({', '.join([e.nombre for e in c.especialidades.all()])})",
                     styles["FichaBody"],
                 )
             ]

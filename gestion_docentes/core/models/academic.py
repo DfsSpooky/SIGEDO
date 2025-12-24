@@ -83,8 +83,8 @@ class Curso(models.Model):
         related_name="cursos",
     )
     carrera = models.ForeignKey(Carrera, on_delete=models.CASCADE)
-    especialidad = models.ForeignKey(
-        Especialidad, on_delete=models.SET_NULL, null=True, related_name="cursos"
+    especialidades = models.ManyToManyField(
+        Especialidad, related_name="cursos", blank=True
     )
     semestre = models.ForeignKey(
         Semestre, on_delete=models.SET_NULL, null=True, related_name="cursos"
@@ -114,7 +114,8 @@ class Curso(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.nombre} ({self.especialidad.nombre if self.especialidad else 'N/A'})"
+        esp_nombres = ", ".join([e.nombre for e in self.especialidades.all()])
+        return f"{self.nombre} ({esp_nombres if esp_nombres else 'N/A'})"
 
     def save(self, *args, **kwargs):
         # La lógica de 'dia_semana' se ha movido a BloqueHorario

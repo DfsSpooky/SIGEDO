@@ -501,13 +501,23 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
 
+            // Logic to display shared specialties
+            let sharedBadge = '';
+            if (curso.especialidades_nombres && curso.especialidades_nombres.length > 1) {
+                const titleText = curso.especialidades_nombres.join(', ');
+                sharedBadge = `<span class="badge badge-xs badge-info ml-1" title="${titleText}" style="cursor: help;">+${curso.especialidades_nombres.length - 1}</span>`;
+            }
+
             div.innerHTML = `
                 <div class="flex-grow">
-                    <p class="font-bold truncate pr-4">${curso.nombre}</p>
+                    <p class="font-bold truncate pr-4" title="${curso.nombre}">${curso.nombre}</p>
                     <p class="text-xs opacity-70 truncate">${curso.docente_nombre}</p>
                 </div>
                 <div class="mt-2 text-xs opacity-80">
-                    <div class="flex items-center">${icon} ${curso.tipo_curso}</div>
+                    <div class="flex items-center">
+                        ${icon} ${curso.tipo_curso}
+                        ${sharedBadge}
+                    </div>
                     <div class="font-mono mt-1"><i class="far fa-clock fa-fw mr-2 opacity-60"></i>${timeText} (${curso.duracion_bloques}h)</div>
                 </div>
             `;
@@ -536,9 +546,19 @@ document.addEventListener('DOMContentLoaded', function () {
             div.dataset.fullData = JSON.stringify(curso);
             div.dataset.duracion = Math.min(2, curso.horas_pendientes);
             div.classList.add('unassigned-course-item'); // Clase específica para el nuevo estilo
+
+            let sharedBadge = '';
+            if (curso.especialidades_nombres && curso.especialidades_nombres.length > 1) {
+                const titleText = curso.especialidades_nombres.join(', ');
+                sharedBadge = `<span class="badge badge-xs badge-ghost ml-1 border-base-300" title="${titleText}" style="cursor: help;">+${curso.especialidades_nombres.length - 1}</span>`;
+            }
+
             div.innerHTML = `
-                <p class="course-name">${curso.nombre}</p>
-                <p class="course-teacher">${curso.docente_nombre}</p>
+                <div class="flex justify-between items-start">
+                    <p class="course-name truncate pr-1" title="${curso.nombre}">${curso.nombre}</p>
+                    ${sharedBadge}
+                </div>
+                <p class="course-teacher truncate">${curso.docente_nombre}</p>
                 <p class="course-pending-hours">${curso.horas_pendientes} de ${curso.horas_totales}h pendientes</p>
             `;
         }

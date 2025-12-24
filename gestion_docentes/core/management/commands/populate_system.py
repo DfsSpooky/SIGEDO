@@ -162,18 +162,34 @@ class Command(BaseCommand):
                     docente_asignado = random.choice(local_docentes)
                     horas = random.choice([2, 4, 6])
                     
-                    curso = Curso.objects.create(
-                        nombre=f"{esp_nom} {sem_num}",
-                        tipo_curso="ESPECIALIDAD",
+                    # LOGICA DE UNIFICACION (REFÁCTOR)
+                    nombre_curso = f"{esp_nom} {sem_num}"
+
+                    curso_existente = Curso.objects.filter(
+                        nombre=nombre_curso,
                         docente=docente_asignado,
-                        carrera=carrera_edu,
-                        especialidad=especialidad,
-                        semestre=semestre,
-                        semestre_cursado=sem_num,
-                        horas_academicas_semanales=horas,
-                        excepcion_horario=(docente_asignado.disponibilidad == 'TARDE')
-                    )
-                    cursos_creados.append(curso)
+                        semestre=semestre
+                    ).first()
+
+                    if curso_existente:
+                        curso_existente.especialidades.add(especialidad)
+                        self.stdout.write(f"  -> Curso unificado: {nombre_curso} (Docente: {docente_asignado}) -> Agregada {especialidad.nombre}")
+                        if curso_existente not in cursos_creados:
+                             cursos_creados.append(curso_existente)
+                    else:
+                        curso = Curso.objects.create(
+                            nombre=nombre_curso,
+                            tipo_curso="ESPECIALIDAD",
+                            docente=docente_asignado,
+                            carrera=carrera_edu,
+                            # Ya no asignamos especialidad directa
+                            semestre=semestre,
+                            semestre_cursado=sem_num,
+                            horas_academicas_semanales=horas,
+                            excepcion_horario=(docente_asignado.disponibilidad == 'TARDE')
+                        )
+                        curso.especialidades.add(especialidad)
+                        cursos_creados.append(curso)
 
         # --- 6. Generación de Horarios (Planificación) ---
         self.stdout.write("... Generando Bloques de Horario...")
