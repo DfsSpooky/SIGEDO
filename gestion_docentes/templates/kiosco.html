@@ -241,12 +241,36 @@
             teacherPhoto.src = data.teacher.photoUrl;
             attendanceActions.innerHTML = '';
 
-            // Lógica para QR: Muestra botones de acción
-            if (data.courses) {
-                if (!data.isDailyAttendanceMarked) { attendanceActions.appendChild(createButton('Marcar Entrada General del Día', 'bg-blue-600', () => markAttendance('general_entry', data.qrId), 'fa-user-check')); }
-                else { attendanceActions.appendChild(createInfo('Entrada General ya marcada.', 'text-lg', 'fa-check-circle')); }
+            // Lógica Unificada (QR y RFID)
 
-                if (data.courses.length > 0) { attendanceActions.appendChild(createInfo('Asistencia por Curso', 'text-xl font-bold mt-4 mb-2 text-left', 'fa-chalkboard-teacher')); }
+            // 1. Asistencia General
+            // Compatibilidad con respuestas anteriores (solo boolean) y nueva (objeto detallado)
+            let dailyEntryMarked = false;
+            let dailyExitMarked = false;
+            let dailyEntryTime = '';
+            let dailyExitTime = '';
+
+            if (data.dailyAttendance) {
+                dailyEntryMarked = data.dailyAttendance.entryMarked;
+                dailyExitMarked = data.dailyAttendance.exitMarked;
+                dailyEntryTime = data.dailyAttendance.entryTime;
+                dailyExitTime = data.dailyAttendance.exitTime;
+            } else if (typeof data.isDailyAttendanceMarked !== 'undefined') {
+                dailyEntryMarked = data.isDailyAttendanceMarked;
+            }
+
+            if (!dailyEntryMarked) {
+                 attendanceActions.appendChild(createButton('Marcar Entrada General del Día', 'bg-blue-600', () => markAttendance('general_entry', data.qrId), 'fa-user-check'));
+            } else if (!dailyExitMarked) {
+                attendanceActions.appendChild(createInfo(`Entrada marcada a las ${dailyEntryTime || ''}`, 'text-lg text-green-400', 'fa-check-circle'));
+                attendanceActions.appendChild(createButton('Marcar Salida General', 'bg-orange-600', () => markAttendance('general_exit', data.qrId), 'fa-person-walking-arrow-right', 'mt-2 w-full p-5 text-lg'));
+            } else {
+                attendanceActions.appendChild(createInfo(`Jornada Completa (Entrada: ${dailyEntryTime} - Salida: ${dailyExitTime})`, 'text-lg text-green-400 font-bold', 'fa-check-double'));
+            }
+
+            // 2. Asistencia por Cursos
+            if (data.courses && data.courses.length > 0) {
+                 attendanceActions.appendChild(createInfo('Asistencia por Curso', 'text-xl font-bold mt-4 mb-2 text-left', 'fa-chalkboard-teacher'));
 
                 data.courses.forEach((course, index) => {
                     const courseContainer = document.createElement('div');
@@ -270,13 +294,12 @@
                     courseContainer.appendChild(buttonWrapper);
                     attendanceActions.appendChild(courseContainer);
                 });
-            // Lógica para RFID: Muestra solo el mensaje de estado
+            } else if (!data.courses) {
+                // Si no hay cursos en la data, pero tampoco es un error explicito
+                // Probablemente RFID simple sin cursos? No, ahora siempre devolvemos estructura unificada
+                // Si llegamos aqui es que courses es null o undefined, pero status es success.
             } else {
-                let iconClass = 'fa-info-circle';
-                if (data.status === 'success') iconClass = 'fa-check-circle';
-                if (data.status === 'warning') iconClass = 'fa-exclamation-triangle';
-                attendanceActions.appendChild(createInfo(data.message, 'text-2xl text-center', iconClass));
-                setTimeout(resetKiosk, 5000); // Resetea el kiosko tras mostrar el mensaje
+                 attendanceActions.appendChild(createInfo('No hay cursos programados para hoy.', 'text-gray-500 italic', 'fa-calendar-day'));
             }
 
             // Transición de vistas

@@ -23,6 +23,7 @@ from core.models import (
     Docente,
     Semestre,
 )
+from core.api.views.utils import get_kiosk_data_for_docente
 
 
 class TeacherInfoView(APIView):
@@ -40,16 +41,6 @@ class TeacherInfoView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        today = timezone.localtime(timezone.now()).date()
-
-        if today.weekday() in [5, 6]:  # Sábado=5, Domingo=6
-            return Response(
-                {
-                    "status": "weekend_off",
-                    "message": "El kiosco no está disponible los fines de semana.",
-                }
-            )
-
         try:
             docente = Docente.objects.get(id_qr=qr_id)
         except Docente.DoesNotExist:
@@ -58,56 +49,9 @@ class TeacherInfoView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        semestre_activo = Semestre.objects.filter(
-            estado="ACTIVO", fecha_inicio__lte=today, fecha_fin__gte=today
-        ).first()
-        if not semestre_activo:
-            return Response(
-                {"status": "error", "message": "No hay un semestre académico activo."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        # Removed weekend check
 
-        # Lógica corregida y robusta para obtener los cursos del día
-        dia_semana_hoy_int = today.weekday()
-        dias_map = {0: "Lunes", 1: "Martes", 2: "Miércoles", 3: "Jueves", 4: "Viernes"}
-        dia_hoy_str = dias_map.get(dia_semana_hoy_int)
-
-        if not dia_hoy_str:
-            # Salvaguarda para fines de semana, aunque la vista ya los controla.
-            cursos_hoy = Curso.objects.none()
-        else:
-            cursos_hoy = Curso.objects.filter(
-                docente=docente,
-                semestre=semestre_activo,
-                bloques_horario__dia=dia_hoy_str,
-            ).distinct()
-
-        # Para cada curso del día, nos aseguramos de que exista un registro de asistencia
-        # Esto simplifica la lógica y asegura que siempre tengamos un objeto para serializar.
-        asistencias = []
-        for curso in cursos_hoy:
-            asistencia, _ = Asistencia.objects.get_or_create(
-                docente=docente, curso=curso, fecha=today
-            )
-            asistencias.append(asistencia)
-
-        # Usamos los serializers para construir la respuesta
-        docente_serializer = DocenteInfoSerializer(
-            docente, context={"request": request}
-        )
-        cursos_asistencia_serializer = CursoAsistenciaSerializer(asistencias, many=True)
-        is_daily_marked = AsistenciaDiaria.objects.filter(
-            docente=docente, fecha=today
-        ).exists()
-
-        response_data = {
-            "status": "success",
-            "qrId": qr_id,
-            "teacher": docente_serializer.data,
-            "isDailyAttendanceMarked": is_daily_marked,
-            "courses": cursos_asistencia_serializer.data,
-        }
-
+        response_data = get_kiosk_data_for_docente(docente, request)
         return Response(response_data)
 
 
@@ -178,6 +122,39 @@ class MarkAttendanceView(APIView):
                         "data": {"already_marked": True},
                     }
                 )
+
+        elif action_type == "general_exit":
+            asistencia_diaria = AsistenciaDiaria.objects.filter(
+                docente=docente, fecha=today
+            ).first()
+
+            if not asistencia_diaria:
+                return Response(
+                    {
+                        "status": "error",
+                        "message": "Debe marcar la entrada general antes de marcar la salida.",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if asistencia_diaria.hora_salida:
+                return Response(
+                    {
+                        "status": "warning",
+                        "message": "La salida general ya ha sido marcada hoy.",
+                    }
+                )
+
+            asistencia_diaria.hora_salida = now
+            asistencia_diaria.foto_salida = photo_file
+            asistencia_diaria.save()
+
+            return Response(
+                {
+                    "status": "success",
+                    "message": "Salida general registrada correctamente.",
+                }
+            )
 
         elif action_type in ["course_entry", "course_exit"]:
             curso_id = validated_data.get("courseId")
@@ -295,15 +272,7 @@ class RegistrarAsistenciaRfidView(APIView):
             )
 
         uid = serializer.validated_data["uid"]
-        today = timezone.localtime(timezone.now()).date()
-
-        if today.weekday() in [5, 6]:
-            return Response(
-                {
-                    "status": "weekend_off",
-                    "message": "El registro de asistencia no está disponible los fines de semana.",
-                }
-            )
+        # Removed weekend check
 
         try:
             docente = Docente.objects.get(rfid_uid=uid)
@@ -316,26 +285,8 @@ class RegistrarAsistenciaRfidView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        asistencia_diaria, created = AsistenciaDiaria.objects.get_or_create(
-            docente=docente, fecha=today
-        )
-
-        teacher_serializer = DocenteInfoSerializer(
-            docente, context={"request": request}
-        )
-
-        if created:
-            response_data = {
-                "status": "success",
-                "message": "Asistencia registrada correctamente.",
-                "teacher": teacher_serializer.data,
-            }
-        else:
-            response_data = {
-                "status": "warning",
-                "message": f'La asistencia de hoy ya fue registrada a las {asistencia_diaria.hora_entrada.strftime("%I:%M:%S %p")}.',
-                "teacher": teacher_serializer.data,
-            }
+        # Updated to use shared logic - NO auto marking anymore, just data retrieval
+        response_data = get_kiosk_data_for_docente(docente, request)
 
         # Enviar actualización a través de Channels
         channel_layer = get_channel_layer()

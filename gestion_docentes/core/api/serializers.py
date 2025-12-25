@@ -70,7 +70,7 @@ class MarkAttendanceSerializer(serializers.Serializer):
 
     qrId = serializers.UUIDField()
     actionType = serializers.ChoiceField(
-        choices=["general_entry", "course_entry", "course_exit"]
+        choices=["general_entry", "general_exit", "course_entry", "course_exit"]
     )
     courseId = serializers.IntegerField(required=False, allow_null=True)
     photoBase64 = serializers.CharField()

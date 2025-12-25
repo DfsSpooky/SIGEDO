@@ -582,7 +582,7 @@ class RfidAsistenciaTest(TestCase):
 
     @patch("django.utils.timezone.now")
     def test_registrar_asistencia_rfid_success(self, mock_now):
-        """Test successful attendance registration via RFID on a weekday."""
+        """Test successful retrieval of teacher info via RFID on a weekday."""
         # Mock 'now' to be a weekday
         mock_now.return_value = make_aware(
             timezone.datetime(2023, 10, 26, 10, 0, 0)
@@ -599,36 +599,8 @@ class RfidAsistenciaTest(TestCase):
         self.assertEqual(response_data["status"], "success")
         self.assertIn("teacher", response_data)
         self.assertEqual(response_data["teacher"]["name"], "RFID User")
-        self.assertEqual(AsistenciaDiaria.objects.count(), 1)
-
-        asistencia = AsistenciaDiaria.objects.first()
-        self.assertEqual(asistencia.docente, self.docente)
-        self.assertEqual(asistencia.fecha, date(2023, 10, 26))
-
-    @patch("django.utils.timezone.now")
-    def test_registrar_asistencia_rfid_duplicate(self, mock_now):
-        """Test that duplicate attendance registration is prevented."""
-        mock_now.return_value = make_aware(timezone.datetime(2023, 10, 26, 10, 0, 0))
-        # First registration
-        self.client.post(
-            self.url,
-            data=json.dumps({"uid": self.rfid_uid}),
-            content_type="application/json",
-        )
-        self.assertEqual(AsistenciaDiaria.objects.count(), 1)
-
-        # Second (duplicate) registration
-        response = self.client.post(
-            self.url,
-            data=json.dumps({"uid": self.rfid_uid}),
-            content_type="application/json",
-        )
-
-        self.assertEqual(response.status_code, 200)
-        response_data = response.json()
-        self.assertEqual(response_data["status"], "warning")
-        self.assertIn("teacher", response_data)
-        self.assertEqual(AsistenciaDiaria.objects.count(), 1)
+        # Attendance should NOT be created automatically anymore
+        self.assertEqual(AsistenciaDiaria.objects.count(), 0)
 
     @patch("django.utils.timezone.now")
     def test_registrar_asistencia_rfid_not_found(self, mock_now):
@@ -661,7 +633,7 @@ class RfidAsistenciaTest(TestCase):
 
     @patch("django.utils.timezone.now")
     def test_registrar_asistencia_rfid_weekend(self, mock_now):
-        """Test that attendance registration is blocked on weekends."""
+        """Test that retrieval is allowed on weekends (weekend block removed)."""
         # Mock 'now' to be a Saturday
         mock_now.return_value = make_aware(
             timezone.datetime(2023, 10, 28, 10, 0, 0)
@@ -673,7 +645,8 @@ class RfidAsistenciaTest(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["status"], "weekend_off")
+        # Should now be success, not weekend_off
+        self.assertEqual(response.json()["status"], "success")
         self.assertEqual(AsistenciaDiaria.objects.count(), 0)
 
 
