@@ -329,6 +329,24 @@ class BloqueHorario(models.Model):
         if self.duracion_bloques > 4:
              raise ValidationError("No se pueden asignar bloques de más de 4 horas continuas.")
 
+        # 8. Validar Reglas de Turno por Semestre
+        # Semestres 1-4: Turno MAÑANA (salvo excepción)
+        # Semestres 5-10: Turno TARDE
+        if self.curso.pk and self.curso.semestre_cursado:
+            turno_franja = self.franja_inicio.turno
+            semestre = self.curso.semestre_cursado
+
+            if semestre <= 4:
+                if turno_franja == "TARDE" and not self.curso.excepcion_horario:
+                    raise ValidationError(
+                        f"Los cursos del Semestre {semestre} deben dictarse en la MAÑANA (salvo excepción habilitada)."
+                    )
+            elif semestre >= 5:
+                if turno_franja == "MANANA":
+                    raise ValidationError(
+                        f"Los cursos del Semestre {semestre} deben dictarse en la TARDE."
+                    )
+
     def save(self, *args, **kwargs):
         # Salvaguarda para ignorar la creación de bloques vacíos desde el admin inline
         if not self.franja_inicio_id:
