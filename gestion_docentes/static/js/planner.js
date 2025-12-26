@@ -219,7 +219,11 @@ document.addEventListener('DOMContentLoaded', function () {
             // --- FIN DE VALIDACIÓN PERSONALIZADA ---
 
 
-            if (to.classList.contains('conflict-cell') || to.querySelector('[data-bloque-id]')) {
+            // Validar si la celda está ocupada (ignorando el elemento que se está arrastrando)
+            // Cuando SortableJS mueve el elemento, ya está en el DOM de 'to', por lo que debemos excluirlo.
+            const existingBlock = to.querySelector('[data-bloque-id]:not(.sortable-chosen)');
+
+            if (to.classList.contains('conflict-cell') || existingBlock) {
                 Toast.fire({ icon: 'error', title: 'No se puede asignar en este espacio ocupado o en conflicto.' });
                 await loadPlannerData();
                 return;
