@@ -1,109 +1,129 @@
 import random
 from django.core.management.base import BaseCommand
-from datetime import date, timedelta, time
+from datetime import date, time
+from django.contrib.auth import get_user_model
+from django.db import transaction
 from core.models import (
-    Carrera, Especialidad, Docente, Curso, Semestre, ConfiguracionInstitucion, FranjaHoraria, Grupo
+    Carrera, Especialidad, Curso, Semestre,
+    Grupo, Docente, FranjaHoraria
 )
 
-class Command(BaseCommand):
-    help = 'Puebla la base de datos con un escenario específico para probar los cursos generales por grupo.'
+User = get_user_model()
 
+class Command(BaseCommand):
+    help = 'Puebla la base de datos con una estructura de grupos, especialidades y cursos bien definida.'
+
+    @transaction.atomic
     def handle(self, *args, **kwargs):
-        self.stdout.write(self.style.SUCCESS('--- Iniciando la población del sistema para la prueba de Cursos Generales ---'))
-        
-        # Limpiar datos para un inicio fresco
+        self.stdout.write(self.style.SUCCESS('--- Iniciando la nueva población del sistema ---'))
+
+        # --- 1. Limpiar la base de datos ---
+        self.stdout.write('... Limpiando datos existentes...')
         Curso.objects.all().delete()
-        Docente.objects.filter(is_superuser=False).delete()
+        User.objects.filter(is_superuser=False).delete()
         Especialidad.objects.all().delete()
+        Grupo.objects.all().delete()
         Carrera.objects.all().delete()
         Semestre.objects.all().delete()
-        ConfiguracionInstitucion.objects.all().delete()
         FranjaHoraria.objects.all().delete()
-        Grupo.objects.all().delete()
-        self.stdout.write('... Datos antiguos eliminados.')
+        self.stdout.write(self.style.SUCCESS('-> Modelos principales limpiados.'))
 
-        # 1. Crear Configuración y Carrera
-        ConfiguracionInstitucion.objects.get_or_create(
-            pk=1, defaults={'nombre_institucion': 'UNIVERSIDAD NACIONAL DANIEL ALCIDES CARRIÓN'}
+        # --- 2. Crear usuarios clave ---
+        self.stdout.write('... Creando usuarios clave...')
+        if not User.objects.filter(username='admin').exists():
+            User.objects.create_superuser('admin', 'admin@example.com', '12345', dni='10000000')
+
+        secretaria, _ = User.objects.get_or_create(username='secretaria', defaults={'first_name': 'Secretaria', 'last_name': 'Académica', 'is_staff': True, 'dni': '10000001'})
+        secretaria.set_password('123456')
+        secretaria.save()
+
+        director, _ = User.objects.get_or_create(username='director', defaults={'first_name': 'Director', 'last_name': 'General', 'is_staff': True, 'is_superuser': True, 'dni': '10000002'})
+        director.set_password('123456')
+        director.save()
+        self.stdout.write(self.style.SUCCESS('-> Usuarios admin, secretaria y director creados/actualizados.'))
+
+        # --- 3. Crear Carrera y Semestre ---
+        carrera_edu, _ = Carrera.objects.get_or_create(nombre="EDUCACION SECUNDARIA")
+        semestre, _ = Semestre.objects.get_or_create(
+            nombre=f'Semestre {date.today().year}-A',
+            defaults={'fecha_inicio': date(date.today().year, 3, 1), 'fecha_fin': date(date.today().year, 8, 31), 'estado': 'ACTIVO', 'tipo': 'IMPAR'}
         )
-        carrera, _ = Carrera.objects.get_or_create(nombre="EDUCACION SECUNDARIA")
-        self.stdout.write('-> Configuración y Carrera creadas.')
+        self.stdout.write(self.style.SUCCESS('-> Carrera y Semestre creados.'))
 
-        # 2. Crear Franjas Horarias
+        # --- 4. Crear Franjas Horarias ---
         franjas_data = [
             ('MANANA', time(8, 0), time(8, 50)), ('MANANA', time(8, 50), time(9, 40)),
             ('MANANA', time(9, 40), time(10, 30)), ('MANANA', time(10, 30), time(11, 20)),
+            ('MANANA', time(11, 20), time(12, 10)), ('MANANA', time(12, 10), time(13, 0)),
+            ('TARDE', time(15, 0), time(15, 50)), ('TARDE', time(15, 50), time(16, 40)),
+            ('TARDE', time(16, 40), time(17, 30)), ('TARDE', time(17, 30), time(18, 20)),
+            ('TARDE', time(18, 20), time(19, 10)),
         ]
         for turno, inicio, fin in franjas_data:
             FranjaHoraria.objects.get_or_create(turno=turno, hora_inicio=inicio, hora_fin=fin)
-        self.stdout.write(f'-> {len(franjas_data)} Franjas Horarias creadas.')
+        self.stdout.write(self.style.SUCCESS(f'-> {len(franjas_data)} Franjas Horarias creadas/verificadas.'))
 
-        # 3. Crear Grupo y Especialidades
-        grupo_c, _ = Grupo.objects.get_or_create(nombre='Grupo C')
-        self.stdout.write('-> Grupo C creado.')
+        # --- 5. Crear Grupos, Especialidades, Docentes y Cursos ---
+        self.stdout.write('... Creando estructura académica...')
 
-        especialidades_data = ['Matemática', 'Biología', 'Computacion']
-        for esp_nombre in especialidades_data:
-            Especialidad.objects.get_or_create(nombre=esp_nombre, grupo=grupo_c)
-        self.stdout.write('-> Especialidades creadas y asignadas a Grupo C.')
-
-        # 4. Crear Docentes
-        docentes_data = {
-            'Matemática': 'SOTO MATEO Hernán',
-            'Biología': 'ATENCIO CARHUARICRA Graciela',
-            'Computacion': 'CANDIOTTI PACHECO, Cesar',
-            'General': 'ROJAS CALDERON Rocio Pilar'
+        grupos_data = {
+            "Grupo A": ["Historia", "Comunicacion", "Ingles"],
+            "Grupo B": ["Filosofía", "Biologia"],
+            "Grupo C": ["Matematica", "Computacion", "Quimica"]
         }
-        todos_los_docentes = {}
-        for nombre, nombre_completo in docentes_data.items():
-            partes = nombre_completo.replace(',', '').split()
-            primer_nombre = partes[-1].capitalize() if partes else ''
-            apellido_paterno = partes[0].capitalize() if partes else ''
-            username = f"{primer_nombre[0].lower()}{apellido_paterno.lower()}"
-            docente, created = Docente.objects.get_or_create(
-                username=username,
-                defaults={'first_name': primer_nombre, 'last_name': " ".join(partes[0:-1]), 'dni': f"{random.randint(10000000, 99999999)}"}
-            )
-            if created: docente.set_password('password123'); docente.save()
-            todos_los_docentes[nombre] = docente
-            if nombre != 'General':
-                especialidad = Especialidad.objects.get(nombre=nombre)
-                docente.especialidades.add(especialidad)
-        
-        # 5. Crear Semestre Activo
-        semestre_activo, _ = Semestre.objects.get_or_create(
-            nombre=f'Semestre {date.today().year}-A',
-            defaults={'fecha_inicio': date(date.today().year, 3, 17), 'fecha_fin': date(date.today().year, 7, 11), 'estado': 'ACTIVO', 'tipo': 'IMPAR'}
-        )
 
-        # 6. Crear Cursos de Especialidad y Generales
-        # Cursos Generales para el Grupo C (vinculados a una especialidad, pero con tipo 'GENERAL')
-        general_docente = todos_los_docentes.get('General')
-        especialidad_base_general = Especialidad.objects.get(nombre='Matemática')
-        if general_docente:
-            Curso.objects.get_or_create(
-                nombre='Filosofía y Lógica', semestre_cursado=1, especialidad=especialidad_base_general, semestre=semestre_activo,
-                defaults={'carrera': carrera, 'docente': general_docente, 'tipo_curso': 'GENERAL', 'duracion_bloques': 2}
+        docentes_generales = []
+        for i in range(5):
+            docente_gen, created = Docente.objects.get_or_create(
+                username=f"general{i+1}",
+                defaults={'first_name': f"DocenteGeneral{i+1}", 'last_name': "Multi", 'dni': f"9000000{i}"}
             )
-            Curso.objects.get_or_create(
-                nombre='Inglés Básico I', semestre_cursado=1, especialidad=especialidad_base_general, semestre=semestre_activo,
-                defaults={'carrera': carrera, 'docente': general_docente, 'tipo_curso': 'GENERAL', 'duracion_bloques': 2}
-            )
+            if created:
+                docente_gen.set_password('123456')
+                docente_gen.save()
+            docentes_generales.append(docente_gen)
 
-        # Cursos de Especialidad
-        cursos_especialidad_data = {
-            'Matemática': [('Cálculo I', 'SOTO MATEO Hernán'), ('Álgebra Superior', 'SOTO MATEO Hernán')],
-            'Biología': [('Biología Celular', 'ATENCIO CARHUARICRA Graciela'), ('Química Orgánica', 'ATENCIO CARHUARICRA Graciela')],
-            'Computacion': [('Algoritmos', 'CANDIOTTI PACHECO, Cesar'), ('Estructuras de Datos', 'CANDIOTTI PACHECO, Cesar')],
-        }
-        for esp_nombre, cursos_data in cursos_especialidad_data.items():
-            especialidad = Especialidad.objects.get(nombre=esp_nombre)
-            for nombre_curso, nombre_docente in cursos_data:
-                docente_obj = Docente.objects.get(first_name=nombre_docente.split()[-1])
-                if docente_obj:
-                    Curso.objects.get_or_create(
-                        nombre=nombre_curso, semestre_cursado=1, especialidad=especialidad, semestre=semestre_activo,
-                        defaults={'carrera': carrera, 'docente': docente_obj, 'tipo_curso': 'ESPECIALIDAD', 'duracion_bloques': 2}
+        for grupo_nombre, especialidades_nombres in grupos_data.items():
+            grupo, _ = Grupo.objects.get_or_create(nombre=grupo_nombre)
+            for esp_nombre in especialidades_nombres:
+                especialidad, _ = Especialidad.objects.get_or_create(nombre=esp_nombre, defaults={'grupo': grupo})
+
+                docentes_especialidad = []
+                for i in range(3):
+                    docente, created = Docente.objects.get_or_create(
+                        username=f"d{i+1}{esp_nombre[:4].lower()}",
+                        defaults={'first_name': f"Docente{i+1}", 'last_name': esp_nombre, 'dni': f"{random.randint(20000000, 89999999)}"}
                     )
-        
-        self.stdout.write(self.style.SUCCESS('--- ¡Población del sistema para prueba completada! ---'))
+                    if created:
+                        docente.set_password('123456')
+                        docente.save()
+                    docente.especialidades.add(especialidad)
+                    docentes_especialidad.append(docente)
+
+                for sem_cursado in range(1, 11):
+                    # Crear 2 cursos de especialidad
+                    for i in range(2):
+                        Curso.objects.create(
+                            nombre=f"Curso de {esp_nombre} {i+1} - Sem {sem_cursado}",
+                            tipo_curso='ESPECIALIDAD',
+                            docente=random.choice(docentes_especialidad),
+                            carrera=carrera_edu,
+                            especialidad=especialidad,
+                            semestre=semestre,
+                            semestre_cursado=sem_cursado,
+                            duracion_bloques=random.choice([2, 3])
+                        )
+                    # Crear 1 curso general
+                    Curso.objects.create(
+                        nombre=f"Curso General {sem_cursado}",
+                        tipo_curso='GENERAL',
+                        docente=random.choice(docentes_generales),
+                        carrera=carrera_edu,
+                        especialidad=especialidad,
+                        semestre=semestre,
+                        semestre_cursado=sem_cursado,
+                        duracion_bloques=random.choice([2, 3])
+                    )
+
+        self.stdout.write(self.style.SUCCESS('-> Estructura académica creada.'))
+        self.stdout.write(self.style.SUCCESS('--- ¡Población completa del sistema finalizada! ---'))
