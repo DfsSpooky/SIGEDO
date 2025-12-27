@@ -1,5 +1,7 @@
 # core/templatetags/template_extras.py
 from django import template
+from ..utils.encryption import encrypt_id
+
 register = template.Library()
 
 @register.filter
@@ -33,3 +35,10 @@ def roman(number):
             number -= val[i]
         i += 1
     return roman_num
+
+@register.filter(name='encrypt')
+def encrypt(value):
+    """
+    Encrypts a value using the encrypt_id utility.
+    """
+    return encrypt_id(value)
