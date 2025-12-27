@@ -298,11 +298,15 @@
     .swal2-confirm:hover, .swal2-cancel:hover {
         opacity: 0.9;
     }
+    
+    /* Progress Bars Colors */
+    .progress-success { --p: 142 71% 45%; } /* Green */
+    .progress-warning { --p: 41 100% 50%; } /* Yellow */
+    .progress-error { --p: 0 84% 60%; } /* Red */
 </style>
 
 <div class="card bg-base-100 shadow-xl planner-modern">
     <div class="card-body">
-        <!-- Step 1: Selection -->
         <div class="planner-header flex flex-wrap justify-between items-center">
             <div>
                 <h1 class="card-title">Planificador de Horarios</h1>
@@ -310,11 +314,27 @@
             </div>
             
             <div class="flex items-center gap-4 p-2 bg-base-200 rounded-box">
+                <button id="btn-export-pdf" class="btn btn-error btn-sm btn-outline text-error-content hover:bg-error hover:text-white" title="Exportar horario actual a PDF">
+                    <i class="fas fa-file-pdf"></i>
+                    PDF
+                </button>
+                
+                <div class="divider divider-horizontal mx-0"></div>
+
                 <button id="global-auto-assign-btn" class="btn btn-primary btn-sm">
                     <i class="fas fa-globe-americas"></i>
                     Generar Horario Global
                 </button>
                 <div class="divider divider-horizontal"></div>
+                
+                <div class="form-control" title="Habilita para mover cursos generales compartidos">
+                    <label class="label cursor-pointer gap-2">
+                        <span class="label-text font-semibold text-xs uppercase tracking-wide text-base-content/70 leading-3 text-right">Editar<br>Generales</span> 
+                        <input type="checkbox" id="toggle-general-edit" class="toggle toggle-primary toggle-sm" />
+                    </label>
+                </div>
+                <div class="divider divider-horizontal mx-0"></div>
+
                 <div class="form-control">
                     <label class="label pb-1"><span class="label-text">Especialidad:</span></label>
                     <select id="especialidad" class="select select-bordered select-sm">
@@ -336,7 +356,6 @@
             </div>
         </div>
 
-        <!-- Step 2: Workspace (hidden by default) -->
         <div id="planner-body" class="hidden">
             <div class="planner-main-grid grid grid-cols-1 lg:grid-cols-4 mt-4">
                 
@@ -356,8 +375,7 @@
                                     </tr>
                                 </thead>
                                 <tbody id="schedule-grid-manana">
-                                    <!-- Mañana Grid will be populated by JS -->
-                                </tbody>
+                                    </tbody>
                             </table>
                         </div>
                     </div>
@@ -372,8 +390,7 @@
                                     </tr>
                                 </thead>
                                 <tbody id="schedule-grid-tarde">
-                                    <!-- Tarde Grid will be populated by JS -->
-                                </tbody>
+                                    </tbody>
                             </table>
                         </div>
                     </div>
@@ -386,14 +403,12 @@
                             <a role="tab" class="tab" data-tab="auto">Automático</a>
                         </div>
 
-                        <!-- Manual Assignment Tab -->
                         <div id="tab-manual" class="tab-content active space-y-4">
                             <h3 class="font-bold text-lg">Cursos por Asignar</h3>
                             <p class="text-xs text-base-content/60 -mt-3">Arrastra un curso al horario para asignarlo.</p>
                             <input type="text" id="course-search-input" placeholder="Buscar curso..." class="input input-bordered input-sm w-full">
                             <div id="unassigned-courses-container" class="space-y-2 max-h-96 overflow-y-auto pr-2">
-                                <!-- Unassigned courses will be populated by JS -->
-                            </div>
+                                </div>
                             <div class="divider"></div>
                             <div id="trash-zone" class="p-4 text-center border-2 border-dashed border-base-300 rounded-box bg-base-200 text-base-content/70 min-h-[80px] flex flex-col justify-center items-center transition-all duration-300">
                                 <i class="fas fa-trash-alt text-2xl mb-2"></i>
@@ -401,7 +416,6 @@
                             </div>
                         </div>
 
-                        <!-- Automatic Generator Tab -->
                         <div id="tab-auto" class="tab-content space-y-4">
                             <h3 class="font-bold text-lg">Generador Automático</h3>
                             <p class="text-xs text-base-content/60 -mt-3">Asigna automáticamente los cursos pendientes.</p>
@@ -420,7 +434,6 @@
             </div>
         </div>
 
-        <!-- Placeholder when no selection is made -->
         <div id="planner-placeholder" class="text-center py-20 text-base-content/50">
             <i class="fas fa-drafting-compass fa-4x mb-4"></i>
             <p class="text-xl font-semibold">Selecciona una especialidad y un semestre para comenzar a planificar.</p>
@@ -429,13 +442,32 @@
 </div>
 
 <script>
-    // Configuration object to pass Django context to external JS
     window.PlannerConfig = {
         csrfToken: '{{ csrf_token }}',
         franjasManana: {{ franjas_manana_json|safe }},
         franjasTarde: {{ franjas_tarde_json|safe }},
         diasSemana: {{ dias_semana_json|safe }}
     };
+
+    // --- Script simple para el botón de Exportar ---
+    document.getElementById('btn-export-pdf').addEventListener('click', function() {
+        const especialidad = document.getElementById('especialidad').value;
+        const semestre = document.getElementById('semestre_cursado').value;
+
+        if (!especialidad || !semestre) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Selección Incompleta',
+                text: 'Por favor, selecciona una especialidad y un semestre para exportar.'
+            });
+            return;
+        }
+
+        // Abrir la URL de generación de PDF en una nueva pestaña
+        // Nota: Asegúrate de tener esta URL configurada en urls.py
+        const url = `/api/exportar-horario/?especialidad_id=${especialidad}&semestre=${semestre}`;
+        window.open(url, '_blank');
+    });
 </script>
 <script src="{% static 'js/planner.js' %}"></script>
 

@@ -36,10 +36,10 @@ ID_ENCRYPTION_KEY = os.environ.get("ID_ENCRYPTION_KEY", "").encode()
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DEBUG", "False").lower() in ("true", "1", "t")
 
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost").split(",")
+ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost").split(",") + ["oversophisticated-dedra-overgross.ngrok-free.dev"]
 # ... cerca de ALLOWED_HOSTS ...
 
-CSRF_TRUSTED_ORIGINS = ["https://aquienpasco.lat", "https://www.aquienpasco.lat"]
+CSRF_TRUSTED_ORIGINS = ["https://aquienpasco.lat", "https://www.aquienpasco.lat", "https://oversophisticated-dedra-overgross.ngrok-free.dev" ]
 
 # Settings for running behind a reverse proxy like Nginx
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

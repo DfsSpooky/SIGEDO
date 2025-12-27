@@ -1,4 +1,7 @@
 document.addEventListener('DOMContentLoaded', function () {
+    
+    let currentPlannerData = null;
+
     // --- API & UTILITY FUNCTIONS ---
     async function callApi(url, method = 'GET', body = null) {
         const options = {
@@ -28,7 +31,8 @@ document.addEventListener('DOMContentLoaded', function () {
         autoAssignBtn: document.querySelector('#auto-assign-btn'),
         autoAssignLog: document.querySelector('#auto-assign-log'),
         globalAutoAssignBtn: document.querySelector('#global-auto-assign-btn'),
-        scheduleTabsContainer: document.querySelector('#schedule-tabs-container')
+        scheduleTabsContainer: document.querySelector('#schedule-tabs-container'),
+        toggleGeneralEdit: document.querySelector('#toggle-general-edit')
     };
 
     const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, timerProgressBar: true });
@@ -42,13 +46,18 @@ document.addEventListener('DOMContentLoaded', function () {
     // --- RENDERING FUNCTIONS ---
     function createCourseElement(curso, isAssigned = false) {
         const div = document.createElement('div');
-        div.className = `relative p-2 rounded-lg text-sm transition-all duration-300 cursor-grab active:cursor-grabbing border h-full flex flex-col`;
+        div.className = `relative p-2 rounded-lg text-sm transition-all duration-300 border h-full flex flex-col`;
 
         let blockClasses = '';
         let cellClasses = '';
 
         if (isAssigned) {
             div.classList.add('group', 'assigned-course-item');
+            
+            // Lógica de Ghost Blocks
+            const allowEdit = DOMElements.toggleGeneralEdit ? DOMElements.toggleGeneralEdit.checked : false;
+            const isGhost = curso.tipo_curso === 'GENERAL' && !allowEdit;
+
             div.dataset.bloqueId = curso.bloque_id;
             div.dataset.cursoId = curso.curso_id;
             div.dataset.duracion = curso.duracion_bloques;
@@ -56,12 +65,20 @@ document.addEventListener('DOMContentLoaded', function () {
             div.dataset.courseType = curso.tipo_curso;
 
             let icon = '';
-            if (curso.tipo_curso === 'GENERAL') {
-                cellClasses = 'cell-general';
-                icon = '<i class="fas fa-globe-americas fa-fw mr-2"></i>';
+            
+            if (isGhost) {
+                cellClasses = 'bg-base-300 text-base-content/60 border-base-300 cursor-not-allowed'; 
+                icon = '<i class="fas fa-lock fa-fw mr-2 opacity-50"></i>';
+                div.classList.add('static-course');
             } else {
-                cellClasses = 'cell-especialidad';
-                icon = '<i class="fas fa-graduation-cap fa-fw mr-2"></i>';
+                div.classList.add('cursor-grab', 'active:cursor-grabbing');
+                if (curso.tipo_curso === 'GENERAL') {
+                     cellClasses = 'cell-general'; 
+                     icon = '<i class="fas fa-globe-americas fa-fw mr-2"></i>';
+                } else {
+                     cellClasses = 'cell-especialidad';
+                     icon = '<i class="fas fa-graduation-cap fa-fw mr-2"></i>';
+                }
             }
 
             const allFranjas = [...window.PlannerConfig.franjasManana, ...window.PlannerConfig.franjasTarde];
@@ -94,30 +111,34 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
             `;
 
-            const controlsDiv = document.createElement('div');
-            controlsDiv.className = 'absolute top-1 right-1 flex flex-col items-center space-y-1 opacity-0 group-hover:opacity-100 transition-opacity';
-            const createControlButton = (iconClass, colorClass, title, onClick) => {
-                const button = document.createElement('button');
-                button.className = `btn btn-xs btn-square bg-base-100/50 backdrop-blur-sm border-0 text-${colorClass}/80 hover:bg-base-100 hover:text-${colorClass}`;
-                button.innerHTML = `<i class="fas ${iconClass}"></i>`;
-                button.title = title;
-                button.addEventListener('click', (e) => { e.stopPropagation(); onClick(e); });
-                return button;
-            };
-            controlsDiv.appendChild(createControlButton('fa-plus', 'success', 'Aumentar duración', () => handleDurationChange(div.dataset.bloqueId, 'increase')));
-            controlsDiv.appendChild(createControlButton('fa-minus', 'warning', 'Disminuir duración', () => handleDurationChange(div.dataset.bloqueId, 'decrease')));
-            controlsDiv.appendChild(createControlButton('fa-times', 'error', 'Eliminar bloque', () => {
-                Swal.fire({
-                    title: '¿Eliminar este bloque?', text: `Se eliminará el bloque de ${curso.duracion_bloques} hora(s) para "${curso.nombre}".`,
-                    icon: 'warning', showCancelButton: true, confirmButtonText: 'Sí, eliminar', cancelButtonText: 'No'
-                }).then(result => result.isConfirmed && handleDeassign(div));
-            }));
-            div.appendChild(controlsDiv);
+            if (!isGhost) {
+                const controlsDiv = document.createElement('div');
+                controlsDiv.className = 'absolute top-1 right-1 flex flex-col items-center space-y-1 opacity-0 group-hover:opacity-100 transition-opacity';
+                const createControlButton = (iconClass, colorClass, title, onClick) => {
+                    const button = document.createElement('button');
+                    button.className = `btn btn-xs btn-square bg-base-100/50 backdrop-blur-sm border-0 text-${colorClass}/80 hover:bg-base-100 hover:text-${colorClass}`;
+                    button.innerHTML = `<i class="fas ${iconClass}"></i>`;
+                    button.title = title;
+                    button.addEventListener('click', (e) => { e.stopPropagation(); onClick(e); });
+                    return button;
+                };
+                controlsDiv.appendChild(createControlButton('fa-plus', 'success', 'Aumentar duración', () => handleDurationChange(div.dataset.bloqueId, 'increase')));
+                controlsDiv.appendChild(createControlButton('fa-minus', 'warning', 'Disminuir duración', () => handleDurationChange(div.dataset.bloqueId, 'decrease')));
+                controlsDiv.appendChild(createControlButton('fa-times', 'error', 'Eliminar bloque', () => {
+                    Swal.fire({
+                        title: '¿Eliminar este bloque?', text: `Se eliminará el bloque de ${curso.duracion_bloques} hora(s) para "${curso.nombre}".`,
+                        icon: 'warning', showCancelButton: true, confirmButtonText: 'Sí, eliminar', cancelButtonText: 'No'
+                    }).then(result => result.isConfirmed && handleDeassign(div));
+                }));
+                div.appendChild(controlsDiv);
+            }
+
         } else {
+            // --- Cursos NO asignados (Lista Lateral) ---
             div.dataset.cursoId = curso.id;
             div.dataset.fullData = JSON.stringify(curso);
             div.dataset.duracion = Math.min(2, curso.horas_pendientes);
-            div.classList.add('unassigned-course-item');
+            div.classList.add('unassigned-course-item', 'cursor-grab', 'active:cursor-grabbing');
 
             let sharedBadge = '';
             if (curso.especialidades_nombres && curso.especialidades_nombres.length > 1) {
@@ -125,13 +146,37 @@ document.addEventListener('DOMContentLoaded', function () {
                 sharedBadge = `<span class="badge badge-xs badge-ghost ml-1 border-base-300" title="${titleText}" style="cursor: help;">+${curso.especialidades_nombres.length - 1}</span>`;
             }
 
+            // 1. LÓGICA DE BARRA DE PROGRESO
+            // Calculamos porcentaje usando horas_asignadas (que viene del backend nuevo)
+            const assigned = curso.horas_asignadas || 0;
+            const total = curso.horas_totales || 0;
+            const percent = total > 0 ? Math.round((assigned / total) * 100) : 0;
+            
+            let progressColor = 'progress-error'; // Rojo (poco avance)
+            let textColor = 'text-error';
+            
+            if (percent >= 100) {
+                progressColor = 'progress-success'; // Verde
+                textColor = 'text-success';
+            } else if (percent >= 50) {
+                progressColor = 'progress-warning'; // Amarillo
+                textColor = 'text-warning';
+            }
+
             div.innerHTML = `
-                <div class="flex justify-between items-start">
+                <div class="flex justify-between items-start mb-1">
                     <p class="course-name truncate pr-1" title="${curso.nombre}">${curso.nombre}</p>
                     ${sharedBadge}
                 </div>
-                <p class="course-teacher truncate">${curso.docente_nombre}</p>
-                <p class="course-pending-hours">${curso.horas_pendientes} de ${curso.horas_totales}h pendientes</p>
+                <p class="course-teacher truncate mb-2">${curso.docente_nombre}</p>
+                
+                <div class="w-full">
+                    <div class="flex justify-between text-[10px] font-bold ${textColor} mb-0.5">
+                        <span>${curso.horas_pendientes}h pendientes</span>
+                        <span>${percent}%</span>
+                    </div>
+                    <progress class="progress ${progressColor} w-full h-1.5 bg-base-300" value="${assigned}" max="${total}"></progress>
+                </div>
             `;
         }
         return { element: div, cellClasses: cellClasses ? cellClasses.split(' ') : [] };
@@ -190,44 +235,46 @@ document.addEventListener('DOMContentLoaded', function () {
     function initializeDragAndDrop() {
         sortableInstances.forEach(s => s.destroy());
         sortableInstances = [];
-        const sharedConfig = { group: 'shared', animation: 150 };
+        
+        const sharedConfig = { 
+            group: 'shared', 
+            animation: 150,
+            filter: '.static-course', 
+            onMove: function (evt) {
+                 return !evt.related.classList.contains('static-course');
+            }
+        };
 
         const onAdd = async (evt) => {
             const { item, to, from } = evt;
             revertVisualSpan(from);
 
-            // --- INICIO DE VALIDACIÓN PERSONALIZADA ---
+            // Validaciones
             const cursoData = JSON.parse(item.dataset.fullData);
             const targetFranjaId = parseInt(to.dataset.franjaId, 10);
-
             const isTarde = window.PlannerConfig.franjasTarde.some(f => f.id === targetFranjaId);
             const targetTurno = isTarde ? 'TARDE' : 'MANANA';
 
-            // Regla 1: Semestres 1-4 solo pueden ir en la mañana, salvo excepción.
             if (cursoData.semestre_cursado <= 4 && targetTurno === 'TARDE' && !cursoData.excepcion_horario) {
-                Toast.fire({ icon: 'error', title: 'Horario no permitido', text: 'Los cursos de semestres inferiores solo pueden llevarse en el turno de mañana.' });
+                Toast.fire({ icon: 'error', title: 'Horario no permitido', text: 'Semestres 1-4 solo en turno mañana.' });
                 await loadPlannerData();
                 return;
             }
-
-            // Regla 2: Semestres 5-10 solo pueden ir en la tarde.
             if (cursoData.semestre_cursado >= 5 && targetTurno === 'MANANA') {
-                Toast.fire({ icon: 'error', title: 'Horario no permitido', text: 'Los cursos de semestres superiores solo pueden llevarse en el turno de tarde.' });
+                Toast.fire({ icon: 'error', title: 'Horario no permitido', text: 'Semestres 5-10 solo en turno tarde.' });
                 await loadPlannerData();
                 return;
             }
-            // --- FIN DE VALIDACIÓN PERSONALIZADA ---
 
-
-            // Validar si la celda está ocupada (ignorando el elemento que se está arrastrando)
-            // Cuando SortableJS mueve el elemento, ya está en el DOM de 'to', por lo que debemos excluirlo.
-            const existingBlock = to.querySelector('[data-bloque-id]:not(.sortable-chosen)');
-
+            const existingBlock = Array.from(to.querySelectorAll('[data-bloque-id]')).find(el => el !== item);
             if (to.classList.contains('conflict-cell') || existingBlock) {
-                Toast.fire({ icon: 'error', title: 'No se puede asignar en este espacio ocupado o en conflicto.' });
+                Toast.fire({ icon: 'error', title: 'Espacio ocupado o en conflicto.' });
                 await loadPlannerData();
                 return;
             }
+
+            // 2. VALIDACIÓN DE FATIGA DOCENTE (CLIENT-SIDE)
+            checkTeacherFatigue(to, cursoData);
 
             try {
                 const isExistingBlock = item.dataset.bloqueId;
@@ -253,13 +300,75 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const onStart = (evt) => highlightConflicts(evt.item);
         const onEnd = () => clearConflicts();
+        
         sortableInstances.push(new Sortable(document.getElementById('unassigned-generales'), sharedConfig));
         sortableInstances.push(new Sortable(document.getElementById('unassigned-especialidad'), sharedConfig));
         document.querySelectorAll('.drop-zone').forEach(zone => sortableInstances.push(new Sortable(zone, { ...sharedConfig, onAdd, onStart, onEnd })));
         sortableInstances.push(new Sortable(DOMElements.trash, { ...sharedConfig, onAdd: (evt) => handleDeassign(evt.item) }));
     }
 
+    // --- NUEVA FUNCIÓN: VALIDAR FATIGA DOCENTE ---
+    function checkTeacherFatigue(targetCell, courseData) {
+        const teacherName = courseData.docente_nombre;
+        const day = targetCell.dataset.dia;
+        
+        if (!teacherName || teacherName === 'N/A' || !day) return;
+
+        // Buscamos todas las celdas de ESE día en ambas grillas (mañana y tarde)
+        // Nota: Esto funciona buscando por el atributo data-dia
+        const allCellsOfDay = document.querySelectorAll(`td[data-dia="${day}"]`);
+        
+        let consecutiveHours = 0;
+        let maxConsecutive = 0;
+
+        // Recorremos las celdas en orden (el DOM las devuelve en orden de aparición: Mañana -> Tarde)
+        allCellsOfDay.forEach(cell => {
+            // Buscamos si hay un curso asignado en esta celda
+            const courseItem = cell.querySelector('.assigned-course-item');
+            let isTeacherPresent = false;
+
+            if (courseItem) {
+                try {
+                    const data = JSON.parse(courseItem.dataset.fullData);
+                    // Comparamos nombres (idealmente sería ID, pero nombre funciona visualmente)
+                    if (data.docente_nombre === teacherName) {
+                        isTeacherPresent = true;
+                    }
+                } catch (e) { console.error("Error parsing course data for fatigue check"); }
+            }
+
+            // Si es la celda donde acabamos de soltar, también cuenta (aunque aún no tenga la clase assigned-course-item renderizada final)
+            // Pero como onAdd ocurre cuando el elemento YA está en el DOM de 'to', el querySelector podría encontrarlo o podríamos forzarlo.
+            // Para simplificar, asumimos que si cell === targetCell, el docente está presente.
+            if (cell === targetCell) {
+                isTeacherPresent = true;
+            }
+
+            if (isTeacherPresent) {
+                consecutiveHours++;
+            } else {
+                // Si encontramos un hueco, reseteamos el contador, pero guardamos el máximo visto
+                if (consecutiveHours > maxConsecutive) maxConsecutive = consecutiveHours;
+                consecutiveHours = 0;
+            }
+        });
+
+        // Chequeo final por si la racha termina al final del día
+        if (consecutiveHours > maxConsecutive) maxConsecutive = consecutiveHours;
+
+        // Si detectamos fatiga (ej: > 4 horas seguidas)
+        if (maxConsecutive > 4) {
+             Toast.fire({
+                icon: 'warning',
+                title: 'Posible Fatiga Docente',
+                text: `El docente ${teacherName} tendría ${maxConsecutive} horas consecutivas este día.`
+            });
+        }
+    }
+
     async function handleDeassign(courseElement) {
+        if(courseElement.classList.contains('static-course')) return;
+
         const bloqueId = courseElement.dataset.bloqueId;
         if (!bloqueId) {
             courseElement.remove();
@@ -282,7 +391,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // --- HELPER FUNCTIONS ---
     function getCellColorClasses(cell) {
         return Array.from(cell.classList).filter(c => c.startsWith('bg-'));
     }
@@ -373,6 +481,7 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             const response = await callApi(`/api/get-cursos-no-asignados/?especialidad_id=${especialidadId}&semestre_cursado=${semestreNum}`);
             if (response.status === 'success') {
+                currentPlannerData = response.data;
                 renderPlanner(response.data);
             } else { throw new Error(response.message || 'El servidor devolvió una respuesta inesperada.'); }
         } catch (error) {
@@ -424,6 +533,17 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    if (DOMElements.toggleGeneralEdit) {
+        DOMElements.toggleGeneralEdit.addEventListener('change', () => {
+            if (currentPlannerData) {
+                renderPlanner(currentPlannerData);
+                const msg = DOMElements.toggleGeneralEdit.checked ? 'Edición de Generales HABILITADA' : 'Edición de Generales BLOQUEADA';
+                const icon = DOMElements.toggleGeneralEdit.checked ? 'success' : 'info';
+                Toast.fire({ icon: icon, title: msg });
+            }
+        });
+    }
+
     if (DOMElements.especialidad) DOMElements.especialidad.addEventListener('change', loadPlannerData);
     if (DOMElements.semestre) DOMElements.semestre.addEventListener('change', loadPlannerData);
     if (DOMElements.autoAssignBtn) DOMElements.autoAssignBtn.addEventListener('click', handleAutoAssign);
@@ -433,7 +553,8 @@ document.addEventListener('DOMContentLoaded', function () {
         DOMElements.searchInput.addEventListener('input', (e) => {
             const searchTerm = e.target.value.toLowerCase();
             document.querySelectorAll('#unassigned-courses-container > .collapse .p-2.rounded-lg').forEach(card => {
-                card.style.display = card.textContent.toLowerCase().includes(searchTerm) ? '' : 'none';
+                // Buscamos dentro del texto visible de la tarjeta
+                card.style.display = card.innerText.toLowerCase().includes(searchTerm) ? '' : 'none';
             });
         });
     }
