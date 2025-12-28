@@ -63,12 +63,11 @@ class CursoAsistenciaSerializer(serializers.ModelSerializer):
         return obj.hora_salida is not None
 
 
-class MarkAttendanceSerializer(serializers.Serializer):
+class BaseAttendanceSerializer(serializers.Serializer):
     """
-    Serializer para validar los datos de entrada al marcar una asistencia.
+    Serializer base para validar los datos de entrada al marcar una asistencia.
     """
 
-    qrId = serializers.UUIDField()
     actionType = serializers.ChoiceField(
         choices=["general_entry", "general_exit", "course_entry", "course_exit"]
     )
@@ -89,6 +88,22 @@ class MarkAttendanceSerializer(serializers.Serializer):
         except:
             raise serializers.ValidationError("Formato de photoBase64 inválido.")
         return value
+
+
+class MarkAttendanceSerializer(BaseAttendanceSerializer):
+    """
+    Serializer para el Kiosco (requiere QR).
+    """
+
+    qrId = serializers.UUIDField()
+
+
+class MobileMarkAttendanceSerializer(BaseAttendanceSerializer):
+    """
+    Serializer para la App Móvil (Autenticado, sin QR).
+    """
+
+    pass
 
 
 class RegistrarAsistenciaRfidSerializer(serializers.Serializer):

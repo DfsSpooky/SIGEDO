@@ -24,6 +24,7 @@ from core.models import (
     Semestre,
 )
 from core.api.views.utils import get_kiosk_data_for_docente
+from core.services.attendance import process_attendance_action
 
 
 class TeacherInfoView(APIView):
@@ -78,6 +79,7 @@ class MarkAttendanceView(APIView):
         qr_id = validated_data["qrId"]
         action_type = validated_data["actionType"]
         photo_base64 = validated_data["photoBase64"]
+        course_id = validated_data.get("courseId")
 
         try:
             docente = Docente.objects.get(id_qr=qr_id)
@@ -87,180 +89,43 @@ class MarkAttendanceView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        today = timezone.localtime(timezone.now()).date()
-        now = timezone.now()
-
+        # Decodificar Base64 a ContentFile
         try:
             format, imgstr = photo_base64.split(";base64,")
             ext = format.split("/")[-1]
+            now = timezone.now()
             photo_file = ContentFile(
                 base64.b64decode(imgstr),
                 name=f"{docente.username}_{now.timestamp()}.{ext}",
             )
-        except:
-            return Response(
+        except Exception:
+             return Response(
                 {"status": "error", "message": "Formato de photoBase64 inválido."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if action_type == "general_entry":
-            _, created = AsistenciaDiaria.objects.get_or_create(
-                docente=docente, fecha=today, defaults={"foto_verificacion": photo_file}
+        # Usar el servicio compartido
+        try:
+            result = process_attendance_action(
+                docente=docente,
+                action_type=action_type,
+                photo_file=photo_file,
+                course_id=course_id
             )
-            if created:
-                return Response(
-                    {
-                        "status": "success",
-                        "message": "Entrada general registrada correctamente.",
-                    }
-                )
-            else:
-                return Response(
-                    {
-                        "status": "success",
-                        "message": "La entrada general ya ha sido marcada hoy.",
-                        "data": {"already_marked": True},
-                    }
-                )
+            return Response(result, status=status.HTTP_200_OK)
 
-        elif action_type == "general_exit":
-            asistencia_diaria = AsistenciaDiaria.objects.filter(
-                docente=docente, fecha=today
-            ).first()
-
-            if not asistencia_diaria:
-                return Response(
-                    {
-                        "status": "error",
-                        "message": "Debe marcar la entrada general antes de marcar la salida.",
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            if asistencia_diaria.hora_salida:
-                return Response(
-                    {
-                        "status": "warning",
-                        "message": "La salida general ya ha sido marcada hoy.",
-                    }
-                )
-
-            asistencia_diaria.hora_salida = now
-            asistencia_diaria.foto_salida = photo_file
-            asistencia_diaria.save()
-
+        except ValueError as e:
             return Response(
-                {
-                    "status": "success",
-                    "message": "Salida general registrada correctamente.",
-                }
+                {"status": "error", "message": str(e)},
+                status=status.HTTP_400_BAD_REQUEST,
             )
-
-        elif action_type in ["course_entry", "course_exit"]:
-            curso_id = validated_data.get("courseId")
-            if not curso_id:
-                return Response(
-                    {
-                        "status": "error",
-                        "message": "courseId es requerido para esta acción.",
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            try:
-                curso = Curso.objects.get(id=curso_id)
-            except Curso.DoesNotExist:
-                return Response(
-                    {"status": "error", "message": "Curso no encontrado."},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-
-            asistencia, _ = Asistencia.objects.get_or_create(
-                docente=docente, curso=curso, fecha=today
-            )
-            response_data = {}
-
-            if action_type == "course_entry":
-                if asistencia.hora_entrada:
-                    return Response(
-                        {
-                            "status": "warning",
-                            "message": "La entrada para este curso ya fue marcada.",
-                        }
-                    )
-
-                asistencia.hora_entrada = now
-                asistencia.foto_entrada = photo_file
-                response_data["es_tardanza"] = asistencia.es_tardanza()
-
-                # --- MEJORA: Cálculo Dinámico de Duración (Igual que en Web) ---
-                bloque_del_dia = BloqueHorario.objects.filter(
-                    curso=curso, dia_semana=today.weekday()
-                ).first()
-
-                if bloque_del_dia:
-                    # Usamos el método del modelo para obtener minutos reales
-                    duracion_real = bloque_del_dia.get_duracion_real_minutos()
-                    # Salida permitida 15 min antes del fin real
-                    duracion_minima_minutos = duracion_real - 15
-                else:
-                    # Fallback por seguridad (ej. clase extra no programada)
-                    # Asumimos 90 min (2 bloques de 45) - 15 = 75 min
-                    duracion_minima_minutos = 75
-
-                # Salvaguarda de tiempo mínimo absoluto
-                if duracion_minima_minutos < 15:
-                    duracion_minima_minutos = 15
-
-                asistencia.hora_salida_permitida = now + timedelta(
-                    minutes=duracion_minima_minutos
-                )
-                asistencia.save()
-                # -------------------------------------------------------------
-
-            elif action_type == "course_exit":
-                if not asistencia.hora_entrada:
-                    return Response(
-                        {
-                            "status": "error",
-                            "message": "Debe marcar la entrada antes de poder marcar la salida.",
-                        },
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-                if asistencia.hora_salida:
-                    return Response(
-                        {
-                            "status": "warning",
-                            "message": "La salida para este curso ya fue marcada.",
-                        }
-                    )
-                
-                # Verificamos si ya cumplió el tiempo mínimo
-                if not asistencia.puede_marcar_salida:
-                    return Response(
-                        {
-                            "status": "error",
-                            "message": "Aún no puede marcar la salida. No se ha cumplido el tiempo mínimo.",
-                        },
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-
-                asistencia.hora_salida = now
-                asistencia.foto_salida = photo_file
-                asistencia.save()
-
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
             return Response(
-                {
-                    "status": "success",
-                    "message": "Asistencia registrada correctamente.",
-                    "data": response_data,
-                }
+                {"status": "error", "message": "Error interno del servidor."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
-        return Response(
-            {"status": "error", "message": "Tipo de acción no válida."},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
 
 
 class RegistrarAsistenciaRfidView(APIView):
