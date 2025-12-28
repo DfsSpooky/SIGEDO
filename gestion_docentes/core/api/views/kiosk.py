@@ -49,7 +49,7 @@ class TeacherInfoView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # Removed weekend check
+        # Removed weekend check - Permitimos acceso siempre que haya horario programado
 
         response_data = get_kiosk_data_for_docente(docente, request)
         return Response(response_data)
@@ -193,21 +193,30 @@ class MarkAttendanceView(APIView):
                 asistencia.foto_entrada = photo_file
                 response_data["es_tardanza"] = asistencia.es_tardanza()
 
-                # Lógica corregida para usar la duración del bloque específico de ese día
+                # --- MEJORA: Cálculo Dinámico de Duración (Igual que en Web) ---
                 bloque_del_dia = BloqueHorario.objects.filter(
                     curso=curso, dia_semana=today.weekday()
                 ).first()
-                duracion_bloques_hoy = (
-                    bloque_del_dia.duracion_bloques if bloque_del_dia else 2
-                )  # Default a 2 si no se encuentra
 
-                duracion_minima_minutos = (duracion_bloques_hoy * 50) - 15
+                if bloque_del_dia:
+                    # Usamos el método del modelo para obtener minutos reales
+                    duracion_real = bloque_del_dia.get_duracion_real_minutos()
+                    # Salida permitida 15 min antes del fin real
+                    duracion_minima_minutos = duracion_real - 15
+                else:
+                    # Fallback por seguridad (ej. clase extra no programada)
+                    # Asumimos 90 min (2 bloques de 45) - 15 = 75 min
+                    duracion_minima_minutos = 75
+
+                # Salvaguarda de tiempo mínimo absoluto
                 if duracion_minima_minutos < 15:
                     duracion_minima_minutos = 15
+
                 asistencia.hora_salida_permitida = now + timedelta(
                     minutes=duracion_minima_minutos
                 )
                 asistencia.save()
+                # -------------------------------------------------------------
 
             elif action_type == "course_exit":
                 if not asistencia.hora_entrada:
@@ -225,11 +234,13 @@ class MarkAttendanceView(APIView):
                             "message": "La salida para este curso ya fue marcada.",
                         }
                     )
+                
+                # Verificamos si ya cumplió el tiempo mínimo
                 if not asistencia.puede_marcar_salida:
                     return Response(
                         {
                             "status": "error",
-                            "message": "Aún no puede marcar la salida.",
+                            "message": "Aún no puede marcar la salida. No se ha cumplido el tiempo mínimo.",
                         },
                         status=status.HTTP_400_BAD_REQUEST,
                     )
@@ -272,8 +283,7 @@ class RegistrarAsistenciaRfidView(APIView):
             )
 
         uid = serializer.validated_data["uid"]
-        # Removed weekend check
-
+        
         try:
             docente = Docente.objects.get(rfid_uid=uid)
         except Docente.DoesNotExist:

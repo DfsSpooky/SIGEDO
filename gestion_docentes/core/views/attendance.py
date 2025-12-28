@@ -1,3 +1,4 @@
+from datetime import timedelta
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from django.utils import timezone
@@ -6,30 +7,27 @@ from django.contrib import messages
 
 from ..models import Asistencia, BloqueHorario, Semestre
 
+
 @login_required
 def registrar_asistencia(request):
     docente = request.user
-    now = timezone.now()
+    now = timezone.localtime(timezone.now())  # Usamos hora local para evitar desfases
     error_message = None
 
-    # 1. Obtener Semestre y Bloque Actual (Lógica existente)
+    # 1. Obtener Semestre Activo
     semestre_activo = Semestre.objects.filter(
-        estado="ACTIVO", fecha_inicio__lte=now.date(), fecha_fin__gte=now.date()
+        estado="ACTIVO", 
+        fecha_inicio__lte=now.date(), 
+        fecha_fin__gte=now.date()
     ).first()
 
     bloque_actual = None
     if semestre_activo:
-        # Nota: Asegúrate que tus días en BD estén capitalizados ("Lunes", "Martes")
-        # .strftime("%A") devuelve en inglés ("Monday"). Django suele manejarlo, 
-        # pero si tus datos están en español, podrías necesitar un mapeo.
-        # Asumiremos que tu populate crea los días en inglés o tienes un sistema bilingüe.
-        # Si falla, revisa que 'dia_actual_str' coincida con lo que hay en BloqueHorario.
-        dia_nombre = now.strftime("%A") 
-        dias_traduccion = {
-            "Monday": "Lunes", "Tuesday": "Martes", "Wednesday": "Miércoles",
-            "Thursday": "Jueves", "Friday": "Viernes", "Saturday": "Sábado", "Sunday": "Domingo"
-        }
-        dia_actual_str = dias_traduccion.get(dia_nombre, dia_nombre)
+        # Mejora: Usamos weekday() (0=Lunes, 6=Domingo) para ser independientes del idioma del servidor
+        dias_semana = [
+            "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"
+        ]
+        dia_actual_str = dias_semana[now.weekday()]
 
         bloque_actual = (
             BloqueHorario.objects.filter(
@@ -47,15 +45,17 @@ def registrar_asistencia(request):
     asistencia_obj = None
     if bloque_actual:
         asistencia_obj = Asistencia.objects.filter(
-            docente=docente, curso=bloque_actual.curso, fecha=now.date()
+            docente=docente, 
+            curso=bloque_actual.curso, 
+            fecha=now.date()
         ).first()
 
-    # 3. MANEJAR EL POST (Esto es lo que faltaba)
+    # 3. MANEJAR EL POST
     if request.method == "POST":
-        accion = request.POST.get("accion") # 'entrada' o 'salida'
+        accion = request.POST.get("accion")  # 'entrada' o 'salida'
 
         if not bloque_actual:
-             error_message = "No se encontró un bloque horario activo en este momento."
+            error_message = "No se encontró un bloque horario activo en este momento."
         
         elif accion == "entrada":
             if asistencia_obj:
@@ -68,33 +68,43 @@ def registrar_asistencia(request):
                         fecha=now.date(),
                         hora_entrada=now
                     )
-                    # Calcular hora de salida permitida (Lógica similar a la API)
-                    duracion_minutos = (bloque_actual.duracion_bloques * 45) # Asumiendo 45min por hora académica
-                    if duracion_minutos < 15: duracion_minutos = 15
                     
-                    # Opcional: Si quieres ser estricto con la salida mínima
-                    # nueva_asistencia.hora_salida_permitida = now + timezone.timedelta(minutes=duracion_minutos)
+                    # --- MEJORA: Cálculo dinámico de la duración ---
+                    # Obtenemos la duración real basada en las franjas horarias
+                    duracion_real_minutos = bloque_actual.get_duracion_real_minutos()
                     
-                    nueva_asistencia.full_clean() # Valida el Anti-Passback del modelo
+                    # Definimos que se puede salir 15 minutos antes de que acabe la hora real
+                    tiempo_minimo_clase = duracion_real_minutos - 15
+                    
+                    # Salvaguarda: Si la clase es muy corta (ej. < 30 min), forzamos al menos 15 min
+                    if tiempo_minimo_clase < 15:
+                        tiempo_minimo_clase = 15
+                    
+                    nueva_asistencia.hora_salida_permitida = now + timedelta(minutes=tiempo_minimo_clase)
+                    # -----------------------------------------------
+
+                    nueva_asistencia.full_clean()  # Valida reglas del modelo (ej. anti-passback)
                     nueva_asistencia.save()
+                    
                     messages.success(request, f"Entrada marcada correctamente a las {now.strftime('%H:%M')}")
                     return redirect("asistencia")
                     
                 except ValidationError as e:
-                    error_message = e.message_dict.get('__all__', [str(e)])[0]
+                    # Extraemos el primer error disponible para mostrarlo limpio
+                    error_message = e.message_dict.get('__all__', [str(e)])[0] if hasattr(e, 'message_dict') else str(e)
 
         elif accion == "salida":
             if not asistencia_obj:
                 error_message = "No hay una entrada marcada para registrar salida."
             elif asistencia_obj.hora_salida:
-                 error_message = "La salida ya fue marcada anteriormente."
+                error_message = "La salida ya fue marcada anteriormente."
             else:
-                # Validar si puede marcar salida (usando tu propiedad del modelo)
-                # Si quieres saltarte esta validación para pruebas manuales, comenta el if.
+                # Validar si puede marcar salida usando la propiedad del modelo
                 if not asistencia_obj.puede_marcar_salida and asistencia_obj.hora_salida_permitida:
-                     restante = asistencia_obj.hora_salida_permitida - now
-                     minutos = int(restante.total_seconds() / 60)
-                     error_message = f"Aún no puede marcar salida. Espere {minutos} minutos."
+                    restante = asistencia_obj.hora_salida_permitida - now
+                    # Evitamos mostrar números negativos si acaba de pasar el tiempo
+                    minutos = max(1, int(restante.total_seconds() / 60))
+                    error_message = f"Aún no puede marcar salida. Espere {minutos} minutos más para completar el tiempo mínimo."
                 else:
                     asistencia_obj.hora_salida = now
                     asistencia_obj.save()
@@ -107,7 +117,7 @@ def registrar_asistencia(request):
         "asistencia.html",
         {
             "curso_actual": bloque_actual.curso if bloque_actual else None,
-            "bloque_actual": bloque_actual, # Necesario para el template
+            "bloque_actual": bloque_actual,  # Necesario para mostrar info en el template
             "asistencia": asistencia_obj,
             "error": error_message,
         },

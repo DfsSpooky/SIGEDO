@@ -1,3 +1,4 @@
+from datetime import datetime, date
 from django.core.exceptions import ValidationError
 from django.db import models
 
@@ -188,6 +189,22 @@ class BloqueHorario(models.Model):
             pass
 
         return start_time, end_time
+
+    def get_duracion_real_minutos(self):
+        """
+        Calcula la duración exacta del bloque basándose en su hora de inicio y fin.
+        Esto se adapta automáticamente a si la franja es de 45, 50 o 60 minutos.
+        """
+        if not self.horario_inicio or not self.horario_fin:
+            return 0
+            
+        # Truco para restar horas: combinarlas con una fecha ficticia
+        dummy_date = date(2000, 1, 1)
+        inicio_dt = datetime.combine(dummy_date, self.horario_inicio)
+        fin_dt = datetime.combine(dummy_date, self.horario_fin)
+        
+        diferencia = fin_dt - inicio_dt
+        return int(diferencia.total_seconds() / 60)
 
     class Meta:
         verbose_name = "Bloque de Horario"
