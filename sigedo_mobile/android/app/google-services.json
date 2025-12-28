@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "618600500306",
+    "project_id": "sigedo-2296d",
+    "storage_bucket": "sigedo-2296d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:618600500306:android:47f1705a6395aabc25a38b",
+        "android_client_info": {
+          "package_name": "com.example.sigedo_mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBDcML29dkyDERa7hEakq3IGDkGkS6e2Z0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

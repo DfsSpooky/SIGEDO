@@ -49,3 +49,4 @@ icalendar
 djangorestframework-simplejwt
 qrcode
 pillow
+firebase-admin

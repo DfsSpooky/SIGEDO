@@ -436,3 +436,8 @@ LOGIN_REDIRECT_URL = "dashboard"
 LOGOUT_REDIRECT_URL = "login"
 
 X_FRAME_OPTIONS = "SAMEORIGIN"
+
+# Geolocalización (Anti-Fraude)
+# Coordenadas de prueba (Plaza de Armas de Lima)
+CAMPUS_LOCATION = (-12.046374, -77.042793) 
+ALLOWED_RADIUS_METERS = 200 # Radio en metros

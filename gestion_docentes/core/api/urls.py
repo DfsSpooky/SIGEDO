@@ -79,4 +79,13 @@ urlpatterns = [
     # --- Autenticación JWT ---
     path("token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+
+    # --- API Móvil ---
+    path("mobile/status/", views.MobileStatusView.as_view(), name="mobile_status"),
+    path("mobile/attendance/", views.MobileMarkAttendanceView.as_view(), name="mobile_attendance"),
+    path("mobile/fcm-token/", views.UpdateFCMTokenView.as_view(), name="mobile_fcm_token"),
+    
+    # --- Justificaciones ---
+    path("justificaciones/", views.JustificationListView.as_view(), name="justification_list"),
+    path("tipo-justificaciones/", views.TipoJustificacionListView.as_view(), name="tipo_justification_list"),
 ]

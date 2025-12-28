@@ -69,10 +69,10 @@ def get_kiosk_data_for_docente(docente, request):
 
     if asistencia_diaria:
         is_daily_entry_marked = True # Since it exists, entry is marked
-        daily_entry_time = asistencia_diaria.hora_entrada.strftime("%I:%M %p")
+        daily_entry_time = timezone.localtime(asistencia_diaria.hora_entrada).strftime("%I:%M %p")
         if asistencia_diaria.hora_salida:
             is_daily_exit_marked = True
-            daily_exit_time = asistencia_diaria.hora_salida.strftime("%I:%M %p")
+            daily_exit_time = timezone.localtime(asistencia_diaria.hora_salida).strftime("%I:%M %p")
 
     # 4. Serialize
     docente_serializer = DocenteInfoSerializer(

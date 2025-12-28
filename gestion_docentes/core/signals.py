@@ -20,7 +20,43 @@ from .models import (
     VersionDocumento,
 )
 
+from django.conf import settings
+import os
+import firebase_admin
+from firebase_admin import credentials, messaging
+
 logger = logging.getLogger(__name__)
+
+# --- Inicialización Lazy de Firebase ---
+if not firebase_admin._apps:
+    try:
+        cred_path = os.path.join(settings.BASE_DIR, 'serviceAccountKey.json')
+        if os.path.exists(cred_path):
+            cred = credentials.Certificate(cred_path)
+            firebase_admin.initialize_app(cred)
+    except Exception as e:
+        logger.error(f"Error loading Firebase credentials in signals: {e}")
+
+def send_fcm_notification(user, title, body):
+    """Envía una notificación Push al Token FCM del usuario."""
+    if not user.fcm_token:
+        return
+    
+    try:
+        if not firebase_admin._apps: 
+             return # No configurado
+
+        message = messaging.Message(
+            notification=messaging.Notification(
+                title=title,
+                body=body,
+            ),
+            token=user.fcm_token,
+        )
+        response = messaging.send(message)
+        logger.info(f"FCM Sent to {user.username}: {response}")
+    except Exception as e:
+        logger.error(f"Error sending FCM to {user.username}: {e}")
 
 
 def do_broadcast(user_id, payload):
@@ -311,4 +347,16 @@ def notificar_cambio_horario_on_delete(sender, instance, **kwargs):
     if instance.curso and instance.curso.docente:
         transaction.on_commit(
             partial(broadcast_horario_update, instance.curso.docente.id)
+        )
+
+@receiver(post_save, sender=Notificacion)
+def enviar_push_al_crear_notificacion(sender, instance, created, **kwargs):
+    """
+    Cada vez que se crea una Notificación interna (BD), se intenta enviar como Push.
+    """
+    if created and instance.destinatario.fcm_token:
+        # Usamos on_commit para no bloquear la transacción DB con la llamada de red
+        transaction.on_commit(
+            # Título genérico o personalizado según contexto
+            partial(send_fcm_notification, instance.destinatario, "SIGEDO", instance.mensaje)
         )

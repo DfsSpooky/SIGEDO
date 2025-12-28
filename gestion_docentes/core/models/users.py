@@ -36,6 +36,12 @@ class Docente(AbstractUser):
         blank=True,
         default="fotos_docentes/placeholder.png",
     )
+    fcm_token = models.CharField(
+        max_length=255, 
+        blank=True, 
+        null=True, 
+        help_text="Token de notificaciones Push (Firebase)"
+    )
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
