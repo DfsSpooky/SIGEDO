@@ -5,11 +5,19 @@ from rest_framework_simplejwt.views import (
 )
 
 from . import views
+from .views import mobile  # Importamos el módulo mobile
 
 # Define el espacio de nombres para estas URLs de API
 app_name = "api"
 
 urlpatterns = [
+    # --- URLs para la App Móvil ---
+    path("mobile/status/", mobile.MobileStatusView.as_view(), name="mobile_status"),
+    path(
+        "mobile/attendance/",
+        mobile.MobileAttendanceView.as_view(),
+        name="mobile_attendance",
+    ),
     # --- URLs para el Kiosco ---
     path("get-teacher-info/", views.TeacherInfoView.as_view(), name="get_teacher_info"),
     path(
