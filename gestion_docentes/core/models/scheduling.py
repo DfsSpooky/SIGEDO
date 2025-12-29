@@ -1,3 +1,4 @@
+from datetime import datetime, date
 from django.core.exceptions import ValidationError
 from django.db import models
 
@@ -189,6 +190,22 @@ class BloqueHorario(models.Model):
 
         return start_time, end_time
 
+    def get_duracion_real_minutos(self):
+        """
+        Calcula la duración exacta del bloque basándose en su hora de inicio y fin.
+        Esto se adapta automáticamente a si la franja es de 45, 50 o 60 minutos.
+        """
+        if not self.horario_inicio or not self.horario_fin:
+            return 0
+            
+        # Truco para restar horas: combinarlas con una fecha ficticia
+        dummy_date = date(2000, 1, 1)
+        inicio_dt = datetime.combine(dummy_date, self.horario_inicio)
+        fin_dt = datetime.combine(dummy_date, self.horario_fin)
+        
+        diferencia = fin_dt - inicio_dt
+        return int(diferencia.total_seconds() / 60)
+
     class Meta:
         verbose_name = "Bloque de Horario"
         verbose_name_plural = "Bloques de Horario"
@@ -328,6 +345,24 @@ class BloqueHorario(models.Model):
         # o si el bloque actual es excesivamente largo.
         if self.duracion_bloques > 4:
              raise ValidationError("No se pueden asignar bloques de más de 4 horas continuas.")
+
+        # 8. Validar Reglas de Turno por Semestre
+        # Semestres 1-4: Turno MAÑANA (salvo excepción)
+        # Semestres 5-10: Turno TARDE
+        if self.curso.pk and self.curso.semestre_cursado:
+            turno_franja = self.franja_inicio.turno
+            semestre = self.curso.semestre_cursado
+
+            if semestre <= 4:
+                if turno_franja == "TARDE" and not self.curso.excepcion_horario:
+                    raise ValidationError(
+                        f"Los cursos del Semestre {semestre} deben dictarse en la MAÑANA (salvo excepción habilitada)."
+                    )
+            elif semestre >= 5:
+                if turno_franja == "MANANA":
+                    raise ValidationError(
+                        f"Los cursos del Semestre {semestre} deben dictarse en la TARDE."
+                    )
 
     def save(self, *args, **kwargs):
         # Salvaguarda para ignorar la creación de bloques vacíos desde el admin inline

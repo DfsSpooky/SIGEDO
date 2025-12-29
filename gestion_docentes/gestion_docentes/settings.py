@@ -36,10 +36,10 @@ ID_ENCRYPTION_KEY = os.environ.get("ID_ENCRYPTION_KEY", "").encode()
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DEBUG", "False").lower() in ("true", "1", "t")
 
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost").split(",")
+ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost").split(",") + ["oversophisticated-dedra-overgross.ngrok-free.dev"]
 # ... cerca de ALLOWED_HOSTS ...
 
-CSRF_TRUSTED_ORIGINS = ["https://aquienpasco.lat", "https://www.aquienpasco.lat"]
+CSRF_TRUSTED_ORIGINS = ["https://aquienpasco.lat", "https://www.aquienpasco.lat", "https://oversophisticated-dedra-overgross.ngrok-free.dev" ]
 
 # Settings for running behind a reverse proxy like Nginx
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -62,6 +62,8 @@ INSTALLED_APPS = [
     "rest_framework",
     "core",
     "tailwind",
+    "drf_spectacular",
+    "simple_history",
 ]
 
 MIDDLEWARE = [
@@ -72,7 +74,9 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "simple_history.middleware.HistoryRequestMiddleware",
 ]
 
 ROOT_URLCONF = "gestion_docentes.urls"
@@ -98,19 +102,48 @@ TEMPLATES = [
 WSGI_APPLICATION = "gestion_docentes.wsgi.application"
 ASGI_APPLICATION = "gestion_docentes.asgi.application"
 
+# Channel Layers are configured below based on environment
+
+# If in DEBUG mode, override channel layer to use in-memory for local development
+# This avoids needing a Redis server running locally.
+# Start channels layer configuration
+redis_host = os.environ.get("REDIS_HOST")
+redis_port = os.environ.get("REDIS_PORT", 6379)
+
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [(os.environ.get("REDIS_HOST"), os.environ.get("REDIS_PORT"))],
+            "hosts": [(redis_host if redis_host else "redis", redis_port)],
         },
     },
 }
 
 # If in DEBUG mode, override channel layer to use in-memory for local development
 # This avoids needing a Redis server running locally.
-if DEBUG:
+if DEBUG and not redis_host:
     CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
+
+# --- Cache Configuration (Redis) ---
+if os.environ.get("REDIS_HOST"):
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": f"redis://{os.environ.get('REDIS_HOST')}:{os.environ.get('REDIS_PORT')}/1",
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            }
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        }
+    }
+    
+# --- Email Configuration (Console for Development) ---
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 
 # Database
@@ -194,6 +227,15 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
     ),
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "100/day",
+        "user": "1000/day",
+    },
 }
 
 from datetime import timedelta
@@ -260,6 +302,11 @@ UNFOLD = {
                         "title": "Dashboard",
                         "icon": "dashboard",
                         "link": reverse_lazy("admin:index"),
+                    },
+                    {
+                        "title": "Centro de Control",
+                        "icon": "monitor_heart",
+                        "link": reverse_lazy("dashboard_feed"),
                     },
                 ],
             },
@@ -436,3 +483,16 @@ LOGIN_REDIRECT_URL = "dashboard"
 LOGOUT_REDIRECT_URL = "login"
 
 X_FRAME_OPTIONS = "SAMEORIGIN"
+
+# Geolocalización (Anti-Fraude)
+# Coordenadas de prueba (Plaza de Armas de Lima)
+CAMPUS_LOCATION = (-12.046374, -77.042793) 
+ALLOWED_RADIUS_METERS = 200 # Radio en metros
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Gestión de Docentes API",
+    "DESCRIPTION": "API para la gestión de docentes, asistencia e inventario.",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    # OTHER SETTINGS
+}

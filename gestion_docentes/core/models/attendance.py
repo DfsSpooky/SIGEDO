@@ -3,6 +3,7 @@ from datetime import date
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
+from simple_history.models import HistoricalRecords
 
 
 class Asistencia(models.Model):
@@ -23,6 +24,7 @@ class Asistencia(models.Model):
     foto_salida = models.ImageField(
         upload_to="verificacion_cursos/salidas/%Y/%m/%d/", null=True, blank=True
     )
+    history = HistoricalRecords()
 
     class Meta:
         permissions = [
@@ -114,8 +116,12 @@ class AsistenciaDiaria(models.Model):
     docente = models.ForeignKey("core.Docente", on_delete=models.CASCADE)
     fecha = models.DateField(default=date.today)
     hora_entrada = models.DateTimeField(auto_now_add=True)
+    hora_salida = models.DateTimeField(null=True, blank=True)
     foto_verificacion = models.ImageField(
         upload_to="verificacion_diaria/%Y/%m/%d/", null=True, blank=True
+    )
+    foto_salida = models.ImageField(
+        upload_to="verificacion_diaria/salidas/%Y/%m/%d/", null=True, blank=True
     )
 
     def __str__(self):

@@ -10,6 +10,7 @@ from django.urls import reverse
 
 from .models import (
     Anuncio,
+    AsistenciaDiaria,
     BloqueHorario,
     Curso,
     Docente,
@@ -20,7 +21,43 @@ from .models import (
     VersionDocumento,
 )
 
+from django.conf import settings
+import os
+import firebase_admin
+from firebase_admin import credentials, messaging
+
 logger = logging.getLogger(__name__)
+
+# --- Inicialización Lazy de Firebase ---
+if not firebase_admin._apps:
+    try:
+        cred_path = os.path.join(settings.BASE_DIR, 'serviceAccountKey.json')
+        if os.path.exists(cred_path):
+            cred = credentials.Certificate(cred_path)
+            firebase_admin.initialize_app(cred)
+    except Exception as e:
+        logger.error(f"Error loading Firebase credentials in signals: {e}")
+
+def send_fcm_notification(user, title, body):
+    """Envía una notificación Push al Token FCM del usuario."""
+    if not user.fcm_token:
+        return
+    
+    try:
+        if not firebase_admin._apps: 
+             return # No configurado
+
+        message = messaging.Message(
+            notification=messaging.Notification(
+                title=title,
+                body=body,
+            ),
+            token=user.fcm_token,
+        )
+        response = messaging.send(message)
+        logger.info(f"FCM Sent to {user.username}: {response}")
+    except Exception as e:
+        logger.error(f"Error sending FCM to {user.username}: {e}")
 
 
 def do_broadcast(user_id, payload):
@@ -169,7 +206,7 @@ def crear_notificacion_asignacion_curso(sender, instance, **kwargs):
 @receiver(post_save, sender=Anuncio)
 def crear_notificacion_anuncio(sender, instance, created, **kwargs):
     if created:
-        message = f"Nuevo anuncio publicado: '{instance.titulo}'"
+        message = f"Nuevo anuncio: {instance.titulo}\n\n{instance.contenido}"
 
         for docente in Docente.objects.all():
             notificacion = Notificacion.objects.create(
@@ -312,3 +349,65 @@ def notificar_cambio_horario_on_delete(sender, instance, **kwargs):
         transaction.on_commit(
             partial(broadcast_horario_update, instance.curso.docente.id)
         )
+
+@receiver(post_save, sender=Notificacion)
+def enviar_push_al_crear_notificacion(sender, instance, created, **kwargs):
+    """
+    Cada vez que se crea una Notificación interna (BD), se intenta enviar como Push.
+    """
+    if created and instance.destinatario.fcm_token:
+        # Usamos on_commit para no bloquear la transacción DB con la llamada de red
+        transaction.on_commit(
+            # Título genérico o personalizado según contexto
+            partial(send_fcm_notification, instance.destinatario, "SIGEDO", instance.mensaje)
+        )
+
+# --- Dashboard Real-time Signal ---
+from .models import Asistencia
+
+def broadcast_dashboard_update(data):
+    try:
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            async_to_sync(channel_layer.group_send)(
+                "dashboard_feed",
+                {
+                    "type": "attendance.update",
+                    "data": data,
+                },
+            )
+    except Exception as e:
+        logger.error(f"Failed to broadcast dashboard update: {e}", exc_info=True)
+
+@receiver(post_save, sender=Asistencia)
+def notificar_dashboard_asistencia(sender, instance, created, **kwargs):
+    if created or instance.hora_entrada or instance.hora_salida:
+        data = {
+            "id": instance.id,
+            "docente_nombre": f"{instance.docente.first_name} {instance.docente.last_name}",
+            "curso": instance.curso.nombre,
+            "hora_entrada": instance.hora_entrada.strftime("%H:%M") if instance.hora_entrada else "--:--",
+            "hora_salida": instance.hora_salida.strftime("%H:%M") if instance.hora_salida else "--:--",
+            "foto_url": instance.foto_entrada.url if instance.foto_entrada else None,
+            "estado": "Finalizado" if instance.hora_salida else "En curso",
+            "tipo": "entrada" if created else "salida",
+            "es_general": False
+        }
+        transaction.on_commit(partial(broadcast_dashboard_update, data))
+
+@receiver(post_save, sender=AsistenciaDiaria)
+def notificar_dashboard_asistencia_diaria(sender, instance, created, **kwargs):
+    if created or instance.hora_salida:
+        # Lógica similar para asistencia general (sin curso)
+        data = {
+            "id": f"gen_{instance.id}",
+            "docente_nombre": f"{instance.docente.first_name} {instance.docente.last_name}",
+            "curso": "Control General", # Etiqueta distintiva
+            "hora_entrada": instance.hora_entrada.strftime("%H:%M") if instance.hora_entrada else "--:--",
+            "hora_salida": instance.hora_salida.strftime("%H:%M") if instance.hora_salida else "--:--",
+            "foto_url": instance.foto_verificacion.url if instance.foto_verificacion else None,
+            "estado": "Jornada Finalizada" if instance.hora_salida else "En Campus",
+            "tipo": "entrada_general" if created else "salida_general",
+            "es_general": True
+        }
+        transaction.on_commit(partial(broadcast_dashboard_update, data))
