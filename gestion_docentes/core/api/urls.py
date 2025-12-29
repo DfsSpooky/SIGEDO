@@ -84,8 +84,15 @@ urlpatterns = [
     path("mobile/status/", views.MobileStatusView.as_view(), name="mobile_status"),
     path("mobile/attendance/", views.MobileMarkAttendanceView.as_view(), name="mobile_attendance"),
     path("mobile/fcm-token/", views.UpdateFCMTokenView.as_view(), name="mobile_fcm_token"),
+    path("mobile/documents/", views.MobileDocumentsView.as_view(), name="mobile_documents"),
+    path("mobile/documents/upload/", views.MobileUploadDocumentView.as_view(), name="mobile_documents_upload"),
     
+    # --- Justificaciones ---
     # --- Justificaciones ---
     path("justificaciones/", views.JustificationListView.as_view(), name="justification_list"),
     path("tipo-justificaciones/", views.TipoJustificacionListView.as_view(), name="tipo_justification_list"),
+
+    # --- Autenticación y Recuperación ---
+    path("auth/request-reset/", views.RequestPasswordResetView.as_view(), name="request_reset"),
+    path("auth/reset-password/", views.ResetPasswordView.as_view(), name="reset_password"),
 ]

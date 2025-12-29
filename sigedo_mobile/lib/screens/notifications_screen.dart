@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-// import 'package:url_launcher/url_launcher.dart'; // Si quieres abrir URLs
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -11,7 +10,9 @@ class NotificationsScreen extends StatefulWidget {
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
   final ApiService _apiService = ApiService();
-  late Future<Map<String, dynamic>> _notificationsFuture;
+  bool _isLoading = true;
+  List<dynamic> _notifications = [];
+  String? _error;
 
   @override
   void initState() {
@@ -19,63 +20,192 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     _loadNotifications();
   }
 
-  void _loadNotifications() {
+  Future<void> _loadNotifications() async {
     setState(() {
-      _notificationsFuture = _apiService.getNotifications();
+      _isLoading = true;
+      _error = null;
     });
+
+    try {
+      final data = await _apiService.getNotifications();
+      setState(() {
+        _notifications = data['notifications'] ?? [];
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _markAsRead(int id, int index) async {
+    // Optimistic update
+    setState(() {
+      _notifications[index]['leido'] = true;
+    });
+
+    final success = await _apiService.markNotificationAsRead(id);
+    if (!success) {
+      // Revert if failed
+      if (mounted) {
+        setState(() {
+           _notifications[index]['leido'] = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Error al marcar como leída")));
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text("Notificaciones"),
-        backgroundColor: Colors.indigo,
-        foregroundColor: Colors.white,
+        title: const Text("Notificaciones", style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        elevation: 0,
+        centerTitle: true,
       ),
-      body: FutureBuilder<Map<String, dynamic>>(
-        future: _notificationsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text("Error: ${snapshot.error}"));
-          } else if (!snapshot.hasData) {
-            return const Center(child: Text("Sin información."));
-          }
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator()) 
+        : RefreshIndicator(
+            onRefresh: _loadNotifications,
+            child: _notifications.isEmpty 
+              ? _buildEmptyState()
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  itemCount: _notifications.length,
+                  itemBuilder: (ctx, index) {
+                    final notif = _notifications[index];
+                    return _buildNotificationCard(notif, index);
+                  },
+                ),
+          ),
+    );
+  }
 
-          final data = snapshot.data!;
-          final List<dynamic> notifications = data['notifications'] ?? [];
+  Widget _buildEmptyState() {
+     return ListView( // To allow pull-to-refresh even on empty
+       children: [
+         SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+         const Center(
+           child: Column(
+             mainAxisAlignment: MainAxisAlignment.center,
+             children: [
+               Icon(Icons.notifications_none_outlined, size: 80, color: Colors.grey),
+               SizedBox(height: 20),
+               Text("No tienes notificaciones", style: TextStyle(color: Colors.grey, fontSize: 18)),
+             ],
+           ),
+         ),
+       ],
+     );
+  }
 
-          if (notifications.isEmpty) {
-            return const Center(child: Text("No tienes notificaciones recientes."));
-          }
+  Widget _buildNotificationCard(dynamic notif, int index) {
+    final bool read = notif['leido'] ?? false;
+    final int id = notif['id'];
+    final String dateStr = notif['fecha_creacion'].toString().split('T')[0];
 
-          return ListView.builder(
-            itemCount: notifications.length,
-            itemBuilder: (ctx, index) {
-              final notif = notifications[index];
-              return Card(
-                color: notif['leido'] ? Colors.white : Colors.indigo.shade50,
-                margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                child: ListTile(
-                  leading: Icon(
-                    notif['leido'] ? Icons.notifications_none : Icons.notifications_active,
-                    color: notif['leido'] ? Colors.grey : Colors.red,
+    return Dismissible(
+      key: Key(id.toString()),
+      background: Container(color: Colors.red),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (dir) async {
+         // Maybe delete functionality later? For now just confirm nothing happens on swipe
+         return false; 
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        decoration: BoxDecoration(
+          color: read ? Colors.white : Colors.indigo.shade50,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 4)
+            )
+          ],
+          border: read ? Border.all(color: Colors.grey.shade200) : Border.all(color: Colors.indigo.shade100, width: 1.5)
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () {
+              // 1. Marcar como leída si no lo está
+              if (!read) {
+                _markAsRead(id, index);
+              }
+              // 2. Mostrar diálogo con el contenido completo
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text("Detalle de Notificación"),
+                  content: SingleChildScrollView(
+                    child: Text(notif['mensaje'] ?? "Sin contenido"),
                   ),
-                  title: Text(
-                    notif['mensaje'],
-                    style: TextStyle(
-                      fontWeight: notif['leido'] ? FontWeight.normal : FontWeight.bold,
-                    ),
-                  ),
-                  subtitle: Text(notif['fecha_creacion'].toString().split('T')[0]),
-                  // Aquí se podría agregar onTap para marcar como leída
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text("Cerrar"),
+                    )
+                  ],
                 ),
               );
             },
-          );
-        },
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: read ? Colors.grey.shade100 : Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      read ? Icons.notifications_none : Icons.notifications_active,
+                      color: read ? Colors.grey : Colors.indigo,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          notif['mensaje'] ?? "Sin mensaje",
+                          style: TextStyle(
+                            fontWeight: read ? FontWeight.normal : FontWeight.bold,
+                            fontSize: 14,
+                            color: read ? Colors.grey.shade800 : Colors.black87
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          dateStr,
+                          style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                        )
+                      ],
+                    ),
+                  ),
+                  if (!read)
+                    Container(
+                      margin: const EdgeInsets.only(left: 8),
+                      width: 10, height: 10,
+                      decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                    )
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

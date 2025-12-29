@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
+import 'providers/theme_provider.dart'; // Import ThemeProvider
 import 'screens/splash_screen.dart';
 
 import 'theme/app_theme.dart';
@@ -21,12 +22,21 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
-      providers: [ChangeNotifierProvider(create: (_) => AuthProvider())],
-      child: MaterialApp(
-        title: 'SIGEDO Mobile',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
-        home: const SplashScreen(),
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()), // Register ThemeProvider
+      ],
+      child: Consumer<ThemeProvider>( // Listen to theme changes
+        builder: (context, themeProvider, child) {
+          return MaterialApp(
+            title: 'SIGEDO Mobile',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: themeProvider.themeMode, // Use dynamic theme mode
+            home: const SplashScreen(),
+          );
+        },
       ),
     );
   }

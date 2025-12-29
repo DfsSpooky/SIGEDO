@@ -24,14 +24,27 @@ class TeacherInfo {
   final String name;
   final String dni;
   final String? photoUrl;
+  final String? email; // NEW
+  final String? idQr; // NEW
 
-  TeacherInfo({required this.name, required this.dni, this.photoUrl});
+  // Getters for compatibility with CredentialScreen
+  String? get foto => photoUrl;
+  
+  TeacherInfo({
+    required this.name, 
+    required this.dni, 
+    this.photoUrl,
+    this.email,
+    this.idQr,
+  });
 
   factory TeacherInfo.fromJson(Map<String, dynamic> json) {
     return TeacherInfo(
       name: json['name'],
       dni: json['dni'],
-      photoUrl: json['photoUrl'],
+      photoUrl: json['photoUrl'] ?? json['foto'], // Flexible key
+      email: json['email'],
+      idQr: json['id_qr'] ?? json['rfid_uid'], // Map backend field
     );
   }
 }

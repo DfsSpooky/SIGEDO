@@ -1,18 +1,20 @@
-from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
-
 from core.models import Notificacion
 
 
-@login_required
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def notificaciones_json(request):
     """
     API view to get the user's notifications in JSON format.
+    Compatible with both Web (Session) and Mobile (JWT).
     """
     notifications = Notificacion.objects.filter(destinatario=request.user).order_by(
         "-fecha_creacion"
-    )[:10]
+    )[:20] # Increased limit
     unread_count = Notificacion.objects.filter(
         destinatario=request.user, leido=False
     ).count()
@@ -28,12 +30,13 @@ def notificaciones_json(request):
         for n in notifications
     ]
 
-    return JsonResponse(
+    return Response(
         {"notifications": notifications_data, "unread_count": unread_count}
     )
 
 
-@login_required
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def marcar_notificacion_como_leida(request, notificacion_id):
     """
     API view to mark a single notification as read.
@@ -44,10 +47,11 @@ def marcar_notificacion_como_leida(request, notificacion_id):
     if not notificacion.leido:
         notificacion.leido = True
         notificacion.save()
-    return JsonResponse({"status": "success"})
+    return Response({"status": "success"})
 
 
-@login_required
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def marcar_todas_como_leidas(request):
     """
     API view to mark all unread notifications as read.
@@ -55,4 +59,4 @@ def marcar_todas_como_leidas(request):
     Notificacion.objects.filter(destinatario=request.user, leido=False).update(
         leido=True
     )
-    return JsonResponse({"status": "success"})
+    return Response({"status": "success"})

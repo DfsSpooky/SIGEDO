@@ -10,6 +10,7 @@ from django.urls import reverse
 
 from .models import (
     Anuncio,
+    AsistenciaDiaria,
     BloqueHorario,
     Curso,
     Docente,
@@ -205,7 +206,7 @@ def crear_notificacion_asignacion_curso(sender, instance, **kwargs):
 @receiver(post_save, sender=Anuncio)
 def crear_notificacion_anuncio(sender, instance, created, **kwargs):
     if created:
-        message = f"Nuevo anuncio publicado: '{instance.titulo}'"
+        message = f"Nuevo anuncio: {instance.titulo}\n\n{instance.contenido}"
 
         for docente in Docente.objects.all():
             notificacion = Notificacion.objects.create(
@@ -360,3 +361,53 @@ def enviar_push_al_crear_notificacion(sender, instance, created, **kwargs):
             # Título genérico o personalizado según contexto
             partial(send_fcm_notification, instance.destinatario, "SIGEDO", instance.mensaje)
         )
+
+# --- Dashboard Real-time Signal ---
+from .models import Asistencia
+
+def broadcast_dashboard_update(data):
+    try:
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            async_to_sync(channel_layer.group_send)(
+                "dashboard_feed",
+                {
+                    "type": "attendance.update",
+                    "data": data,
+                },
+            )
+    except Exception as e:
+        logger.error(f"Failed to broadcast dashboard update: {e}", exc_info=True)
+
+@receiver(post_save, sender=Asistencia)
+def notificar_dashboard_asistencia(sender, instance, created, **kwargs):
+    if created or instance.hora_entrada or instance.hora_salida:
+        data = {
+            "id": instance.id,
+            "docente_nombre": f"{instance.docente.first_name} {instance.docente.last_name}",
+            "curso": instance.curso.nombre,
+            "hora_entrada": instance.hora_entrada.strftime("%H:%M") if instance.hora_entrada else "--:--",
+            "hora_salida": instance.hora_salida.strftime("%H:%M") if instance.hora_salida else "--:--",
+            "foto_url": instance.foto_entrada.url if instance.foto_entrada else None,
+            "estado": "Finalizado" if instance.hora_salida else "En curso",
+            "tipo": "entrada" if created else "salida",
+            "es_general": False
+        }
+        transaction.on_commit(partial(broadcast_dashboard_update, data))
+
+@receiver(post_save, sender=AsistenciaDiaria)
+def notificar_dashboard_asistencia_diaria(sender, instance, created, **kwargs):
+    if created or instance.hora_salida:
+        # Lógica similar para asistencia general (sin curso)
+        data = {
+            "id": f"gen_{instance.id}",
+            "docente_nombre": f"{instance.docente.first_name} {instance.docente.last_name}",
+            "curso": "Control General", # Etiqueta distintiva
+            "hora_entrada": instance.hora_entrada.strftime("%H:%M") if instance.hora_entrada else "--:--",
+            "hora_salida": instance.hora_salida.strftime("%H:%M") if instance.hora_salida else "--:--",
+            "foto_url": instance.foto_verificacion.url if instance.foto_verificacion else None,
+            "estado": "Jornada Finalizada" if instance.hora_salida else "En Campus",
+            "tipo": "entrada_general" if created else "salida_general",
+            "es_general": True
+        }
+        transaction.on_commit(partial(broadcast_dashboard_update, data))

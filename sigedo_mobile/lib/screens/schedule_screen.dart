@@ -61,13 +61,20 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           final Map<int, List<dynamic>> eventsByDay = {};
           
           for (var event in events) {
-            List<dynamic> days = event['daysOfWeek'];
-            for (var day in days) {
-                if (!eventsByDay.containsKey(day)) {
-                    eventsByDay[day] = [];
+            // Check if it's a recurring event with daysOfWeek
+            if (event.containsKey('daysOfWeek')) {
+                List<dynamic> days = event['daysOfWeek'];
+                for (var day in days) {
+                    if (!eventsByDay.containsKey(day)) {
+                        eventsByDay[day] = [];
+                    }
+                    eventsByDay[day]!.add(event);
                 }
-                eventsByDay[day]!.add(event);
-            }
+            } 
+            // Handle special days (one-time events) if needed, or skip them for general schedule view
+            // For now, we focus on weekly schedule, so we skip one-time events unless they fall into a specific day view logic.
+            // If the user wants to see holidays, we might need a Calendar View instead of a simple List.
+            // But to prevent crash, we just skip parsing if key is missing.
           }
 
           // Ordenar claves de días (1=Lunes, 2=Martes...)

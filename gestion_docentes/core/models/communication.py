@@ -6,7 +6,7 @@ class Notificacion(models.Model):
     destinatario = models.ForeignKey(
         "core.Docente", on_delete=models.CASCADE, related_name="notificaciones"
     )
-    mensaje = models.CharField(max_length=255)
+    mensaje = models.TextField()
     leido = models.BooleanField(default=False)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     url = models.CharField(

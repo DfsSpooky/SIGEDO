@@ -6,6 +6,7 @@ from .utils import exports
 
 # Importamos las vistas específicas del planificador desde la API
 from core.api.views import planner
+from core.views.realtime_dashboard import RealTimeDashboardView
 
 urlpatterns = [
     # --- Gestión de Documentos ---
@@ -20,6 +21,7 @@ urlpatterns = [
     # --- Asistencia y Dashboard ---
     path("asistencia/", views.registrar_asistencia, name="asistencia"),
     path("", views.dashboard, name="dashboard"),
+    path("dashboard-feed/", RealTimeDashboardView.as_view(), name="dashboard_feed"),
     path("perfil/", views.perfil, name="perfil"),
     
     # --- Calendario y Horarios (Vistas Tradicionales) ---

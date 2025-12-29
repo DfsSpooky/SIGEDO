@@ -9,6 +9,9 @@ import 'dart:convert';
 import 'dart:io';
 import '../services/location_service.dart';
 import 'justification_screen.dart';
+import 'credential_screen.dart';
+import 'documents_screen.dart';
+import 'justification_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -132,15 +135,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _buildDailyAttendanceCard(context, dailyAttendance),
           
           const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              icon: const Icon(Icons.assignment_late_outlined, size: 18),
-              label: const Text("Solicitar Justificación"),
-              onPressed: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const JustificationScreen()));
-              },
-              style: TextButton.styleFrom(foregroundColor: Colors.grey[700]),
+          // Botones de Acceso Rápido (Nuevo)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildQuickAccessPill(
+                  context, 
+                  "Carnet Digital", 
+                  Icons.qr_code, 
+                  Colors.indigo, 
+                  () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CredentialScreen()))
+                ),
+                const SizedBox(width: 12),
+                _buildQuickAccessPill(
+                  context, 
+                  "Mis Documentos", 
+                  Icons.folder_shared, 
+                  Colors.orange, 
+                  () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DocumentsScreen()))
+                ),
+                const SizedBox(width: 12),
+                 _buildQuickAccessPill(
+                  context, 
+                  "Justificar", 
+                  Icons.assignment_late_outlined, 
+                  Colors.teal, 
+                  () => Navigator.push(context, MaterialPageRoute(builder: (_) => const JustificationScreen()))
+                ),
+              ],
             ),
           ),
 
@@ -370,6 +393,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey[500], fontSize: 16),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickAccessPill(BuildContext context, String label, IconData icon, Color color, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withOpacity(0.2)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(width: 8),
+            Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13)),
           ],
         ),
       ),

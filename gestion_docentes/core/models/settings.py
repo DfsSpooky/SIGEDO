@@ -35,6 +35,11 @@ class ConfiguracionInstitucion(models.Model):
         default="Gestión Docente",
         help_text="El nombre que se mostrará en el dashboard.",
     )
+    
+    validar_geolocalizacion = models.BooleanField(
+        default=True,
+        help_text="Si está activo, se validará que el docente esté dentro del campus para marcar."
+    )
 
     class Meta:
         verbose_name = "Configuración de la Institución"

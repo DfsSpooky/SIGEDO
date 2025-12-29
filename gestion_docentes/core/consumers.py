@@ -97,3 +97,22 @@ class CalendarConsumer(AsyncWebsocketConsumer):
                 }
             )
         )
+
+
+class DashboardConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        self.user = self.scope["user"]
+        # Solo permitir admin o staff
+        if not self.user.is_authenticated or not self.user.is_staff:
+            await self.close()
+            return
+
+        self.room_group_name = "dashboard_feed"
+        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+
+    async def attendance_update(self, event):
+        await self.send(text_data=json.dumps(event["data"]))

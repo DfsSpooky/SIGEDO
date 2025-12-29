@@ -50,3 +50,6 @@ djangorestframework-simplejwt
 qrcode
 pillow
 firebase-admin
+drf-spectacular
+django-simple-history
+django-redis

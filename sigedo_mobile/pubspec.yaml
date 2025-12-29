@@ -40,6 +40,7 @@ dependencies:
   jwt_decoder: ^2.0.1
   # Para tomar la selfie de asistencia
   image_picker: ^1.0.7
+  camera: ^0.10.5
   # Manejo de rutas y permisos
   permission_handler: ^11.3.0
 
@@ -58,6 +59,12 @@ dependencies:
   firebase_core: ^2.24.2
   firebase_messaging: ^14.7.9
   flutter_local_notifications: ^17.0.0
+  # Generación de códigos QR
+  qr_flutter: ^4.1.0
+  # Persistencia de datos local (Cache/Settings)
+  shared_preferences: ^2.2.2
+  # Conectividad (Offline Mode)
+  connectivity_plus: ^5.0.2
 
 dev_dependencies:
   flutter_test:

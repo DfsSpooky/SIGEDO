@@ -1,17 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/theme_provider.dart';
 
-class ProfileScreen extends StatefulWidget {
+class ProfileScreen extends StatelessWidget { // Changed to Stateless as Provider handles state
   const ProfileScreen({super.key});
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
-}
-
-class _ProfileScreenState extends State<ProfileScreen> {
-  bool _isDarkMode = false; // Placeholder local
-
-  @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -32,14 +29,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         SwitchListTile(
           title: const Text("Modo Oscuro"),
           subtitle: const Text("Cambiar apariencia de la aplicación"),
-          value: _isDarkMode,
+          value: themeProvider.isDarkMode,
           onChanged: (val) {
-            setState(() {
-              _isDarkMode = val;
-            });
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("Modo oscuro próximamente...")),
-            );
+            themeProvider.toggleTheme(val);
           },
         ),
         const Divider(),

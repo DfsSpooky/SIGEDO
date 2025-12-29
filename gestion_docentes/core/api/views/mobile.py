@@ -13,7 +13,11 @@ from core.models import (
     AsistenciaDiaria,
     BloqueHorario,
     Curso,
+    Documento,
+    TipoDocumento,
+    VersionDocumento,
 )
+from rest_framework.parsers import MultiPartParser, FormParser
 from core.api.views.utils import get_kiosk_data_for_docente
 
 
@@ -56,9 +60,13 @@ class MobileMarkAttendanceView(APIView):
         
         # --- VALIDACIÓN GEOLOCALIZACIÓN ---
         from django.conf import settings
+        from core.models.settings import ConfiguracionInstitucion
         import math
 
-        if latitude is not None and longitude is not None:
+        config = ConfiguracionInstitucion.load()
+        
+        # Solo validar si está activo en la configuración
+        if config.validar_geolocalizacion and latitude is not None and longitude is not None:
              # Coordenadas Campus
              campus_lat, campus_lng = settings.CAMPUS_LOCATION
              
@@ -84,9 +92,14 @@ class MobileMarkAttendanceView(APIView):
                      },
                      status=status.HTTP_400_BAD_REQUEST,
                  )
+        elif config.validar_geolocalizacion and (latitude is None or longitude is None):
+            # Si es obligatorio y no mandan coordenadas
+             return Response(
+                 {"status": "error", "message": "Ubicación requerida por política institucional."},
+                 status=status.HTTP_400_BAD_REQUEST
+             )
         else:
-             # Si es obligatorio, descomentar esto:
-             # return Response({"status": "error", "message": "Ubicación requerida."}, status=400)
+             # Validación apagada o datos incompletos pero permitidos (si fuera opcional)
              pass 
         # ----------------------------------
 
@@ -274,4 +287,143 @@ class UpdateFCMTokenView(APIView):
         user = request.user
         user.fcm_token = token
         user.save()
-        return Response({'status': 'Token updated'})
+
+class MobileDocumentsView(APIView):
+    """
+    API View para obtener la lista de documentos del docente (Misma lógica que web).
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        # 1. Obtener documentos existentes
+        docs_existentes = (
+            Documento.objects.filter(docente=request.user)
+            .select_related("tipo_documento")
+            .prefetch_related("versiones")
+            .order_by("-fecha_subida")
+        )
+
+        # 2. Identificar tipos faltantes
+        ids_tipos_subidos = docs_existentes.values_list('tipo_documento_id', flat=True)
+        tipos_faltantes = TipoDocumento.objects.exclude(id__in=ids_tipos_subidos)
+
+        # 3. Definir orden status
+        status_order = ["PENDIENTE", "OBSERVADO", "EN_REVISION", "RECIBIDO", "APROBADO", "VENCIDO"]
+        
+        # 4. Agrupar logicamente
+        documentos_agrupados = {status: [] for status in status_order}
+
+        # Distribución de Existentes
+        for doc in docs_existentes:
+            if doc.estado in documentos_agrupados:
+                ultima_version = doc.versiones.first()
+                documentos_agrupados[doc.estado].append({
+                    "isDummy": False,
+                    "id": doc.id,
+                    "titulo": doc.titulo,
+                    "tipo": doc.tipo_documento.nombre,
+                    "tipoId": doc.tipo_documento.id,
+                    "fechaSubida": doc.fecha_subida.strftime("%d %b, %Y") if doc.fecha_subida else "--",
+                    "fechaVencimiento": doc.fecha_vencimiento.strftime("%d %b, %Y") if doc.fecha_vencimiento else None,
+                    "estado": doc.estado,
+                    "archivoUrl": ultima_version.archivo.url if ultima_version and ultima_version.archivo else None,
+                    "version": ultima_version.numero_version if ultima_version else None,
+                })
+
+        # Distribución de Pendientes (Dummies)
+        for tipo in tipos_faltantes:
+            documentos_agrupados["PENDIENTE"].append({
+                "isDummy": True,
+                "id": 0,
+                "titulo": f"{tipo.nombre}", # Title as Type Name for clarity in mobile card
+                "tipo": tipo.nombre,
+                "tipoId": tipo.id,
+                "fechaSubida": None,
+                "fechaVencimiento": None,
+                "estado": "PENDIENTE",
+                "archivoUrl": None,
+                "version": None,
+            })
+
+        # 5. Construir respuesta con secciones
+        estado_display_map = dict(Documento.ESTADOS_DOCUMENTO)
+        estado_display_map["PENDIENTE"] = "Pendientes de Entrega"
+
+        sections_list = []
+        for status_key in status_order:
+            docs = documentos_agrupados[status_key]
+            if docs:
+                sections_list.append({
+                    "sectionTitle": estado_display_map.get(status_key, status_key),
+                    "statusKey": status_key,
+                    "documents": docs
+                })
+        
+        return Response(sections_list)
+
+
+class MobileUploadDocumentView(APIView):
+    """
+    API View para subir documentos desde el móvil.
+    Maneja tanto la creación inicial como nuevas versiones si ya existe el documento.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)
+
+    def post(self, request, *args, **kwargs):
+        tipo_id = request.data.get('tipo_id')
+        archivo = request.FILES.get('archivo')
+
+        if not tipo_id or not archivo:
+            return Response(
+                {"error": "Faltan datos requeridos (tipo_id, archivo)"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            tipo_doc = TipoDocumento.objects.get(id=tipo_id)
+        except TipoDocumento.DoesNotExist:
+            return Response(
+                {"error": "Tipo de documento inválido"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Buscar si ya existe documento para este tipo y usuario
+        documento = Documento.objects.filter(
+            docente=request.user, 
+            tipo_documento=tipo_doc
+        ).first()
+
+        if documento:
+            # Caso: Subir nueva versión
+            VersionDocumento.objects.create(
+                documento=documento,
+                archivo=archivo
+            )
+            # Actualizar estado a EN_REVISION si estaba observado o vencido
+            # O simplemente 'RECIBIDO'/'EN_REVISION' para indicar cambio.
+            # Según views/documents.py -> subir_nueva_version pone 'EN_REVISION'
+            documento.estado = "EN_REVISION"
+            documento.save()
+            action = "updated"
+        else:
+            # Caso: Nuevo documento
+            documento = Documento.objects.create(
+                docente=request.user,
+                tipo_documento=tipo_doc,
+                titulo=f"{tipo_doc.nombre} - {request.user.get_full_name()}", # Título autogenerado
+                estado="RECIBIDO"
+            )
+            VersionDocumento.objects.create(
+                documento=documento,
+                archivo=archivo
+            )
+            action = "created"
+
+        return Response({
+            "status": "success",
+            "action": action,
+            "document_id": documento.id,
+            "message": "Documento subido correctamente"
+        })
+

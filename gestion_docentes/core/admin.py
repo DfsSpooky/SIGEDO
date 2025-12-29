@@ -5,6 +5,7 @@ from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html
+from simple_history.admin import SimpleHistoryAdmin
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.contrib.forms.widgets import WysiwygWidget
 
@@ -121,10 +122,36 @@ class DocenteAdmin(UserAdmin, ModelAdmin):
 
     @admin.display(description="Acciones")
     def acciones(self, obj):
+        # Para el cambio normal, mantenemos el contexto del modelo actual (proxy o base)
         change_url = reverse(
             f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change", args=[obj.pk]
         )
-        return format_html(f'<a href="{change_url}" class="button">Editar</a>')
+        
+        # Para la contraseña, usamos SIEMPRE el modelo base (Docente/User)
+        # Esto evita errores "NoReverseMatch" en modelos proxy (PersonalDocente, Administrador)
+        # ya que UserAdmin a veces no registra las URLs de password para proxies.
+        password_url = reverse(
+            f"admin:{obj._meta.concrete_model._meta.app_label}_{obj._meta.concrete_model._meta.model_name}_password_change",
+            args=[obj.pk]
+        )
+        
+        return format_html(
+            f'<a href="{change_url}" class="button" title="Editar Info">Editar</a> '
+            f'<a href="{password_url}" class="button" style="background-color: #f59e0b; color: white;" title="Cambiar Contraseña">🔒 Clave</a>'
+        )
+
+    def get_urls(self):
+        from django.urls import path
+        
+        urls = super().get_urls()
+        my_urls = [
+            path(
+                "<id>/password/",
+                self.admin_site.admin_view(self.user_change_password),
+                name=f"{self.model._meta.app_label}_{self.model._meta.model_name}_password_change",
+            ),
+        ]
+        return my_urls + urls
 
     @admin.display(description="Especialidades", ordering="especialidades")
     def get_especialidades_prettified(self, obj):
@@ -430,7 +457,7 @@ class ConfiguracionInstitucionAdmin(ModelAdmin):
             "Información Principal",
             {"fields": ("nombre_institucion", "logo", "facultad", "nombre_dashboard")},
         ),
-        ("Parámetros del Sistema", {"fields": ("tiempo_limite_tardanza",)}),
+        ("Parámetros del Sistema", {"fields": ("tiempo_limite_tardanza", "validar_geolocalizacion")}),
         (
             "Datos de Contacto (Opcional)",
             {
@@ -658,7 +685,7 @@ class ReservaAdmin(ModelAdmin):
 
 
 @admin.register(Asistencia)
-class AsistenciaAdmin(ModelAdmin):
+class AsistenciaAdmin(SimpleHistoryAdmin, ModelAdmin):
     list_display = (
         "docente",
         "curso",

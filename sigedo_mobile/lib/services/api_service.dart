@@ -46,8 +46,12 @@ class ApiService {
           e.type == DioExceptionType.connectionError) {
          throw Exception('Ocurrió un error de conexión con el servidor.');
       }
-      if (e.response?.statusCode == 401) {
-        throw Exception('Credenciales incorrectas');
+      if (e.response?.statusCode == 400 || e.response?.statusCode == 401) {
+        final Map<String, dynamic> errorData = e.response?.data is String 
+             ? jsonDecode(e.response?.data) 
+             : e.response?.data;
+        final String msg = errorData['message'] ?? 'Error en la solicitud';
+        throw Exception(msg);
       }
       throw Exception('Error en el servidor: ${e.response?.statusCode}');
     } catch (e) {
@@ -104,6 +108,16 @@ class ApiService {
     return response.data;
   }
 
+  Future<bool> markNotificationAsRead(int notificationId) async {
+    try {
+      final response = await _dio.post('${AppConstants.baseUrl}/api/notificaciones/$notificationId/marcar-leida/');
+      return response.statusCode == 200;
+    } catch (e) {
+      print("Error marking notification as read: $e");
+      return false;
+    }
+  }
+
   // --- Justificaciones ---
   Future<List<JustificationType>> getJustificationTypes() async {
     final response = await _dio.get('${AppConstants.baseUrl}/api/tipo-justificaciones/');
@@ -147,6 +161,37 @@ class ApiService {
     }
   }
 
+  Future<List<dynamic>> getDocuments() async {
+    try {
+      final response = await _dio.get('${AppConstants.baseUrl}/api/mobile/documents/');
+      return response.data;
+    } catch (e) {
+      print('Error fetching documents: $e');
+      return [];
+    }
+  }
+
+  Future<bool> uploadDocument({required int typeId, required File file}) async {
+    try {
+      String fileName = file.path.split('/').last;
+      
+      FormData formData = FormData.fromMap({
+        'tipo_id': typeId,
+        'archivo': await MultipartFile.fromFile(file.path, filename: fileName),
+      });
+
+      final response = await _dio.post(
+        '${AppConstants.baseUrl}/api/mobile/documents/upload/',
+        data: formData,
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print("Error uploading document: $e");
+      return false;
+    }
+  }
+
   // --- Biometria ---
   Future<void> saveCredentials(String username, String password) async {
     await _storage.write(key: 'bio_username', value: username);
@@ -164,5 +209,29 @@ class ApiService {
     final username = await _storage.read(key: 'bio_username');
     final password = await _storage.read(key: 'bio_password');
     return {'username': username!, 'password': password!};
+  }
+
+  // --- Recuperación de Contraseña ---
+  Future<void> requestPasswordReset(String email) async {
+    final response = await _dio.post(
+      '${AppConstants.baseUrl}/api/auth/request-reset/',
+      data: {'email': email},
+    );
+    // 200 OK significa enviado (o simulado si no existe)
+  }
+
+  Future<void> resetPassword({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) async {
+    await _dio.post(
+      '${AppConstants.baseUrl}/api/auth/reset-password/',
+      data: {
+        'email': email,
+        'otp': otp,
+        'new_password': newPassword,
+      },
+    );
   }
 }
