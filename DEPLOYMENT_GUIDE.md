@@ -1,66 +1,78 @@
 # Guía de Despliegue de Actualizaciones
 
-Esta guía describe los pasos necesarios para actualizar la aplicación en el servidor de producción después de haber realizado cambios en el código.
-
-Es importante seguir estos pasos en orden para asegurar que la aplicación se actualice correctamente.
+Esta guía describe los pasos necesarios para desplegar y actualizar la aplicación en el servidor de producción.
 
 ## Prerrequisitos
 
-- Acceso SSH al servidor donde está alojada la aplicación.
-- Estar en el directorio raíz del proyecto (donde se encuentra el archivo `docker-compose.yml`).
+- Acceso SSH al servidor.
+- Docker y Docker Compose instalados.
+- Estar en el directorio raíz del proyecto.
 
-## Pasos para el Despliegue
+## 🔒 Manejo de Archivos Sensibles (Secretos)
 
-### Paso 1: Obtener los Últimos Cambios del Código
+**IMPORTANTE**: Por seguridad, los siguientes archivos **NO se guardan en el repositorio** y deben crearse o subirse manualmente al servidor antes de iniciar:
 
-Primero, asegúrate de que el código en tu servidor esté actualizado con la última versión del repositorio.
+1.  **`.env`**: Variables de entorno (Base de datos, claves secretas).
+2.  **`serviceAccountKey.json`**: Credenciales de Firebase.
+
+### ¿Cómo subirlos?
+
+Si estás en tu máquina local y necesitas enviarlos al servidor (VPS), usa `scp`:
+
+```bash
+# Ejemplo para subir el .env
+scp .env usuario@tu-servidor-ip:/ruta/al/proyecto/.env
+
+# Ejemplo para subir la llave de Firebase
+scp serviceAccountKey.json usuario@tu-servidor-ip:/ruta/al/proyecto/serviceAccountKey.json
+```
+
+Una vez que los archivos estén en la carpeta del proyecto en el servidor, **Docker los detectará automáticamente** porque usamos "volúmenes" en `docker-compose.yml`.
+
+---
+
+## Pasos para el Despliegue / Actualización
+
+### 1. Obtener los Últimos Cambios del Código
 
 ```bash
 git pull origin main
 ```
-*(Reemplaza `main` con el nombre de la rama principal si es diferente, por ejemplo `master`)*
 
-### Paso 2: Reconstruir los Contenedores de Docker
+### 2. Verificar Archivos Secretos
+Asegúrate de que `.env` y `serviceAccountKey.json` existan en la carpeta actual.
+```bash
+ls -la .env serviceAccountKey.json
+```
 
-Si se han realizado cambios en los archivos de configuración de Docker (`Dockerfile`, `docker-compose.yml`) o si se han añadido nuevas dependencias, es una buena práctica reconstruir las imágenes de los contenedores.
+### 3. Construir y Levantar Contenedores
 
 ```bash
+# Construye las imágenes (sin incluir los secretos dentro de la imagen)
 docker-compose build
+
+# Levanta los servicios (montando los secretos desde la carpeta actual)
+docker-compose up -d
 ```
 
-### Paso 3: Instalar o Actualizar Dependencias
+### 4. Tareas de Mantenimiento (Solo si es necesario)
 
-Las nuevas funcionalidades que hemos añadido (`djangorestframework`) requieren nuevas librerías de Python. El siguiente comando leerá el archivo `requirements.txt` actualizado y las instalará dentro del contenedor de la aplicación.
+Si hubo cambios en dependencias o base de datos:
 
 ```bash
-docker-compose run --rm web pip install -r requirements.txt
+# Instalar nuevas dependencias
+docker-compose exec web pip install -r requirements.txt
+
+# Ejecutar migraciones
+docker-compose exec web python gestion_docentes/manage.py migrate
+
+# Recopilar archivos estáticos
+docker-compose exec web python gestion_docentes/manage.py collectstatic --noinput
+
+# Reiniciar para aplicar cambios
+docker-compose restart web
 ```
-* **`docker-compose run`**: Ejecuta un comando en un nuevo contenedor para un servicio.
-* **`--rm`**: Elimina el contenedor después de que el comando se complete. Es útil para comandos que solo se ejecutan una vez, como este.
-* **`web`**: Es el nombre del servicio de la aplicación Django definido en `docker-compose.yml`.
-* **`pip install -r requirements.txt`**: Es el comando que se ejecuta dentro del contenedor.
-
-### Paso 4: Ejecutar las Migraciones de la Base de Datos
-
-Hemos realizado cambios en los modelos de la base de datos (añadimos el campo `dia_semana`), por lo que es crucial aplicar estas migraciones.
-
-```bash
-docker-compose run --rm web python gestion_docentes/manage.py migrate
-```
-Este comando ejecutará las nuevas migraciones que creamos (`0017_...` y `0018_...`) y actualizará el esquema de la base de datos.
-
-### Paso 5: Reiniciar los Servicios
-
-Finalmente, para que todos los cambios surtan efecto (código, dependencias y base de datos), es necesario reiniciar los servicios de la aplicación.
-
-```bash
-docker-compose up -d --force-recreate --no-deps web nginx
-```
-* **`up -d`**: Inicia los servicios en segundo plano (detached mode).
-* **`--force-recreate`**: Fuerza la recreación de los contenedores, incluso si su configuración no ha cambiado. Esto asegura que se utilice la nueva imagen y el nuevo código.
-* **`--no-deps`**: Evita que se reinicien los servicios de los que dependen (como la base de datos `db`), lo cual no es necesario en este caso.
-* **`web nginx`**: Especifica los servicios que queremos reiniciar.
 
 ---
-
-¡Y eso es todo! Después de completar estos pasos, la aplicación estará actualizada y funcionando con todas las nuevas mejoras que hemos implementado.
+**Nota sobre Docker y Archivos Ignorados**:
+Aunque `.dockerignore` evita que estos archivos se "quemen" dentro de la imagen durante el `build`, el archivo `docker-compose.yml` tiene una configuración de volúmenes (`volumes: - .:/app`) que "monta" tu carpeta actual dentro del contenedor al arrancar. Por eso, basta con que los archivos existan en tu servidor para que funcionen.
