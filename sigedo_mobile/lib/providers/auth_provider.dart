@@ -3,12 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import '../models/teacher_data.dart';
 import '../models/justification_type.dart';
-import '../models/justification_type.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart'; // Import AuthService
 import '../services/biometric_service.dart';
 
 class AuthProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
+  final AuthService _authService = AuthService(); // Use AuthService
 
   bool _isAuthenticated = false;
   bool _isLoading = false;
@@ -21,7 +22,7 @@ class AuthProvider with ChangeNotifier {
   String? get errorMessage => _errorMessage;
 
   Future<void> checkAuthStatus() async {
-    _isAuthenticated = await _apiService.hasToken();
+    _isAuthenticated = await _authService.hasToken(); // Use AuthService
     if (_isAuthenticated) {
       await loadDashboard();
     }
@@ -34,7 +35,7 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final success = await _apiService.login(username, password);
+      final success = await _authService.login(username, password); // Use AuthService
 
       if (success) {
         _isAuthenticated = true;
@@ -57,7 +58,7 @@ class AuthProvider with ChangeNotifier {
 
   Future<void> logout() async {
     try {
-      await _apiService.logout();
+      await _authService.logout(); // Use AuthService
     } catch (e) {
       print("Error limpiando storage: $e");
     } finally {
@@ -73,7 +74,7 @@ class AuthProvider with ChangeNotifier {
       
       // Actualizar Token FCM en segundo plano
       FirebaseMessaging.instance.getToken().then((token) {
-        if (token != null) _apiService.updateFCMToken(token);
+        if (token != null) _authService.updateFCMToken(token); // Use AuthService
       });
 
       notifyListeners();
@@ -136,18 +137,18 @@ class AuthProvider with ChangeNotifier {
   }
 
   Future<bool> hasStoredCredentials() async {
-    return await _apiService.hasStoredCredentials();
+    return await _authService.hasStoredCredentials(); // Use AuthService
   }
 
   Future<void> saveCredentials(String username, String password) async {
-    await _apiService.saveCredentials(username, password);
+    await _authService.saveCredentials(username, password); // Use AuthService
   }
 
   Future<bool> loginWithBiometrics() async {
     final authenticated = await _biometricService.authenticate();
     if (!authenticated) return false;
 
-    final credentials = await _apiService.getStoredCredentials();
+    final credentials = await _authService.getStoredCredentials(); // Use AuthService
     if (credentials == null) return false;
 
     return await login(credentials['username']!, credentials['password']!);

@@ -1,12 +1,14 @@
 from rest_framework import status, permissions, generics
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.parsers import MultiPartParser, FormParser
 from core.models import Justificacion, TipoJustificacion
 from core.api.serializers import JustificationSerializer, TipoJustificacionSerializer
 
 class JustificationListView(generics.ListCreateAPIView):
     serializer_class = JustificationSerializer
     permission_classes = [permissions.IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)
 
     def get_queryset(self):
         return Justificacion.objects.filter(docente=self.request.user).order_by('-fecha_creacion')
