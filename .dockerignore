@@ -1,6 +1,5 @@
 # Secrets
 .env
-serviceAccountKey.json
 
 # Git
 .git

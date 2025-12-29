@@ -1,6 +1,5 @@
 # Archivos de entorno y secretos
 .env
-serviceAccountKey.json
 certbot/
 
 # Archivos de Python compilados
