@@ -115,4 +115,8 @@ class DashboardConsumer(AsyncWebsocketConsumer):
         await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
 
     async def attendance_update(self, event):
-        await self.send(text_data=json.dumps(event["data"]))
+        # El frontend espera { type: 'attendance.update', data: ... }
+        await self.send(text_data=json.dumps({
+            "type": "attendance.update",
+            "data": event["data"]
+        }))
