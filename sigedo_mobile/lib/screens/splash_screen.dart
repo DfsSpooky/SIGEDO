@@ -10,7 +10,8 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
@@ -23,19 +24,23 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       duration: const Duration(milliseconds: 1500),
     );
 
-    _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
-    );
+    _scaleAnimation = Tween<double>(
+      begin: 0.5,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
 
     _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.5, curve: Curves.easeIn)),
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.5, curve: Curves.easeIn),
+      ),
     );
 
     _controller.forward();
 
     // Iniciar la verificación después de la animación mínima
     Future.delayed(const Duration(milliseconds: 2000), () {
-        _checkAuth();
+      _checkAuth();
     });
   }
 
@@ -48,9 +53,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   Future<void> _checkAuth() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     await authProvider.checkAuthStatus();
-    
+
     if (!mounted) return;
-    
+
     // Smooth transition
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
@@ -88,10 +93,10 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   color: Colors.white,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.school_rounded,
-                  size: 80,
-                  color: Colors.indigo,
+                child: Image.asset(
+                  'assets/images/logo.png',
+                  width: 100,
+                  height: 100,
                 ),
               ),
               const SizedBox(height: 24),

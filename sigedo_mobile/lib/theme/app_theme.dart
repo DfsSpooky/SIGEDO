@@ -21,18 +21,37 @@ class AppTheme {
         secondary: secondaryColor,
         surface: surfaceColor,
         error: errorColor,
-        background: backgroundColor,
       ),
-      
+
       // Tipografía con Google Fonts
       textTheme: TextTheme(
-        displayLarge: GoogleFonts.poppins(fontSize: 32, fontWeight: FontWeight.bold, color: primaryColor),
-        displayMedium: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.bold, color: primaryColor),
-        displaySmall: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.w600, color: primaryColor),
-        headlineMedium: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.black87),
+        displayLarge: GoogleFonts.poppins(
+          fontSize: 32,
+          fontWeight: FontWeight.bold,
+          color: primaryColor,
+        ),
+        displayMedium: GoogleFonts.poppins(
+          fontSize: 28,
+          fontWeight: FontWeight.bold,
+          color: primaryColor,
+        ),
+        displaySmall: GoogleFonts.poppins(
+          fontSize: 24,
+          fontWeight: FontWeight.w600,
+          color: primaryColor,
+        ),
+        headlineMedium: GoogleFonts.poppins(
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: Colors.black87,
+        ),
         bodyLarge: GoogleFonts.inter(fontSize: 16, color: Colors.black87),
         bodyMedium: GoogleFonts.inter(fontSize: 14, color: Colors.black87),
-        labelLarge: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+        labelLarge: GoogleFonts.inter(
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
       ),
 
       // Estilo de Cards (Removido por conflicto de tipos, se usa shape por defecto)
@@ -59,8 +78,13 @@ class AppTheme {
           foregroundColor: Colors.white,
           elevation: 4,
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          textStyle: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          textStyle: GoogleFonts.inter(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
 
@@ -85,6 +109,7 @@ class AppTheme {
       ),
     );
   }
+
   // Tema Oscuro
   static ThemeData get darkTheme {
     return ThemeData(
@@ -97,18 +122,38 @@ class AppTheme {
         primary: secondaryColor, // Teal Accent for visibility in dark
         secondary: primaryColor,
         surface: Color(0xFF1E1E1E), // Darker Surface
-        background: Color(0xFF121212),
+
         error: errorColor,
       ),
 
       textTheme: TextTheme(
-        displayLarge: GoogleFonts.poppins(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
-        displayMedium: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
-        displaySmall: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.w600, color: Colors.white),
-        headlineMedium: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.white70),
+        displayLarge: GoogleFonts.poppins(
+          fontSize: 32,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+        displayMedium: GoogleFonts.poppins(
+          fontSize: 28,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+        displaySmall: GoogleFonts.poppins(
+          fontSize: 24,
+          fontWeight: FontWeight.w600,
+          color: Colors.white,
+        ),
+        headlineMedium: GoogleFonts.poppins(
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: Colors.white70,
+        ),
         bodyLarge: GoogleFonts.inter(fontSize: 16, color: Colors.white70),
         bodyMedium: GoogleFonts.inter(fontSize: 14, color: Colors.white70),
-        labelLarge: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+        labelLarge: GoogleFonts.inter(
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
       ),
 
       appBarTheme: AppBarTheme(
@@ -130,8 +175,13 @@ class AppTheme {
           foregroundColor: Colors.black, // Dark text on teal
           elevation: 4,
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          textStyle: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          textStyle: GoogleFonts.inter(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
 

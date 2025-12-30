@@ -27,21 +27,25 @@ class _LoginScreenState extends State<LoginScreen> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final canCheck = await authProvider.isBiometricAvailable();
     final hasCredentials = await authProvider.hasStoredCredentials();
-    
+
     if (mounted) {
-       setState(() {
-         _canUseBiometric = canCheck && hasCredentials;
-       });
+      setState(() {
+        _canUseBiometric = canCheck && hasCredentials;
+      });
     }
   }
 
   Future<void> _handleBiometricLogin() async {
-     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-     final success = await authProvider.loginWithBiometrics();
-     
-     if (!success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Autenticación biométrica falló o no configurada')));
-     }
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final success = await authProvider.loginWithBiometrics();
+
+    if (!success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Autenticación biométrica falló o no configurada'),
+        ),
+      );
+    }
   }
 
   @override
@@ -50,7 +54,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -72,7 +76,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 30),
-                
+
                 // Título y Bienvenida
                 Text(
                   "Bienvenido a SIGEDO",
@@ -82,9 +86,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 8),
                 Text(
                   "Gestión Docente Inteligente",
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.grey[600],
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 50),
@@ -106,7 +110,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                        _obscurePassword
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
                         color: Colors.grey,
                       ),
                       onPressed: () {
@@ -117,7 +123,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
-                ),
+
                 const SizedBox(height: 10),
                 Align(
                   alignment: Alignment.centerRight,
@@ -125,7 +131,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+                        MaterialPageRoute(
+                          builder: (_) => const ForgotPasswordScreen(),
+                        ),
                       );
                     },
                     child: const Text("¿Olvidaste tu contraseña?"),
@@ -140,7 +148,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     padding: const EdgeInsets.all(12),
                     margin: const EdgeInsets.only(bottom: 20),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.error.withOpacity(0.1),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.error.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -173,8 +183,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               );
                             } else if (success && mounted) {
-                               // Preguntar si quiere guardar biometria
-                               _showBiometricSetupDialog();
+                              // Preguntar si quiere guardar biometria
+                              _showBiometricSetupDialog();
                             }
                           },
                     child: authProvider.isLoading
@@ -182,11 +192,17 @@ class _LoginScreenState extends State<LoginScreen> {
                         : const Text("Iniciar Sesión"),
                   ),
                 ),
-                
+
                 // Botón Biométrico
                 if (_canUseBiometric) ...[
                   const SizedBox(height: 20),
-                  const Row(children: [Expanded(child: Divider()), Text(" Ó "), Expanded(child: Divider())]),
+                  const Row(
+                    children: [
+                      Expanded(child: Divider()),
+                      Text(" Ó "),
+                      Expanded(child: Divider()),
+                    ],
+                  ),
                   const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
@@ -196,7 +212,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       label: const Text("Ingresar con Huella / Rostro"),
                       onPressed: _handleBiometricLogin,
                     ),
-                  )
+                  ),
                 ],
                 const SizedBox(height: 20),
               ],
@@ -219,22 +235,29 @@ class _LoginScreenState extends State<LoginScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text("Habilitar Biometría"),
-        content: const Text("¿Deseas habilitar el inicio de sesión con huella o rostro para la próxima vez?"),
+        content: const Text(
+          "¿Deseas habilitar el inicio de sesión con huella o rostro para la próxima vez?",
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("No")),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("No"),
+          ),
           TextButton(
             onPressed: () async {
-               Navigator.pop(ctx);
-               await authProvider.saveCredentials(
-                 _usernameController.text.trim(), 
-                 _passwordController.text.trim()
-               );
-               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Biometría habilitada")));
-            }, 
+              Navigator.pop(ctx);
+              await authProvider.saveCredentials(
+                _usernameController.text.trim(),
+                _passwordController.text.trim(),
+              );
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Biometría habilitada")),
+              );
+            },
             child: const Text("Sí"),
           ),
         ],
-      )
+      ),
     );
   }
 }

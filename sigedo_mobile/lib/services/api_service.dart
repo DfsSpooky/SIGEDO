@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/teacher_data.dart';
@@ -70,10 +71,12 @@ class ApiService {
 
   Future<bool> markNotificationAsRead(int notificationId) async {
     try {
-      final response = await _dio.post('${AppConstants.baseUrl}/api/notificaciones/$notificationId/marcar-leida/');
+      final response = await _dio.post(
+        '${AppConstants.baseUrl}/api/notificaciones/$notificationId/marcar-leida/',
+      );
       return response.statusCode == 200;
     } catch (e) {
-      print("Error marking notification as read: $e");
+      debugPrint("Error marking notification as read: $e");
       return false;
     }
   }
@@ -81,7 +84,9 @@ class ApiService {
   // --- Justificaciones ---
 
   Future<List<JustificationType>> getJustificationTypes() async {
-    final response = await _dio.get('${AppConstants.baseUrl}/api/tipo-justificaciones/');
+    final response = await _dio.get(
+      '${AppConstants.baseUrl}/api/tipo-justificaciones/',
+    );
     final List<dynamic> data = response.data;
     return data.map((json) => JustificationType.fromJson(json)).toList();
   }
@@ -100,20 +105,28 @@ class ApiService {
       "fecha_inicio": startDate.toIso8601String().split('T')[0],
       "fecha_fin": endDate.toIso8601String().split('T')[0],
       "motivo": reason,
-      "documento_adjunto": await MultipartFile.fromFile(file.path, filename: fileName),
+      "documento_adjunto": await MultipartFile.fromFile(
+        file.path,
+        filename: fileName,
+      ),
     });
 
-    await _dio.post('${AppConstants.baseUrl}/api/justificaciones/', data: formData);
+    await _dio.post(
+      '${AppConstants.baseUrl}/api/justificaciones/',
+      data: formData,
+    );
   }
 
   // --- Documentos ---
 
   Future<List<dynamic>> getDocuments() async {
     try {
-      final response = await _dio.get('${AppConstants.baseUrl}/api/mobile/documents/');
+      final response = await _dio.get(
+        '${AppConstants.baseUrl}/api/mobile/documents/',
+      );
       return response.data;
     } catch (e) {
-      print('Error fetching documents: $e');
+      debugPrint('Error fetching documents: $e');
       return [];
     }
   }
@@ -121,7 +134,7 @@ class ApiService {
   Future<bool> uploadDocument({required int typeId, required File file}) async {
     try {
       String fileName = file.path.split('/').last;
-      
+
       FormData formData = FormData.fromMap({
         'tipo_id': typeId,
         'archivo': await MultipartFile.fromFile(file.path, filename: fileName),
@@ -134,8 +147,28 @@ class ApiService {
 
       return response.statusCode == 200;
     } catch (e) {
-      print("Error uploading document: $e");
+      debugPrint("Error uploading document: $e");
       return false;
     }
+  }
+
+  // --- Recuperación de Contraseña ---
+
+  Future<void> requestPasswordReset(String email) async {
+    await _dio.post(
+      AppConstants.passwordResetRequestEndpoint,
+      data: {'email': email},
+    );
+  }
+
+  Future<void> resetPassword({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) async {
+    await _dio.post(
+      AppConstants.passwordResetConfirmEndpoint,
+      data: {'email': email, 'otp': otp, 'new_password': newPassword},
+    );
   }
 }
