@@ -81,6 +81,7 @@ urlpatterns = [
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
 
     # --- API Móvil ---
+    path("mobile/public-config/", views.MobilePublicConfigView.as_view(), name="mobile_public_config"),
     path("mobile/status/", views.MobileStatusView.as_view(), name="mobile_status"),
     path("mobile/attendance/", views.MobileMarkAttendanceView.as_view(), name="mobile_attendance"),
     path("mobile/fcm-token/", views.UpdateFCMTokenView.as_view(), name="mobile_fcm_token"),

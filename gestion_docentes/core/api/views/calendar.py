@@ -52,6 +52,10 @@ def api_horario_docente(request):
                         "endRecur": semestre_activo.fecha_fin.isoformat(),
                         "display": "auto",
                         "color": "#367BFF",  # Un color base para las clases
+                        "specialties": ", ".join(
+                            [e.nombre for e in bloque.curso.especialidades.all()]
+                        ),
+                        "classroom": bloque.aula.nombre if bloque.aula else "Sin Aula",
                     }
                 )
 

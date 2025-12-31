@@ -35,7 +35,10 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final success = await _authService.login(username, password); // Use AuthService
+      final success = await _authService.login(
+        username,
+        password,
+      ); // Use AuthService
 
       if (success) {
         _isAuthenticated = true;
@@ -71,10 +74,11 @@ class AuthProvider with ChangeNotifier {
   Future<void> loadDashboard() async {
     try {
       _teacherData = await _apiService.getTeacherStatus();
-      
+
       // Actualizar Token FCM en segundo plano
       FirebaseMessaging.instance.getToken().then((token) {
-        if (token != null) _authService.updateFCMToken(token); // Use AuthService
+        if (token != null)
+          _authService.updateFCMToken(token); // Use AuthService
       });
 
       notifyListeners();
@@ -102,16 +106,61 @@ class AuthProvider with ChangeNotifier {
         latitude: latitude,
         longitude: longitude,
       );
-      // Recargar datos para actualizar la UI (botones bloqueados)
+
+      // Actualizar estado local INMEDIATAMENTE para feedback visual rápido
+      _updateLocalState(actionType, courseId);
+      notifyListeners();
+
+      // Recargar datos para sincronizar completamente
       await loadDashboard();
     } catch (e) {
       throw e;
     }
   }
 
+  void _updateLocalState(String actionType, int? courseId) {
+    if (_teacherData == null) return;
+
+    final now = DateTime.now();
+    final timeString =
+        "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
+
+    if (actionType == 'general_entry') {
+      _teacherData = _teacherData!.copyWith(
+        dailyAttendance: _teacherData!.dailyAttendance.copyWith(
+          entryMarked: true,
+          entryTime: timeString,
+        ),
+      );
+    } else if (actionType == 'general_exit') {
+      _teacherData = _teacherData!.copyWith(
+        dailyAttendance: _teacherData!.dailyAttendance.copyWith(
+          exitMarked: true,
+          exitTime: timeString,
+        ),
+      );
+    } else if (courseId != null) {
+      final updatedCourses = _teacherData!.courses.map((course) {
+        if (course.id == courseId) {
+          if (actionType == 'course_entry') {
+            return course.copyWith(
+              entryMarked: true,
+              // Asumimos que al marcar entrada NO se marca salida aún
+            );
+          } else if (actionType == 'course_exit') {
+            return course.copyWith(exitMarked: true, exitTimeStr: timeString);
+          }
+        }
+        return course;
+      }).toList();
+
+      _teacherData = _teacherData!.copyWith(courses: updatedCourses);
+    }
+  }
+
   // --- Justificaciones ---
   Future<List<JustificationType>> getJustificationTypes() async {
-     return await _apiService.getJustificationTypes();
+    return await _apiService.getJustificationTypes();
   }
 
   Future<void> createJustification({
@@ -129,6 +178,7 @@ class AuthProvider with ChangeNotifier {
       file: file,
     );
   }
+
   // --- Biometria ---
   final BiometricService _biometricService = BiometricService();
 
@@ -148,7 +198,8 @@ class AuthProvider with ChangeNotifier {
     final authenticated = await _biometricService.authenticate();
     if (!authenticated) return false;
 
-    final credentials = await _authService.getStoredCredentials(); // Use AuthService
+    final credentials = await _authService
+        .getStoredCredentials(); // Use AuthService
     if (credentials == null) return false;
 
     return await login(credentials['username']!, credentials['password']!);

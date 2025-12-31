@@ -9,13 +9,29 @@ class TeacherData {
     required this.courses,
   });
 
+  TeacherData copyWith({
+    TeacherInfo? teacher,
+    DailyAttendance? dailyAttendance,
+    List<CourseAttendance>? courses,
+  }) {
+    return TeacherData(
+      teacher: teacher ?? this.teacher,
+      dailyAttendance: dailyAttendance ?? this.dailyAttendance,
+      courses: courses ?? this.courses,
+    );
+  }
+
   factory TeacherData.fromJson(Map<String, dynamic> json) {
     return TeacherData(
-      teacher: TeacherInfo.fromJson(json['teacher']),
-      dailyAttendance: DailyAttendance.fromJson(json['dailyAttendance']),
-      courses: (json['courses'] as List)
-          .map((i) => CourseAttendance.fromJson(i))
-          .toList(),
+      teacher: TeacherInfo.fromJson(json['teacher'] ?? <String, dynamic>{}),
+      dailyAttendance: DailyAttendance.fromJson(
+        json['dailyAttendance'] ?? <String, dynamic>{},
+      ),
+      courses:
+          (json['courses'] as List?)
+              ?.map((i) => CourseAttendance.fromJson(i))
+              .toList() ??
+          [],
     );
   }
 }
@@ -29,10 +45,10 @@ class TeacherInfo {
 
   // Getters for compatibility with CredentialScreen
   String? get foto => photoUrl;
-  
+
   TeacherInfo({
-    required this.name, 
-    required this.dni, 
+    required this.name,
+    required this.dni,
     this.photoUrl,
     this.email,
     this.idQr,
@@ -62,6 +78,20 @@ class DailyAttendance {
     this.exitTime,
   });
 
+  DailyAttendance copyWith({
+    bool? entryMarked,
+    bool? exitMarked,
+    String? entryTime,
+    String? exitTime,
+  }) {
+    return DailyAttendance(
+      entryMarked: entryMarked ?? this.entryMarked,
+      exitMarked: exitMarked ?? this.exitMarked,
+      entryTime: entryTime ?? this.entryTime,
+      exitTime: exitTime ?? this.exitTime,
+    );
+  }
+
   factory DailyAttendance.fromJson(Map<String, dynamic> json) {
     return DailyAttendance(
       entryMarked: json['entryMarked'] ?? false,
@@ -88,6 +118,24 @@ class CourseAttendance {
     required this.canMarkExit,
     this.exitTimeStr,
   });
+
+  CourseAttendance copyWith({
+    int? id,
+    String? name,
+    bool? entryMarked,
+    bool? exitMarked,
+    bool? canMarkExit,
+    String? exitTimeStr,
+  }) {
+    return CourseAttendance(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      entryMarked: entryMarked ?? this.entryMarked,
+      exitMarked: exitMarked ?? this.exitMarked,
+      canMarkExit: canMarkExit ?? this.canMarkExit,
+      exitTimeStr: exitTimeStr ?? this.exitTimeStr,
+    );
+  }
 
   factory CourseAttendance.fromJson(Map<String, dynamic> json) {
     return CourseAttendance(

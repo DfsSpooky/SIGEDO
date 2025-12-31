@@ -68,6 +68,9 @@ dependencies:
   # Conectividad (Offline Mode)
   connectivity_plus: ^7.0.0
   lottie: ^3.3.2
+  # Renderizado de HTML
+  flutter_html: ^3.0.0
+
 
 dev_dependencies:
   flutter_test:

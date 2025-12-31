@@ -34,6 +34,22 @@ class MobileStatusView(APIView):
         return Response(response_data)
 
 
+class MobilePublicConfigView(APIView):
+    """
+    API View pública para obtener la configuración de la institución (Logo, Nombre).
+    No requiere autenticación.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, *args, **kwargs):
+        from core.models.settings import ConfiguracionInstitucion
+        from core.api.serializers import ConfiguracionInstitucionSerializer
+        
+        config = ConfiguracionInstitucion.load()
+        serializer = ConfiguracionInstitucionSerializer(config, context={'request': request})
+        return Response(serializer.data)
+
+
 class MobileMarkAttendanceView(APIView):
     """
     API View para marcar asistencia desde la App Móvil.

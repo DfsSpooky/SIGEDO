@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/auth_provider.dart';
+import '../services/config_service.dart';
 import 'forgot_password_screen.dart';
+import 'main_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,11 +18,28 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _canUseBiometric = false;
+  String _institutionName = "SIGEDO";
+  String? _logoUrl;
 
   @override
   void initState() {
     super.initState();
     _checkBiometricAvailability();
+    _loadConfig();
+  }
+
+  Future<void> _loadConfig() async {
+    final config = await ConfigService.getInstitutionConfig();
+    if (config != null && mounted) {
+      setState(() {
+        if (config['nombre_institucion'] != null) {
+          _institutionName = config['nombre_institucion'];
+        }
+        if (config['logo'] != null) {
+          _logoUrl = config['logo'];
+        }
+      });
+    }
   }
 
   Future<void> _checkBiometricAvailability() async {
@@ -35,14 +54,26 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
   Future<void> _handleBiometricLogin() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final success = await authProvider.loginWithBiometrics();
 
-    if (!success && mounted) {
+    if (success && mounted) {
+      Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => const MainScreen()));
+    } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Autenticación biométrica falló o no configurada'),
+          content: Text('No se pudo verificar la identidad.'),
+          behavior: SnackBarBehavior.floating,
         ),
       );
     }
@@ -51,171 +82,249 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
-    final size = MediaQuery.of(context).size;
+    final googleBlue = const Color(0xFF1A73E8);
+    final googleGrey = const Color(0xFF5F6368); // Body text
+    final googleBlack = const Color(0xFF202124); // Headings
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Logo o Icono Principal
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).primaryColor.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.school_rounded,
-                    size: 80,
-                    color: Theme.of(context).primaryColor,
-                  ),
-                ),
-                const SizedBox(height: 30),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 400),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // --- Logo ---
+                  if (_logoUrl != null)
+                    Image.network(
+                      _logoUrl!,
+                      height: 48,
+                      errorBuilder: (_, __, ___) =>
+                          Image.asset('assets/images/logo.png', height: 48),
+                    )
+                  else
+                    Image.asset('assets/images/logo.png', height: 48),
 
-                // Título y Bienvenida
-                Text(
-                  "Bienvenido a SIGEDO",
-                  style: Theme.of(context).textTheme.displaySmall,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  "Gestión Docente Inteligente",
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 50),
+                  const SizedBox(height: 24),
 
-                // Formulario
-                TextFormField(
-                  controller: _usernameController,
-                  decoration: const InputDecoration(
-                    labelText: "Usuario / DNI",
-                    prefixIcon: Icon(Icons.person_outline),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: _obscurePassword,
-                  decoration: InputDecoration(
-                    labelText: "Contraseña",
-                    prefixIcon: const Icon(Icons.lock_outline),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
-                        color: Colors.grey,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _obscurePassword = !_obscurePassword;
-                        });
-                      },
+                  // --- Title ---
+                  Text(
+                    "Iniciar sesión",
+                    style: GoogleFonts.roboto(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w400,
+                      color: googleBlack,
                     ),
                   ),
-                ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Usa tu cuenta de $_institutionName",
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.roboto(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w400,
+                      color: googleBlack,
+                    ),
+                  ),
 
-                const SizedBox(height: 10),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const ForgotPasswordScreen(),
+                  const SizedBox(height: 40),
+
+                  // --- Username Field ---
+                  TextFormField(
+                    controller: _usernameController,
+                    style: GoogleFonts.roboto(fontSize: 16, color: googleBlack),
+                    decoration: InputDecoration(
+                      labelText: "Ingresa tu usuario",
+                      labelStyle: TextStyle(color: googleGrey),
+                      floatingLabelStyle: TextStyle(color: googleBlue),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(4),
+                        borderSide: const BorderSide(color: Colors.grey),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(4),
+                        borderSide: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(4),
+                        borderSide: BorderSide(color: googleBlue, width: 2),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        vertical: 16,
+                        horizontal: 16,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // --- Password Field ---
+                  TextFormField(
+                    controller: _passwordController,
+                    obscureText: _obscurePassword,
+                    style: GoogleFonts.roboto(fontSize: 16, color: googleBlack),
+                    decoration: InputDecoration(
+                      labelText: "Ingresa tu contraseña",
+                      labelStyle: TextStyle(color: googleGrey),
+                      floatingLabelStyle: TextStyle(color: googleBlue),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(4),
+                        borderSide: const BorderSide(color: Colors.grey),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(4),
+                        borderSide: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(4),
+                        borderSide: BorderSide(color: googleBlue, width: 2),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        vertical: 16,
+                        horizontal: 16,
+                      ),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                          color: googleGrey,
                         ),
-                      );
-                    },
-                    child: const Text("¿Olvidaste tu contraseña?"),
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // Mensaje de Error
-                if (authProvider.errorMessage != null)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    margin: const EdgeInsets.only(bottom: 20),
-                    decoration: BoxDecoration(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.error.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      authProvider.errorMessage!,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                        fontWeight: FontWeight.bold,
+                        onPressed: () => setState(
+                          () => _obscurePassword = !_obscurePassword,
+                        ),
                       ),
-                      textAlign: TextAlign.center,
                     ),
                   ),
 
-                // Botón de Login
-                SizedBox(
-                  width: double.infinity,
-                  height: 55,
-                  child: ElevatedButton(
-                    onPressed: authProvider.isLoading
-                        ? null
-                        : () async {
-                            final success = await authProvider.login(
-                              _usernameController.text.trim(),
-                              _passwordController.text.trim(),
-                            );
-                            if (!success && mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text("Credenciales incorrectas"),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                            } else if (success && mounted) {
-                              // Preguntar si quiere guardar biometria
-                              _showBiometricSetupDialog();
-                            }
-                          },
-                    child: authProvider.isLoading
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text("Iniciar Sesión"),
+                  // --- Forgot Password ---
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ForgotPasswordScreen(),
+                            ),
+                          );
+                        },
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(0, 0),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          foregroundColor: googleBlue,
+                        ),
+                        child: Text(
+                          "¿Has olvidado tu contraseña?",
+                          style: GoogleFonts.roboto(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
 
-                // Botón Biométrico
-                if (_canUseBiometric) ...[
-                  const SizedBox(height: 20),
-                  const Row(
+                  const SizedBox(height: 48),
+
+                  // --- Error Message ---
+                  if (authProvider.errorMessage != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 24),
+                      child: Row(
+                        children: [
+                          Icon(Icons.error, color: Colors.red[700], size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              authProvider.errorMessage!,
+                              style: GoogleFonts.roboto(
+                                color: Colors.red[700],
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  // --- Actions Row ---
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Expanded(child: Divider()),
-                      Text(" Ó "),
-                      Expanded(child: Divider()),
+                      // Biometric / Create Account styling space
+                      if (_canUseBiometric)
+                        TextButton.icon(
+                          onPressed: _handleBiometricLogin,
+                          icon: Icon(Icons.fingerprint, color: googleBlue),
+                          label: Text(
+                            "Biometría",
+                            style: GoogleFonts.roboto(
+                              color: googleBlue,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        )
+                      else
+                        const SizedBox.shrink(), // Empty spacer if no biometric
+                      // Next Button
+                      ElevatedButton(
+                        onPressed: authProvider.isLoading
+                            ? null
+                            : () async {
+                                final success = await authProvider.login(
+                                  _usernameController.text.trim(),
+                                  _passwordController.text.trim(),
+                                );
+                                if (success && mounted) {
+                                  await _showBiometricSetupDialog();
+                                  if (mounted) {
+                                    Navigator.of(context).pushReplacement(
+                                      MaterialPageRoute(
+                                        builder: (_) => const MainScreen(),
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: googleBlue,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        child: authProvider.isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Text(
+                                "Siguiente",
+                                style: GoogleFonts.roboto(
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 14,
+                                ),
+                              ),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 55,
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.fingerprint, size: 28),
-                      label: const Text("Ingresar con Huella / Rostro"),
-                      onPressed: _handleBiometricLogin,
-                    ),
-                  ),
                 ],
-                const SizedBox(height: 20),
-              ],
+              ),
             ),
           ),
         ),
@@ -223,25 +332,35 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  void _showBiometricSetupDialog() async {
-    // Solo mostrar si el dispositivo soporta biometría y NO tiene credenciales guardadas aùn
-    // Para simplificar, asumiremos que si entra aquí es un login exitoso manual.
-    // En una app real, verificaríamos flags.
+  Future<void> _showBiometricSetupDialog() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final canCheck = await authProvider.isBiometricAvailable();
     if (!canCheck) return;
+    if (!mounted) return;
 
-    showDialog(
+    await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("Habilitar Biometría"),
-        content: const Text(
-          "¿Deseas habilitar el inicio de sesión con huella o rostro para la próxima vez?",
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        title: Text(
+          "Habilitar Biometría",
+          style: GoogleFonts.roboto(fontWeight: FontWeight.w500),
+        ),
+        content: Text(
+          "¿Quieres usar tu huella o rostro para iniciar sesión la próxima vez?",
+          style: GoogleFonts.roboto(color: const Color(0xFF5F6368)),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text("No"),
+            child: Text(
+              "No",
+              style: GoogleFonts.roboto(
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF5F6368),
+              ),
+            ),
           ),
           TextButton(
             onPressed: () async {
@@ -250,11 +369,19 @@ class _LoginScreenState extends State<LoginScreen> {
                 _usernameController.text.trim(),
                 _passwordController.text.trim(),
               );
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Biometría habilitada")),
-              );
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Biometría habilitada")),
+                );
+              }
             },
-            child: const Text("Sí"),
+            child: Text(
+              "Habilitar",
+              style: GoogleFonts.roboto(
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF1A73E8),
+              ),
+            ),
           ),
         ],
       ),

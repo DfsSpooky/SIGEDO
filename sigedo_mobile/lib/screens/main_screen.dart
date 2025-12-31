@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../services/api_service.dart';
-import '../providers/auth_provider.dart';
+
 import 'dashboard_screen.dart';
 import 'notifications_screen.dart';
 import 'profile_screen.dart';
@@ -17,6 +17,7 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   final ApiService _apiService = ApiService();
   int _unreadCount = 0;
+  int _selectedIndex = 0;
 
   @override
   void initState() {
@@ -37,11 +38,11 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  int _selectedIndex = 0;
-
+  // Update screens list to include Notifications
   final List<Widget> _screens = const [
     DashboardScreen(),
     ScheduleScreen(),
+    NotificationsScreen(),
     ProfileScreen(),
   ];
 
@@ -49,45 +50,25 @@ class _MainScreenState extends State<MainScreen> {
     setState(() {
       _selectedIndex = index;
     });
+
+    // If user Taps on Notifications (index 2), refresh count when leaving or entering?
+    // Optionally refresh notifications when tapping the tab
+    if (index == 2) {
+      _checkNotifications();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Escuchar cambios de AuthProvider para logout
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('SIGEDO Docentes'),
-        backgroundColor: Colors.indigo,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: Badge(
-              isLabelVisible: _unreadCount > 0,
-              label: Text('$_unreadCount'),
-              child: const Icon(Icons.notifications),
-            ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-              ).then((_) => _checkNotifications()); // Actualizar al volver
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => auth.logout(),
-          ),
-        ],
-      ),
+      // No AppBar anymore
       body: _screens[_selectedIndex],
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 10,
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 20,
               offset: const Offset(0, -5),
             ),
           ],
@@ -96,23 +77,46 @@ class _MainScreenState extends State<MainScreen> {
           backgroundColor: Colors.white,
           elevation: 0,
           type: BottomNavigationBarType.fixed,
-          selectedItemColor: Theme.of(context).primaryColor,
-          unselectedItemColor: Colors.grey,
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
-          items: const <BottomNavigationBarItem>[
-            BottomNavigationBarItem(
+          selectedItemColor: const Color(0xFF4F46E5),
+          unselectedItemColor: Colors.grey[400],
+          selectedLabelStyle: GoogleFonts.outfit(
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+          ),
+          unselectedLabelStyle: GoogleFonts.outfit(fontSize: 12),
+          items: <BottomNavigationBarItem>[
+            // 1. Dashboard
+            const BottomNavigationBarItem(
               icon: Icon(Icons.dashboard_outlined),
-              activeIcon: Icon(Icons.dashboard),
+              activeIcon: Icon(Icons.dashboard_rounded),
               label: 'Inicio',
             ),
-            BottomNavigationBarItem(
+            // 2. Schedule
+            const BottomNavigationBarItem(
               icon: Icon(Icons.calendar_month_outlined),
-              activeIcon: Icon(Icons.calendar_month),
+              activeIcon: Icon(Icons.calendar_month_rounded),
               label: 'Horario',
             ),
+            // 3. Notifications
             BottomNavigationBarItem(
+              icon: Badge(
+                isLabelVisible: _unreadCount > 0,
+                label: Text('$_unreadCount'),
+                backgroundColor: Colors.redAccent,
+                child: const Icon(Icons.notifications_outlined),
+              ),
+              activeIcon: Badge(
+                isLabelVisible: _unreadCount > 0,
+                label: Text('$_unreadCount'),
+                backgroundColor: Colors.redAccent,
+                child: const Icon(Icons.notifications_rounded),
+              ),
+              label: 'Avisos',
+            ),
+            // 4. Profile
+            const BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
+              activeIcon: Icon(Icons.person_rounded),
               label: 'Perfil',
             ),
           ],

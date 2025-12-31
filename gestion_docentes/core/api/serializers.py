@@ -1,9 +1,15 @@
 from rest_framework import serializers
 
 
-from ..models import Asistencia, BloqueHorario, Curso, Docente, Justificacion, TipoJustificacion
 
-# ... (Existing Serializers) ...
+from ..models import Asistencia, BloqueHorario, Curso, Docente, Justificacion, TipoJustificacion
+from ..models.settings import ConfiguracionInstitucion
+
+class ConfiguracionInstitucionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ConfiguracionInstitucion
+        fields = ['nombre_institucion', 'logo']
+
 
 class TipoJustificacionSerializer(serializers.ModelSerializer):
     class Meta:
@@ -57,9 +63,7 @@ class CursoAsistenciaSerializer(serializers.ModelSerializer):
     entryMarked = serializers.SerializerMethodField()
     exitMarked = serializers.SerializerMethodField()
     canMarkExit = serializers.BooleanField(source="puede_marcar_salida")
-    hora_salida_permitida_str = serializers.TimeField(
-        source="hora_salida_permitida", format="%H:%M:%S", allow_null=True
-    )
+    hora_salida_permitida_str = serializers.SerializerMethodField()
 
     class Meta:
         model = Asistencia
@@ -73,13 +77,22 @@ class CursoAsistenciaSerializer(serializers.ModelSerializer):
         ]
 
     def get_name(self, obj):
-        # obj es una instancia de Asistencia, accedemos al curso relacionado
-        # y buscamos el bloque de horario para la fecha de la asistencia.
-        bloque = BloqueHorario.objects.filter(
-            curso=obj.curso, dia_semana=obj.fecha.weekday()
-        ).first()
-        if bloque:
-            return f'{obj.curso.nombre} ({bloque.horario_inicio.strftime("%I:%M %p")} - {bloque.horario_fin.strftime("%I:%M %p")})'
+        try:
+            # obj es una instancia de Asistencia, accedemos al curso relacionado
+            # y buscamos el bloque de horario para la fecha de la asistencia.
+            if not obj.fecha:
+                return obj.curso.nombre
+
+            bloque = BloqueHorario.objects.filter(
+                curso=obj.curso, dia_semana=obj.fecha.weekday()
+            ).first()
+            
+            if bloque and bloque.horario_inicio and bloque.horario_fin:
+                return f'{obj.curso.nombre} ({bloque.horario_inicio.strftime("%I:%M %p")} - {bloque.horario_fin.strftime("%I:%M %p")})'
+        except Exception:
+            # En caso de cualquier error (ej. fecha invalida, hora nula, etc),
+            # devolvemos solo el nombre del curso para no romper el endpoint.
+            pass
         return obj.curso.nombre
 
     def get_entryMarked(self, obj):
@@ -87,6 +100,15 @@ class CursoAsistenciaSerializer(serializers.ModelSerializer):
 
     def get_exitMarked(self, obj):
         return obj.hora_salida is not None
+
+    def get_hora_salida_permitida_str(self, obj):
+        if obj.hora_salida_permitida:
+            from django.utils import timezone
+            # Convertir a hora local si es necesario, o usar directamente si ya lo es.
+            # Django DateTimeField suele ser timezone aware.
+            local_dt = timezone.localtime(obj.hora_salida_permitida)
+            return local_dt.strftime("%H:%M:%S")
+        return None
 
 
 class MarkAttendanceSerializer(serializers.Serializer):
