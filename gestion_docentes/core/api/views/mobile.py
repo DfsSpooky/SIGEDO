@@ -16,6 +16,7 @@ from core.models import (
     Documento,
     TipoDocumento,
     VersionDocumento,
+    AdelantoClase,
 )
 from rest_framework.parsers import MultiPartParser, FormParser
 from core.api.views.utils import get_kiosk_data_for_docente
@@ -226,11 +227,37 @@ class MobileMarkAttendanceView(APIView):
                 asistencia.foto_entrada = photo_file
                 response_data["es_tardanza"] = asistencia.es_tardanza()
 
-                # --- Cálculo Dinámico de Duración (Igual que en Kiosk/Web) ---
+                # --- VALIDACIÓN 10 MINUTOS ANTES ---
                 bloque_del_dia = BloqueHorario.objects.filter(
                     curso=curso, dia_semana=today.weekday()
                 ).first()
 
+                if bloque_del_dia and bloque_del_dia.horario_inicio:
+                    # Crear datetime aware para la hora de inicio de hoy
+                    inicio_clase_dt = timezone.make_aware(
+                        timezone.datetime.combine(today, bloque_del_dia.horario_inicio)
+                    )
+                    
+                    # Calcular diferencia
+                    diff = inicio_clase_dt - now
+                    # Si faltan más de 10 minutos (diff > 10 min)
+                    if diff.total_seconds() > 600: 
+                        # Verificar si existe AdelantoClase
+                        has_adelanto = AdelantoClase.objects.filter(
+                            docente=docente, curso=curso, fecha=today
+                        ).exists()
+
+                        if not has_adelanto:
+                             return Response(
+                                {
+                                    "status": "error",
+                                    "message": "Falta mucho para el inicio de clase (Mínimo 10 min antes). Use la opción 'Adelantar Clase' si es necesario.",
+                                    "code": "TOO_EARLY" 
+                                },
+                                status=status.HTTP_400_BAD_REQUEST,
+                            )
+
+                # --- Cálculo Dinámico de Duración (Igual que en Kiosk/Web) ---
                 if bloque_del_dia:
                     duracion_real = bloque_del_dia.get_duracion_real_minutos()
                     duracion_minima_minutos = duracion_real - 15
@@ -436,10 +463,49 @@ class MobileUploadDocumentView(APIView):
             )
             action = "created"
 
+
         return Response({
             "status": "success",
             "action": action,
             "document_id": documento.id,
             "message": "Documento subido correctamente"
+        })
+
+
+class MobileAdelantoClaseView(APIView):
+    """
+    API View para registrar un adelanto de clase.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        course_id = request.data.get('courseId')
+        reason = request.data.get('reason')
+
+        if not course_id or not reason:
+             return Response(
+                {"status": "error", "message": "Faltan datos (courseId, reason)."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            curso = Curso.objects.get(id=course_id)
+        except Curso.DoesNotExist:
+            return Response(
+                {"status": "error", "message": "Curso no encontrado."},
+                 status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Crear el adelanto (usando update_or_create para evitar duplicados el mismo día)
+        AdelantoClase.objects.update_or_create(
+            docente=request.user,
+            curso=curso,
+            fecha=timezone.localtime(timezone.now()).date(),
+            defaults={'motivo': reason}
+        )
+
+        return Response({
+            "status": "success",
+            "message": "Adelanto de clase registrado correctamente. Ahora puede marcar su entrada."
         })
 

@@ -109,6 +109,8 @@ class CourseAttendance {
   final bool exitMarked;
   final bool canMarkExit;
   final String? exitTimeStr;
+  final String? startTime;
+  final String? endTime;
 
   CourseAttendance({
     required this.id,
@@ -117,6 +119,8 @@ class CourseAttendance {
     required this.exitMarked,
     required this.canMarkExit,
     this.exitTimeStr,
+    this.startTime,
+    this.endTime,
   });
 
   CourseAttendance copyWith({
@@ -126,6 +130,8 @@ class CourseAttendance {
     bool? exitMarked,
     bool? canMarkExit,
     String? exitTimeStr,
+    String? startTime,
+    String? endTime,
   }) {
     return CourseAttendance(
       id: id ?? this.id,
@@ -134,6 +140,8 @@ class CourseAttendance {
       exitMarked: exitMarked ?? this.exitMarked,
       canMarkExit: canMarkExit ?? this.canMarkExit,
       exitTimeStr: exitTimeStr ?? this.exitTimeStr,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
     );
   }
 
@@ -145,6 +153,8 @@ class CourseAttendance {
       exitMarked: json['exitMarked'] ?? false,
       canMarkExit: json['canMarkExit'] ?? false,
       exitTimeStr: json['hora_salida_permitida_str'],
+      startTime: json['startTime'],
+      endTime: json['endTime'],
     );
   }
 }

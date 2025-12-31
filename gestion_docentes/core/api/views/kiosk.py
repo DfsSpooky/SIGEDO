@@ -22,6 +22,7 @@ from core.models import (
     Curso,
     Docente,
     Semestre,
+    AdelantoClase,
 )
 from core.api.views.utils import get_kiosk_data_for_docente
 
@@ -193,11 +194,36 @@ class MarkAttendanceView(APIView):
                 asistencia.foto_entrada = photo_file
                 response_data["es_tardanza"] = asistencia.es_tardanza()
 
-                # --- MEJORA: Cálculo Dinámico de Duración (Igual que en Web) ---
+                # --- VALIDACIÓN 10 MINUTOS ANTES ---
                 bloque_del_dia = BloqueHorario.objects.filter(
                     curso=curso, dia_semana=today.weekday()
                 ).first()
 
+                if bloque_del_dia and bloque_del_dia.horario_inicio:
+                    # Crear datetime aware para la hora de inicio de hoy
+                    inicio_clase_dt = timezone.make_aware(
+                        timezone.datetime.combine(today, bloque_del_dia.horario_inicio)
+                    )
+                    
+                    # Calcular diferencia
+                    diff = inicio_clase_dt - now
+                    # Si faltan más de 10 minutos (diff > 10 min)
+                    if diff.total_seconds() > 600: 
+                        # Verificar si existe AdelantoClase
+                        has_adelanto = AdelantoClase.objects.filter(
+                            docente=docente, curso=curso, fecha=today
+                        ).exists()
+
+                        if not has_adelanto:
+                             return Response(
+                                {
+                                    "status": "error",
+                                    "message": "Falta mucho para el inicio de clase (Mínimo 10 min antes). Use la opción 'Adelantar Clase' si es necesario.",
+                                },
+                                status=status.HTTP_400_BAD_REQUEST,
+                            )
+
+                # --- MEJORA: Cálculo Dinámico de Duración (Igual que en Web) ---
                 if bloque_del_dia:
                     # Usamos el método del modelo para obtener minutos reales
                     duracion_real = bloque_del_dia.get_duracion_real_minutos()

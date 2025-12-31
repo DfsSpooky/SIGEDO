@@ -12,6 +12,7 @@ import '../services/location_service.dart';
 import 'credential_screen.dart';
 import 'documents_screen.dart';
 import 'justification_screen.dart';
+import '../utils/date_utils.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -23,7 +24,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   // Función auxiliar para saludos
   String get _greeting {
-    final hour = DateTime.now().hour;
+    final hour = DateUtilsLima.now.hour;
     if (hour < 12) return 'Buenos días';
     if (hour < 18) return 'Buenas tardes';
     return 'Buenas noches';
@@ -192,6 +193,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     children: [
                       // Daily Status Card (Glassmorphic)
                       _buildDailyStatusCard(context, dailyAttendance),
+
+                      const SizedBox(height: 24),
+
+                      // Next Class Countdown
+                      _buildNextClassCard(context, courses),
 
                       const SizedBox(height: 24),
 
@@ -426,6 +432,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   const SizedBox(height: 24),
 
+                  // --- DIDACTIC SMART TIP ---
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 24),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: startColor.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: startColor.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.lightbulb_outline,
+                          color: startColor,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            isCompleted
+                                ? "¡Excelente! Has completado tu jornada por hoy."
+                                : (isEntryMarked
+                                      ? "Recuerda marcar tu SALIDA antes de retirarte."
+                                      : "¡Hola! Marca tu ENTRADA para comenzar."),
+                            style: GoogleFonts.outfit(
+                              color: const Color(0xFF374151),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                   // Time Stats
                   Row(
                     children: [
@@ -593,6 +638,209 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Future<void> _showAdelantoDialog(CourseAttendance course) async {
+    final TextEditingController reasonController = TextEditingController();
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          "Adelantar Clase",
+          style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Falta más de 10 minutos para el inicio. ¿Desea adelantar el inicio de la clase?",
+              style: GoogleFonts.outfit(color: Colors.grey[700]),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: reasonController,
+              decoration: InputDecoration(
+                labelText: "Motivo (Obligatorio)",
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: Colors.grey[50],
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancelar"),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final reason = reasonController.text.trim();
+              if (reason.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Ingrese un motivo")),
+                );
+                return;
+              }
+
+              Navigator.pop(context); // Close Dialog
+
+              // Show Loading
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (_) =>
+                    const Center(child: CircularProgressIndicator()),
+              );
+
+              try {
+                await Provider.of<AuthProvider>(
+                  context,
+                  listen: false,
+                ).api.createClassAdvancement(
+                  courseId: course.id,
+                  reason: reason,
+                );
+                if (mounted) {
+                  Navigator.pop(context); // Close Loading
+                  // Refresh to unlock Entry button
+                  await Provider.of<AuthProvider>(
+                    context,
+                    listen: false,
+                  ).loadDashboard();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        "Adelanto registrado. Puede marcar entrada.",
+                      ),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  Navigator.pop(context); // Close Loading
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text("Error: $e")));
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF59E0B), // Amber
+              foregroundColor: Colors.white,
+            ),
+            child: const Text("Confirmar Adelanto"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNextClassCard(
+    BuildContext context,
+    List<CourseAttendance> courses,
+  ) {
+    // 1. Calculate Next Class
+    final now = DateUtilsLima.now;
+    CourseAttendance? nextCourse;
+    DateTime? nextStartTime;
+    int minutesRemaining = 0;
+
+    for (var course in courses) {
+      if (course.entryMarked) continue; // Already started/done
+
+      final start = DateUtilsLima.parseTimeString(course.startTime);
+      if (start == null) continue;
+
+      // Check if it's in the future
+      if (start.isAfter(now)) {
+        // If it's the first one we find or earlier than current candidate
+        if (nextStartTime == null || start.isBefore(nextStartTime)) {
+          nextCourse = course;
+          nextStartTime = start;
+          minutesRemaining = start.difference(now).inMinutes;
+        }
+      }
+    }
+
+    if (nextCourse == null) return const SizedBox.shrink();
+
+    // 2. Build Card
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF10B981), Color(0xFF34D399)], // Emerald Green
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF10B981).withOpacity(0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.timer_outlined,
+              color: Colors.white,
+              size: 28,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Próxima Clase",
+                  style: GoogleFonts.outfit(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  nextCourse.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.outfit(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "En $minutesRemaining minutos",
+                  style: GoogleFonts.outfit(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCourseTimelineItem(
     BuildContext context,
     CourseAttendance course,
@@ -705,25 +953,72 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Row(
                     children: [
                       if (!course.entryMarked)
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () =>
-                                _handleAttendance("course_entry", course.id),
-                            style: OutlinedButton.styleFrom(
-                              side: BorderSide(color: statusColor),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                            child: Text(
-                              "Entrada",
-                              style: GoogleFonts.outfit(
-                                color: statusColor,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
+                        Builder(
+                          builder: (context) {
+                            bool canMark = true;
+                            final start = DateUtilsLima.parseTimeString(
+                              course.startTime,
+                            );
+                            final now = DateUtilsLima.now;
+
+                            if (start != null) {
+                              // 10 minute rule
+                              final diff = start.difference(now).inMinutes;
+                              if (diff > 10) canMark = false;
+                            }
+
+                            if (canMark) {
+                              return Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () => _handleAttendance(
+                                    "course_entry",
+                                    course.id,
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    side: BorderSide(color: statusColor),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    "Entrada",
+                                    style: GoogleFonts.outfit(
+                                      color: statusColor,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            } else {
+                              // Adelantar Mode
+                              return Expanded(
+                                child: ElevatedButton(
+                                  onPressed: () => _showAdelantoDialog(course),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(
+                                      0xFFF59E0B,
+                                    ), // Amber
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    "Adelantar Clase",
+                                    style: GoogleFonts.outfit(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+                          },
                         ),
 
                       if (inProgress) ...[
@@ -761,7 +1056,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 border: Border.all(color: Colors.grey.shade200),
                               ),
                               child: Text(
-                                "Salida ${course.exitTimeStr ?? '--:--'}",
+                                "Salida programada: ${course.endTime ?? course.exitTimeStr ?? '--:--'}",
                                 style: GoogleFonts.outfit(
                                   color: Colors.grey[500],
                                   fontSize: 12,

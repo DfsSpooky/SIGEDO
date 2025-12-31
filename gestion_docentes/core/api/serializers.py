@@ -46,7 +46,7 @@ class DocenteInfoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Docente
-        fields = ["name", "dni", "photoUrl"]
+        fields = ["name", "dni", "photoUrl", "email"]
 
 
 class CursoAsistenciaSerializer(serializers.ModelSerializer):
@@ -74,7 +74,33 @@ class CursoAsistenciaSerializer(serializers.ModelSerializer):
             "exitMarked",
             "canMarkExit",
             "hora_salida_permitida_str",
+            "startTime",
+            "endTime",
         ]
+
+    startTime = serializers.SerializerMethodField()
+    endTime = serializers.SerializerMethodField()
+
+    def get_bloque(self, obj):
+        try:
+             if not obj.fecha: return None
+             return BloqueHorario.objects.filter(
+                curso=obj.curso, dia_semana=obj.fecha.weekday()
+            ).first()
+        except:
+            return None
+
+    def get_startTime(self, obj):
+        bloque = self.get_bloque(obj)
+        if bloque and bloque.horario_inicio:
+            return bloque.horario_inicio.strftime("%H:%M:%S")
+        return None
+
+    def get_endTime(self, obj):
+        bloque = self.get_bloque(obj)
+        if bloque and bloque.horario_fin:
+            return bloque.horario_fin.strftime("%H:%M:%S")
+        return None
 
     def get_name(self, obj):
         try:

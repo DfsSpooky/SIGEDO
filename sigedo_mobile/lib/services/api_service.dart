@@ -171,4 +171,17 @@ class ApiService {
       data: {'email': email, 'otp': otp, 'new_password': newPassword},
     );
   }
+
+  // --- Adelanto de Clases ---
+
+  Future<void> createClassAdvancement({
+    required int courseId,
+    required String reason,
+  }) async {
+    final data = {"courseId": courseId, "reason": reason};
+    await _dio.post(
+      '${AppConstants.baseUrl}/api/mobile/adelanto-clase/',
+      data: data,
+    );
+  }
 }

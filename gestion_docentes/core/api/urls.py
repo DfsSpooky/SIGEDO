@@ -87,6 +87,7 @@ urlpatterns = [
     path("mobile/fcm-token/", views.UpdateFCMTokenView.as_view(), name="mobile_fcm_token"),
     path("mobile/documents/", views.MobileDocumentsView.as_view(), name="mobile_documents"),
     path("mobile/documents/upload/", views.MobileUploadDocumentView.as_view(), name="mobile_documents_upload"),
+    path("mobile/adelanto-clase/", views.MobileAdelantoClaseView.as_view(), name="mobile_adelanto_clase"),
     
     # --- Justificaciones ---
     # --- Justificaciones ---

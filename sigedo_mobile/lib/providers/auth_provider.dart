@@ -6,6 +6,7 @@ import '../models/justification_type.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart'; // Import AuthService
 import '../services/biometric_service.dart';
+import '../utils/date_utils.dart';
 
 class AuthProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -20,6 +21,7 @@ class AuthProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   TeacherData? get teacherData => _teacherData;
   String? get errorMessage => _errorMessage;
+  ApiService get api => _apiService;
 
   Future<void> checkAuthStatus() async {
     _isAuthenticated = await _authService.hasToken(); // Use AuthService
@@ -121,9 +123,8 @@ class AuthProvider with ChangeNotifier {
   void _updateLocalState(String actionType, int? courseId) {
     if (_teacherData == null) return;
 
-    final now = DateTime.now();
-    final timeString =
-        "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
+    final now = DateUtilsLima.now;
+    final timeString = DateUtilsLima.formatTime(now);
 
     if (actionType == 'general_entry') {
       _teacherData = _teacherData!.copyWith(

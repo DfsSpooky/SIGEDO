@@ -6,7 +6,8 @@ from .mobile import (
     UpdateFCMTokenView, 
     MobileDocumentsView,
     MobileUploadDocumentView,
-    MobilePublicConfigView
+    MobilePublicConfigView,
+    MobileAdelantoClaseView,
 )
 from .notifications import (
     marcar_notificacion_como_leida,

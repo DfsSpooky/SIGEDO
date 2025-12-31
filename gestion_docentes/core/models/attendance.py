@@ -191,3 +191,17 @@ class Justificacion(models.Model):
 
     class Meta:
         ordering = ["-fecha_creacion"]
+
+class AdelantoClase(models.Model):
+    # String references
+    docente = models.ForeignKey("core.Docente", on_delete=models.CASCADE)
+    curso = models.ForeignKey("core.Curso", on_delete=models.CASCADE)
+    fecha = models.DateField(default=date.today)
+    motivo = models.TextField(help_text="Motivo por el cual se adelanta la clase.")
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Adelanto de {self.docente} - {self.curso} ({self.fecha})"
+
+    class Meta:
+        unique_together = ["docente", "curso", "fecha"]

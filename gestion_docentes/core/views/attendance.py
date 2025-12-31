@@ -5,7 +5,7 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.contrib import messages
 
-from ..models import Asistencia, BloqueHorario, Semestre
+from ..models import AdelantoClase, Asistencia, BloqueHorario, Semestre
 
 
 @login_required
@@ -29,15 +29,17 @@ def registrar_asistencia(request):
         ]
         dia_actual_str = dias_semana[now.weekday()]
 
+        # Relaxed query: Find the *next* or *current* block for today
+        # We order by start time to get the most immediate one
         bloque_actual = (
             BloqueHorario.objects.filter(
                 curso__docente=docente,
                 curso__semestre=semestre_activo,
                 dia=dia_actual_str,
-                horario_inicio__lte=now.time(),
-                horario_fin__gte=now.time(),
+                horario_fin__gte=now.time(), # Must not be finished yet
             )
             .select_related("curso")
+            .order_by("horario_inicio")
             .first()
         )
 
@@ -62,6 +64,25 @@ def registrar_asistencia(request):
                 error_message = "Ya existe un registro de entrada para este curso hoy."
             else:
                 try:
+                    # --- VALIDACIÓN 10 MINUTOS / ADELANTO ---
+                    # Calculate start datetime
+                    inicio_clase_dt = timezone.make_aware(
+                        timezone.datetime.combine(now.date(), bloque_actual.horario_inicio)
+                    )
+                    diff = inicio_clase_dt - now
+                    
+                    if diff.total_seconds() > 600: # More than 10 mins early
+                        has_adelanto = AdelantoClase.objects.filter(
+                            docente=docente, 
+                            curso=bloque_actual.curso, 
+                            fecha=now.date()
+                        ).exists()
+                        
+                        if not has_adelanto:
+                            minutos_restantes = int(diff.total_seconds() / 60)
+                            error_message = f"Falta mucho para el inicio ({minutos_restantes} min). Use la opción 'Adelantar Clase' en la App Móvil si es necesario."
+                            raise ValidationError(error_message)
+
                     nueva_asistencia = Asistencia(
                         docente=docente,
                         curso=bloque_actual.curso,
