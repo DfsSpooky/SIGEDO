@@ -105,6 +105,24 @@ class MarkAttendanceView(APIView):
             )
 
         if action_type == "general_entry":
+            # --- Validar Horario Configurado (Igual que Mobile) ---
+            from core.models.settings import ConfiguracionInstitucion
+            config = ConfiguracionInstitucion.load()
+            
+            local_time = timezone.localtime(now).time()
+            if config.hora_inicio_asistencia_general and local_time < config.hora_inicio_asistencia_general:
+                return Response(
+                    {"status": "error", "message": f"El registro de entrada inicia a las {config.hora_inicio_asistencia_general.strftime('%H:%M')}."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            if config.hora_fin_asistencia_general and local_time > config.hora_fin_asistencia_general:
+                 return Response(
+                    {"status": "error", "message": f"El registro de entrada finalizó a las {config.hora_fin_asistencia_general.strftime('%H:%M')}."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            # ------------------------------------------------------
+
             _, created = AsistenciaDiaria.objects.get_or_create(
                 docente=docente, fecha=today, defaults={"foto_verificacion": photo_file}
             )

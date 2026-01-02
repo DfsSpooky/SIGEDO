@@ -54,7 +54,17 @@ class ApiService {
       "longitude": longitude,
     };
 
-    await _dio.post(AppConstants.attendanceEndpoint, data: data);
+    try {
+      await _dio.post(AppConstants.attendanceEndpoint, data: data);
+    } on DioException catch (e) {
+      if (e.response != null && e.response!.data is Map) {
+        final msg = e.response!.data['message'];
+        if (msg != null) {
+          throw Exception(msg);
+        }
+      }
+      throw e;
+    }
   }
 
   Future<List<dynamic>> getSchedule() async {

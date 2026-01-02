@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../services/api_service.dart';
 import '../models/teacher_data.dart'; // Import TeacherData
 
@@ -131,10 +132,42 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
-        _isProcessing = false;
-      });
+
+      String msg = e.toString().replaceAll('Exception: ', '');
+
+      // Extract nicely formatted message from Dio Error if possible
+      // We assume Dio is used in ApiService and might throw DioException
+      // Since we don't import Dio here, we check runtime type string or just rely on ApiService to throw clean errors.
+      // Ideally ApiService should throw a custom exception, but for now we try to parse.
+      if (msg.contains("response has a status code of 400")) {
+        // Generic fallback if we can't parse the body here easily without Dio package
+        // But ApiService usually throws the raw exception.
+        // Let's rely on ApiService improvement OR assume e.toString() is messy.
+      }
+
+      // BETTER: Show Dialog instead of replacing screen for "Modal" feel
+      setState(() => _isProcessing = false);
+
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(
+            "Atención",
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+          ),
+          content: Text(
+            msg.contains("The status code of 400")
+                ? "No se pudo registrar. Verifique horario o permisos."
+                : msg,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text("OK"),
+            ),
+          ],
+        ),
+      );
     }
   }
 

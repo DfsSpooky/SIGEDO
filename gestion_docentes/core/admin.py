@@ -457,7 +457,7 @@ class ConfiguracionInstitucionAdmin(ModelAdmin):
             "Información Principal",
             {"fields": ("nombre_institucion", "logo", "facultad", "nombre_dashboard")},
         ),
-        ("Parámetros del Sistema", {"fields": ("tiempo_limite_tardanza", "validar_geolocalizacion")}),
+        ("Parámetros del Sistema", {"fields": ("tiempo_limite_tardanza", "validar_geolocalizacion", "hora_inicio_asistencia_general", "hora_fin_asistencia_general")}),
         (
             "Datos de Contacto (Opcional)",
             {

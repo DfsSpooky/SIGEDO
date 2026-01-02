@@ -5,12 +5,14 @@ class TeacherData {
   final DailyAttendance dailyAttendance;
   final List<CourseAttendance> courses;
   final List<Announcement> announcements;
+  final AttendanceConfig? attendanceConfig;
 
   TeacherData({
     required this.teacher,
     required this.dailyAttendance,
     required this.courses,
     this.announcements = const [],
+    this.attendanceConfig,
   });
 
   TeacherData copyWith({
@@ -18,12 +20,14 @@ class TeacherData {
     DailyAttendance? dailyAttendance,
     List<CourseAttendance>? courses,
     List<Announcement>? announcements,
+    AttendanceConfig? attendanceConfig,
   }) {
     return TeacherData(
       teacher: teacher ?? this.teacher,
       dailyAttendance: dailyAttendance ?? this.dailyAttendance,
       courses: courses ?? this.courses,
       announcements: announcements ?? this.announcements,
+      attendanceConfig: attendanceConfig ?? this.attendanceConfig,
     );
   }
 
@@ -43,6 +47,9 @@ class TeacherData {
               ?.map((i) => Announcement.fromJson(i))
               .toList() ??
           [],
+      attendanceConfig: json['attendanceConfig'] != null
+          ? AttendanceConfig.fromJson(json['attendanceConfig'])
+          : null,
     );
   }
 }
@@ -174,6 +181,20 @@ class CourseAttendance {
       startTime: json['startTime'],
       endTime: json['endTime'],
       classroom: json['classroom'],
+    );
+  }
+}
+
+class AttendanceConfig {
+  final String? generalEntryStartTime;
+  final String? generalEntryEndTime;
+
+  AttendanceConfig({this.generalEntryStartTime, this.generalEntryEndTime});
+
+  factory AttendanceConfig.fromJson(Map<String, dynamic> json) {
+    return AttendanceConfig(
+      generalEntryStartTime: json['generalEntryStartTime'],
+      generalEntryEndTime: json['generalEntryEndTime'],
     );
   }
 }

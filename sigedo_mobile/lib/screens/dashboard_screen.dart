@@ -169,7 +169,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
     final teacherInfo = auth.teacherData?.teacher;
-    final dailyAttendance = auth.teacherData?.dailyAttendance;
+    // final dailyAttendance removed
     final courses = auth.teacherData?.courses ?? [];
 
     if (auth.isLoading) {
@@ -208,7 +208,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ],
 
                       // Daily Status Card (Glassmorphic)
-                      _buildDailyStatusCard(context, dailyAttendance),
+                      _buildDailyStatusCard(context, auth.teacherData),
 
                       const SizedBox(height: 24),
 
@@ -355,10 +355,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildDailyStatusCard(BuildContext context, DailyAttendance? daily) {
+  Widget _buildDailyStatusCard(BuildContext context, TeacherData? data) {
+    DailyAttendance? daily = data?.dailyAttendance;
+    AttendanceConfig? config = data?.attendanceConfig;
+
     bool isEntryMarked = daily?.entryMarked ?? false;
     bool isExitMarked = daily?.exitMarked ?? false;
     bool isCompleted = isEntryMarked && isExitMarked;
+
+    // --- Time Window Logic ---
+    bool isButtonEnabled = true;
+    String disabledMessage = "";
+
+    // Only check time if we are trying to mark ENTRY (and entry is not marked yet)
+    if (!isEntryMarked &&
+        !isCompleted &&
+        config?.generalEntryStartTime != null) {
+      try {
+        final now = DateTime.now();
+        final parts = config!.generalEntryStartTime!.split(":");
+        final startDt = DateTime(
+          now.year,
+          now.month,
+          now.day,
+          int.parse(parts[0]),
+          int.parse(parts[1]),
+        );
+
+        if (now.isBefore(startDt)) {
+          isButtonEnabled = false;
+          disabledMessage = "Habilitado ${config.generalEntryStartTime}";
+        }
+      } catch (e) {
+        debugPrint("Error parsing time: $e");
+      }
+    }
+    // -------------------------
 
     // Define Theme Colors based on state
     Color primaryColor;
@@ -663,12 +695,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: () => _handleAttendance(
-                          isEntryMarked ? "general_exit" : "general_entry",
-                          null,
-                        ),
+                        onPressed: isButtonEnabled
+                            ? () => _handleAttendance(
+                                isEntryMarked
+                                    ? "general_exit"
+                                    : "general_entry",
+                                null,
+                              )
+                            : () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      "Registro disponible a partir de las ${config?.generalEntryStartTime}",
+                                    ),
+                                  ),
+                                );
+                              },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryColor,
+                          backgroundColor: isButtonEnabled
+                              ? primaryColor
+                              : Colors.grey[400],
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 18),
                           shape: RoundedRectangleBorder(
@@ -688,7 +734,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             Text(
                               isEntryMarked
                                   ? "MARCAR SALIDA"
-                                  : "MARCAR ENTRADA",
+                                  : (isButtonEnabled
+                                        ? "MARCAR ENTRADA"
+                                        : disabledMessage),
                               style: GoogleFonts.outfit(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
