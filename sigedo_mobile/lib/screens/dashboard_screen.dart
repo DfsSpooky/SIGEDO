@@ -1248,7 +1248,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Text(
                         course.name,
                         style: GoogleFonts.outfit(
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: isFuture
                               ? FontWeight.w500
                               : FontWeight.bold,
@@ -1257,6 +1257,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               : const Color(0xFF1F2937),
                         ),
                       ),
+                      if (course.specialty != null &&
+                          course.specialty!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2, bottom: 2),
+                          child: Text(
+                            course.specialty!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                              color: Colors.grey[500],
+                            ),
+                          ),
+                        ),
                       if (course.startTime != null &&
                           course.endTime != null) ...[
                         const SizedBox(height: 4),

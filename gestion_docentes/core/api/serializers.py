@@ -65,6 +65,17 @@ class CursoAsistenciaSerializer(serializers.ModelSerializer):
     canMarkExit = serializers.BooleanField(source="puede_marcar_salida")
     hora_salida_permitida_str = serializers.SerializerMethodField()
 
+    startTime = serializers.SerializerMethodField()
+    endTime = serializers.SerializerMethodField()
+    classroom = serializers.SerializerMethodField()
+    specialty = serializers.SerializerMethodField()
+
+    def get_specialty(self, obj):
+        specs = obj.curso.especialidades.all()
+        if specs.exists():
+             return ", ".join([e.nombre for e in specs])
+        return "General"
+
     class Meta:
         model = Asistencia
         fields = [
@@ -77,11 +88,8 @@ class CursoAsistenciaSerializer(serializers.ModelSerializer):
             "startTime",
             "endTime",
             "classroom",
+            "specialty",
         ]
-
-    startTime = serializers.SerializerMethodField()
-    endTime = serializers.SerializerMethodField()
-    classroom = serializers.SerializerMethodField()
 
     def get_bloque(self, obj):
         try:

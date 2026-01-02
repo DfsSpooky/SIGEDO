@@ -133,6 +133,7 @@ class CourseAttendance {
   final String? startTime;
   final String? endTime;
   final String? classroom;
+  final String? specialty;
 
   CourseAttendance({
     required this.id,
@@ -144,6 +145,7 @@ class CourseAttendance {
     this.startTime,
     this.endTime,
     this.classroom,
+    this.specialty,
   });
 
   CourseAttendance copyWith({
@@ -181,6 +183,7 @@ class CourseAttendance {
       startTime: json['startTime'],
       endTime: json['endTime'],
       classroom: json['classroom'],
+      specialty: json['specialty'],
     );
   }
 }
