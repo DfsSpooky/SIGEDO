@@ -76,10 +76,12 @@ class CursoAsistenciaSerializer(serializers.ModelSerializer):
             "hora_salida_permitida_str",
             "startTime",
             "endTime",
+            "classroom",
         ]
 
     startTime = serializers.SerializerMethodField()
     endTime = serializers.SerializerMethodField()
+    classroom = serializers.SerializerMethodField()
 
     def get_bloque(self, obj):
         try:
@@ -100,6 +102,12 @@ class CursoAsistenciaSerializer(serializers.ModelSerializer):
         bloque = self.get_bloque(obj)
         if bloque and bloque.horario_fin:
             return bloque.horario_fin.strftime("%H:%M:%S")
+        return None
+
+    def get_classroom(self, obj):
+        bloque = self.get_bloque(obj)
+        if bloque and bloque.aula:
+            return bloque.aula.nombre
         return None
 
     def get_name(self, obj):

@@ -210,4 +210,22 @@ class ApiService {
       return {};
     }
   }
+
+  // --- Historial ---
+
+  Future<List<dynamic>> getAttendanceHistory({int? month, int? year}) async {
+    try {
+      final response = await _dio.get(
+        '${AppConstants.baseUrl}/api/mobile/history/',
+        queryParameters: {
+          if (month != null) 'month': month,
+          if (year != null) 'year': year,
+        },
+      );
+      return response.data;
+    } catch (e) {
+      debugPrint("Error fetching history: $e");
+      return [];
+    }
+  }
 }

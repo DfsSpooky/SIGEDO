@@ -10,6 +10,7 @@ from .mobile import (
     MobileAdelantoClaseView,
     MobileDirectorAttendanceView,
     MobileDirectorStatsView,
+    MobileAttendanceHistoryView,
 )
 from .notifications import (
     marcar_notificacion_como_leida,

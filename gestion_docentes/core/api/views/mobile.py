@@ -652,3 +652,82 @@ class MobileDirectorStatsView(APIView):
             "attendance_by_career": career_data
         })
 
+
+class MobileAttendanceHistoryView(APIView):
+    """
+    API View para obtener el historial de asistencia del docente (Mensual).
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        docente = request.user
+        
+        # Obtener mes y año de los params o usar actual
+        now = timezone.now()
+        try:
+            month = int(request.query_params.get('month', now.month))
+            year = int(request.query_params.get('year', now.year))
+        except ValueError:
+            month = now.month
+            year = now.year
+
+        # Definir rango de fechas
+        import calendar
+        _, last_day = calendar.monthrange(year, month)
+        start_date = timezone.datetime(year, month, 1).date()
+        end_date = timezone.datetime(year, month, last_day).date()
+
+        # 1. Obtener Asistencias Generales (Campus)
+        asistencias_general = AsistenciaDiaria.objects.filter(
+            docente=docente,
+            fecha__range=[start_date, end_date]
+        ).order_by('fecha')
+
+        # 2. Obtener Asistencias a Clases
+        asistencias_cursos = Asistencia.objects.filter(
+            docente=docente,
+            fecha__range=[start_date, end_date]
+        ).select_related('curso').order_by('fecha')
+
+        # 3. Agrupar por día
+        history_by_day = {}
+
+        # Helper
+        def get_day_entry(date_obj):
+            if date_obj not in history_by_day:
+                history_by_day[date_obj] = {
+                    "date": date_obj.strftime("%Y-%m-%d"),
+                    "dayName": date_obj.strftime("%A"), 
+                    "general": None,
+                    "courses": []
+                }
+            return history_by_day[date_obj]
+
+        def format_time(dt):
+            if not dt: return None
+            return timezone.localtime(dt).strftime("%I:%M %p")
+
+        # Procesar General
+        for g in asistencias_general:
+            entry = get_day_entry(g.fecha)
+            entry["general"] = {
+                "entryTime": format_time(g.hora_entrada),
+                "exitTime": format_time(g.hora_salida),
+                "status": "COMPLETED" if g.hora_entrada and g.hora_salida else ("INCOMPLETE" if g.hora_entrada else "ABSENT")
+            }
+
+        # Procesar Cursos
+        for c in asistencias_cursos:
+            entry = get_day_entry(c.fecha)
+            entry["courses"].append({
+                "courseName": c.curso.nombre,
+                "entryTime": format_time(c.hora_entrada),
+                "exitTime": format_time(c.hora_salida),
+                "isLate": c.es_tardanza(),
+                "status": "COMPLETED" if c.hora_entrada and c.hora_salida else ("IN_PROGRESS" if c.hora_entrada else "--")
+            })
+
+        # Convertir a lista y ordenar
+        response_list = sorted(history_by_day.values(), key=lambda x: x['date'], reverse=True)
+
+        return Response(response_list)

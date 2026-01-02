@@ -10,6 +10,8 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../services/location_service.dart';
 import 'credential_screen.dart';
+
+import 'history_screen.dart';
 import 'documents_screen.dart';
 import 'justification_screen.dart';
 import '../utils/date_utils.dart';
@@ -251,9 +253,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           "No tienes clases programadas.\n¡Tómate un descanso!",
                         ),
 
-                      ...courses.map(
-                        (course) => _buildCourseTimelineItem(context, course),
-                      ),
+                      ...List.generate(courses.length, (index) {
+                        return _buildCourseTimelineItem(
+                          context,
+                          courses[index],
+                          index == courses.length - 1,
+                        );
+                      }),
 
                       const SizedBox(height: 40),
                     ],
@@ -794,6 +800,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
               MaterialPageRoute(builder: (_) => const JustificationScreen()),
             ),
           ),
+        _buildQuickActionItem(
+          context,
+          icon: Icons.history_rounded,
+          label: "Historial",
+          color: const Color(0xFF8B5CF6),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const HistoryScreen()),
+          ),
+        ),
       ],
     );
   }
@@ -986,163 +1002,318 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildCourseTimelineItem(
     BuildContext context,
     CourseAttendance course,
+    bool isLast,
   ) {
     bool inProgress = course.entryMarked && !course.exitMarked;
     bool completed = course.entryMarked && course.exitMarked;
+
+    // Future course check could be better if backend sent it,
+    // but we can infer if not marked and no entry time.
+    bool isFuture = !course.entryMarked;
 
     Color statusColor = const Color(0xFF6366F1); // Default Indigo
     if (inProgress) statusColor = const Color(0xFF10B981); // Green
     if (completed) statusColor = Colors.grey;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Timeline Line & Dot
-          Column(
-            children: [
-              Container(
-                width: 16,
-                height: 16,
-                decoration: BoxDecoration(
-                  color: inProgress
-                      ? Colors.white
-                      : statusColor.withValues(alpha: 0.2),
-                  border: Border.all(
-                    color: statusColor,
-                    width: inProgress ? 4 : 2,
+      margin: const EdgeInsets.only(
+        bottom: 0,
+      ), // Removed margin, managed by Column/Stack if needed
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Timeline Line & Dot
+            SizedBox(
+              width: 24,
+              child: Column(
+                children: [
+                  // Dot
+                  Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: inProgress
+                          ? Colors.white
+                          : (isFuture
+                                ? Colors.white
+                                : statusColor.withValues(alpha: 0.2)),
+                      border: Border.all(
+                        color: isFuture ? Colors.grey[300]! : statusColor,
+                        width: inProgress ? 4 : 2,
+                      ),
+                      shape: BoxShape.circle,
+                    ),
+                    child: inProgress
+                        ? Center(
+                            child: Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: statusColor,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          )
+                        : null,
                   ),
-                  shape: BoxShape.circle,
-                ),
-              ),
-              Container(
-                width: 2,
-                height: 100, // Dynamic height ideal path, fixed for simplicity
-                color: Colors.grey[200],
-              ),
-            ],
-          ),
-          const SizedBox(width: 16),
-
-          // Card Content
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: inProgress
-                    ? Border.all(
-                        color: statusColor.withValues(alpha: 0.3),
-                        width: 1.5,
-                      )
-                    : null,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withValues(alpha: 0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
+                  // Line
+                  if (!isLast)
+                    Expanded(
+                      child: Container(
+                        width: 2,
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isFuture
+                              ? Colors.transparent
+                              : statusColor.withValues(
+                                  alpha: 0.2,
+                                ), // Solid for past
+                          border: isFuture
+                              ? Border.symmetric(
+                                  vertical: BorderSide(
+                                    color: Colors.grey[300]!,
+                                    width: 1,
+                                    style: BorderStyle.none,
+                                  ),
+                                )
+                              : null, // Dashed replacement hack or just grey
+                          // Simple solid grey line for future for now to keep it clean, or custom dashed painter.
+                          // Let's use a simple Grey line for future.
+                          gradient: isFuture
+                              ? LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.grey[300]!,
+                                    Colors.grey[200]!,
+                                  ],
+                                  stops: const [0.0, 0.5],
+                                )
+                              : null,
+                        ),
+                        // Dashed line implementation requires CustomPainter, keeping it simple solid grey for future.
+                        child: isFuture
+                            ? LayoutBuilder(
+                                builder: (context, constraints) {
+                                  return Flex(
+                                    direction: Axis.vertical,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: List.generate(
+                                      (constraints.maxHeight / 6).floor(),
+                                      (index) => SizedBox(
+                                        width: 2,
+                                        height: 3,
+                                        child: DecoratedBox(
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey[300],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              )
+                            : null,
+                      ),
+                    ),
                 ],
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: statusColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          inProgress
-                              ? "EN CURSO"
-                              : (completed ? "FINALIZADO" : "PENDIENTE"),
-                          style: GoogleFonts.outfit(
-                            color: statusColor,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+            ),
+            const SizedBox(width: 16),
+
+            // Card Content
+            Expanded(
+              child: Padding(
+                // Pricing padding for the card to separate from line
+                padding: const EdgeInsets.only(bottom: 24),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: inProgress
+                        ? Border.all(
+                            color: statusColor.withValues(alpha: 0.3),
+                            width: 1.5,
+                          )
+                        : Border.all(color: Colors.transparent),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withValues(alpha: 0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
                       ),
-                      const Spacer(),
-                      if (inProgress)
-                        const Icon(
-                          Icons.mic_none,
-                          size: 16,
-                          color: Colors.grey,
-                        ), // Just an example decoration
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    course.name,
-                    style: GoogleFonts.outfit(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF1F2937),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Actions
-                  Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (!course.entryMarked)
-                        Builder(
-                          builder: (context) {
-                            bool canMark = true;
-                            final start = DateUtilsLima.parseTimeString(
-                              course.startTime,
-                            );
-                            final now = DateUtilsLima.now;
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isFuture
+                                  ? Colors.grey[100]
+                                  : statusColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              inProgress
+                                  ? "EN CURSO"
+                                  : (completed ? "FINALIZADO" : "PENDIENTE"),
+                              style: GoogleFonts.outfit(
+                                color: isFuture
+                                    ? Colors.grey[500]
+                                    : statusColor,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          // Classroom Badge
+                          if (course.classroom != null) ...[
+                            Icon(
+                              Icons.location_on_outlined,
+                              size: 14,
+                              color: Colors.grey[400],
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              course.classroom!,
+                              style: GoogleFonts.outfit(
+                                color: Colors.grey[600],
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        course.name,
+                        style: GoogleFonts.outfit(
+                          fontSize: 16,
+                          fontWeight: isFuture
+                              ? FontWeight.w500
+                              : FontWeight.bold,
+                          color: isFuture
+                              ? Colors.grey[600]
+                              : const Color(0xFF1F2937),
+                        ),
+                      ),
+                      if (course.startTime != null &&
+                          course.endTime != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          "${course.startTime} - ${course.endTime}",
+                          style: GoogleFonts.outfit(
+                            fontSize: 13,
+                            color: Colors.grey[400],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
 
-                            if (start != null) {
-                              // 10 minute rule
-                              final diff = start.difference(now).inMinutes;
-                              if (diff > 10) canMark = false;
-                            }
+                      const SizedBox(height: 16),
 
-                            if (canMark) {
-                              return Expanded(
-                                child: OutlinedButton(
+                      // Actions
+                      Row(
+                        children: [
+                          if (!course.entryMarked)
+                            Builder(
+                              builder: (context) {
+                                bool canMark = true;
+                                final start = DateUtilsLima.parseTimeString(
+                                  course.startTime,
+                                );
+                                final now = DateUtilsLima.now;
+
+                                if (start != null) {
+                                  // 10 minute rule
+                                  final diff = start.difference(now).inMinutes;
+                                  if (diff > 10) canMark = false;
+                                }
+
+                                if (canMark) {
+                                  return Expanded(
+                                    child: OutlinedButton(
+                                      onPressed: () => _handleAttendance(
+                                        "course_entry",
+                                        course.id,
+                                      ),
+                                      style: OutlinedButton.styleFrom(
+                                        side: BorderSide(color: statusColor),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 12,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        "Entrada",
+                                        style: GoogleFonts.outfit(
+                                          color: statusColor,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                } else {
+                                  // Adelantar Mode
+                                  // Don't show button if it is too far in future (e.g. > 2 hours?) - Optional
+                                  // Keeping logic same as before
+                                  return Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: () =>
+                                          _showAdelantoDialog(course),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(
+                                          0xFFF59E0B,
+                                        ), // Amber
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 12,
+                                        ),
+                                        elevation: 0,
+                                      ),
+                                      child: Text(
+                                        "Adelantar Clase",
+                                        style: GoogleFonts.outfit(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
+
+                          if (inProgress) ...[
+                            if (course.canMarkExit)
+                              Expanded(
+                                child: ElevatedButton(
                                   onPressed: () => _handleAttendance(
-                                    "course_entry",
+                                    "course_exit",
                                     course.id,
                                   ),
-                                  style: OutlinedButton.styleFrom(
-                                    side: BorderSide(color: statusColor),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 12,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    "Entrada",
-                                    style: GoogleFonts.outfit(
-                                      color: statusColor,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            } else {
-                              // Adelantar Mode
-                              return Expanded(
-                                child: ElevatedButton(
-                                  onPressed: () => _showAdelantoDialog(course),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(
-                                      0xFFF59E0B,
-                                    ), // Amber
+                                    backgroundColor: statusColor,
                                     foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
@@ -1150,79 +1321,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     padding: const EdgeInsets.symmetric(
                                       vertical: 12,
                                     ),
+                                    elevation: 2,
                                   ),
                                   child: Text(
-                                    "Adelantar Clase",
+                                    "Salida",
                                     style: GoogleFonts.outfit(
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                 ),
-                              );
-                            }
-                          },
-                        ),
-
-                      if (inProgress) ...[
-                        if (course.canMarkExit)
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () =>
-                                  _handleAttendance("course_exit", course.id),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: statusColor,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                              ),
-                              child: Text(
-                                "Salida",
-                                style: GoogleFonts.outfit(
-                                  fontWeight: FontWeight.bold,
+                              )
+                            else
+                              Expanded(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[50],
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: Colors.grey.shade200,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    "Salida: ${course.endTime ?? course.exitTimeStr ?? '--:--'}",
+                                    style: GoogleFonts.outfit(
+                                      color: Colors.grey[500],
+                                      fontSize: 12,
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
-                          )
-                        else
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[50],
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.grey.shade200),
-                              ),
-                              child: Text(
-                                "Salida programada: ${course.endTime ?? course.exitTimeStr ?? '--:--'}",
-                                style: GoogleFonts.outfit(
-                                  color: Colors.grey[500],
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-
-                      if (completed)
-                        Text(
-                          "Clase completada",
-                          style: GoogleFonts.outfit(
-                            color: Colors.grey[400],
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
+                          ],
+                        ],
+                      ),
                     ],
                   ),
-                ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

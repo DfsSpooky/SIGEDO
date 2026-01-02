@@ -125,6 +125,7 @@ class CourseAttendance {
   final String? exitTimeStr;
   final String? startTime;
   final String? endTime;
+  final String? classroom;
 
   CourseAttendance({
     required this.id,
@@ -135,6 +136,7 @@ class CourseAttendance {
     this.exitTimeStr,
     this.startTime,
     this.endTime,
+    this.classroom,
   });
 
   CourseAttendance copyWith({
@@ -146,6 +148,7 @@ class CourseAttendance {
     String? exitTimeStr,
     String? startTime,
     String? endTime,
+    String? classroom,
   }) {
     return CourseAttendance(
       id: id ?? this.id,
@@ -156,6 +159,7 @@ class CourseAttendance {
       exitTimeStr: exitTimeStr ?? this.exitTimeStr,
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
+      classroom: classroom ?? this.classroom,
     );
   }
 
@@ -169,6 +173,7 @@ class CourseAttendance {
       exitTimeStr: json['hora_salida_permitida_str'],
       startTime: json['startTime'],
       endTime: json['endTime'],
+      classroom: json['classroom'],
     );
   }
 }
