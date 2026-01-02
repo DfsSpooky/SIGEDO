@@ -8,6 +8,8 @@ from .mobile import (
     MobileUploadDocumentView,
     MobilePublicConfigView,
     MobileAdelantoClaseView,
+    MobileDirectorAttendanceView,
+    MobileDirectorStatsView,
 )
 from .notifications import (
     marcar_notificacion_como_leida,

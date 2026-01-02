@@ -38,7 +38,9 @@ if not firebase_admin._apps:
     except Exception as e:
         logger.error(f"Error loading Firebase credentials in signals: {e}")
 
-def send_fcm_notification(user, title, body):
+from django.utils.html import strip_tags
+
+def send_fcm_notification(user, title, body, data=None):
     """Envía una notificación Push al Token FCM del usuario."""
     if not user.fcm_token:
         return
@@ -47,11 +49,15 @@ def send_fcm_notification(user, title, body):
         if not firebase_admin._apps: 
              return # No configurado
 
+        # Limpiar etiquetas HTML del cuerpo (e.g. <div>, <strong>)
+        clean_body = strip_tags(body)
+
         message = messaging.Message(
             notification=messaging.Notification(
                 title=title,
-                body=body,
+                body=clean_body,
             ),
+            data=data if data else {},
             token=user.fcm_token,
         )
         response = messaging.send(message)
@@ -222,7 +228,10 @@ def crear_notificacion_anuncio(sender, instance, created, **kwargs):
                     "fecha_creacion": notificacion.fecha_creacion.isoformat(),
                 },
             }
+            # Prepare data payload for deep link
+            fcm_data = {"screen": "announcements", "id": str(instance.id)}
             transaction.on_commit(partial(do_broadcast, docente.id, payload))
+            transaction.on_commit(partial(send_fcm_notification, docente, "SIGEDO", message, fcm_data))
 
 
 @receiver(post_save, sender=VersionDocumento)

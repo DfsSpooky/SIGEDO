@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter/foundation.dart';
 import '../utils/constants.dart';
 
 class AuthService {
@@ -37,12 +38,12 @@ class AuthService {
       if (e.type == DioExceptionType.connectionTimeout ||
           e.type == DioExceptionType.receiveTimeout ||
           e.type == DioExceptionType.connectionError) {
-         throw Exception('Ocurrió un error de conexión con el servidor.');
+        throw Exception('Ocurrió un error de conexión con el servidor.');
       }
       if (e.response?.statusCode == 400 || e.response?.statusCode == 401) {
         final Map<String, dynamic> errorData = e.response?.data is String
-             ? jsonDecode(e.response?.data)
-             : e.response?.data;
+            ? jsonDecode(e.response?.data)
+            : e.response?.data;
         final String msg = errorData['message'] ?? 'Error en la solicitud';
         throw Exception(msg);
       }
@@ -62,11 +63,18 @@ class AuthService {
     return token != null;
   }
 
+  Future<String?> getToken() async {
+    return await _storage.read(key: 'access_token');
+  }
+
   Future<void> updateFCMToken(String token) async {
     try {
-      await _dio.post('${AppConstants.baseUrl}/api/mobile/fcm-token/', data: {'fcm_token': token});
+      await _dio.post(
+        '${AppConstants.baseUrl}/api/mobile/fcm-token/',
+        data: {'fcm_token': token},
+      );
     } catch (e) {
-      print("Error actualizando FCM Token: $e");
+      debugPrint("Error actualizando FCM Token: $e");
     }
   }
 
@@ -104,11 +112,7 @@ class AuthService {
   }) async {
     await _dio.post(
       '${AppConstants.baseUrl}/api/auth/reset-password/',
-      data: {
-        'email': email,
-        'otp': otp,
-        'new_password': newPassword,
-      },
+      data: {'email': email, 'otp': otp, 'new_password': newPassword},
     );
   }
 }

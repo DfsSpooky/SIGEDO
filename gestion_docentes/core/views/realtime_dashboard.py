@@ -16,7 +16,7 @@ class RealTimeDashboardView(UserPassesTestMixin, TemplateView):
         today = timezone.localdate()
         
         # 1. Fetch Course Attendance
-        asistencias = list(Asistencia.objects.filter(fecha=today).select_related('docente', 'curso'))
+        asistencias = list(Asistencia.objects.filter(fecha=today).select_related('docente', 'curso').prefetch_related('curso__especialidades'))
         
         # 2. Fetch General Attendance
         from core.models import AsistenciaDiaria

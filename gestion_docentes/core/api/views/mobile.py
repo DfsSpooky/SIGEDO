@@ -509,3 +509,146 @@ class MobileAdelantoClaseView(APIView):
             "message": "Adelanto de clase registrado correctamente. Ahora puede marcar su entrada."
         })
 
+
+class MobileDirectorAttendanceView(APIView):
+    """
+    API View para que el Director (o Staff) monitoree la asistencia en tiempo real.
+    """
+    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
+
+    def get(self, request, *args, **kwargs):
+        # 1. Validar Permisos (Director/Staff)
+        if not request.user.is_staff:
+             return Response(
+                {"status": "error", "message": "No tiene permisos para ver esta información."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+            
+        today = timezone.localdate()
+        
+        # 2. Obtener Asistencias de Curso (Hoy)
+        # Filtramos las que tengan marca de entrada
+        asistencias_curso = (
+            Asistencia.objects.filter(fecha=today, hora_entrada__isnull=False)
+            .select_related('docente', 'curso')
+            .prefetch_related('curso__especialidades')
+        )
+
+        # 3. Obtener Asistencias Generales (Hoy)
+        asistencias_general = (
+            AsistenciaDiaria.objects.filter(fecha=today)
+            .select_related('docente')
+        )
+        
+        events = []
+        
+        # Helper para formatear
+        def format_time(dt):
+            if not dt: return None
+            return timezone.localtime(dt).strftime("%I:%M %p")
+
+        # Procesar Cursos
+        for a in asistencias_curso:
+            specialties = ", ".join([e.nombre for e in a.curso.especialidades.all()])
+            # Timestamp para ordenamiento
+            ts = a.hora_salida or a.hora_entrada
+            
+            events.append({
+                "type": "COURSE",
+                "id": a.id,
+                "teacherName": a.docente.get_full_name(),
+                "teacherPhoto": request.build_absolute_uri(a.docente.foto.url) if a.docente.foto else None,
+                "courseName": a.curso.nombre,
+                "specialty": specialties,
+                "entryTime": format_time(a.hora_entrada),
+                "exitTime": format_time(a.hora_salida),
+                "isLate": a.es_tardanza(),
+                "timestamp": ts
+            })
+            
+        # Procesar Generales
+        for g in asistencias_general:
+            ts = g.hora_salida or g.hora_entrada
+            events.append({
+                "type": "GATE",
+                "id": g.id,
+                "teacherName": g.docente.get_full_name(),
+                "teacherPhoto": request.build_absolute_uri(g.docente.foto.url) if g.docente.foto else None,
+                "courseName": "Control General",
+                "specialty": "Ingreso/Salida Campus",
+                "entryTime": format_time(g.hora_entrada),
+                "exitTime": format_time(g.hora_salida),
+                "isLate": False,
+                "timestamp": ts
+            })
+            
+        # Ordenar por el más reciente (descendente)
+        # Manejar caso de timestamp None (aunque con el filtro no deberia pasar mucho)
+        events.sort(key=lambda x: x['timestamp'] or timezone.now(), reverse=True)
+        
+        # Limpiar timestamp
+        for e in events:
+            del e['timestamp']
+
+        return Response(events)
+
+
+class MobileDirectorStatsView(APIView):
+    """
+    API View para estadísticas del Director (Gráficos).
+    """
+    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
+
+    def get(self, request, *args, **kwargs):
+        if not request.user.is_staff:
+             return Response(status=status.HTTP_403_FORBIDDEN)
+
+        today = timezone.localdate()
+        # 1. Weekly Attendance (Last 7 days or current week)
+        # Let's do current week (Mon-Sun)
+        start_week = today - timedelta(days=today.weekday())
+        weekly_stats = []
+        days_map = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
+        
+        for i in range(7):
+            day = start_week + timedelta(days=i)
+            # Count distinct teachers who attended (Course or Gate)
+            # This is a bit complex, let's simplify: Count total attendance events
+            count_course = Asistencia.objects.filter(fecha=day, hora_entrada__isnull=False).count()
+            count_gate = AsistenciaDiaria.objects.filter(fecha=day).count()
+            weekly_stats.append({
+                "day": days_map[i],
+                "count": count_course + count_gate
+            })
+
+        # 2. Lateness Percentage (Today, Course Only)
+        course_attendance_today = Asistencia.objects.filter(fecha=today, hora_entrada__isnull=False)
+        total_course = course_attendance_today.count()
+        late_count = 0
+        for a in course_attendance_today:
+            if a.es_tardanza():
+                late_count += 1
+        
+        lateness_pct = (late_count / total_course * 100) if total_course > 0 else 0
+
+        # 3. Attendance by Career (Today, Course Only)
+        # We need to aggregate by Curso__carrera__nombre
+        from django.db.models import Count
+        career_stats = (
+            course_attendance_today
+            .values('curso__carrera__nombre')
+            .annotate(count=Count('id'))
+            .order_by('-count')
+        )
+        
+        career_data = [
+            {"name": item['curso__carrera__nombre'], "count": item['count']} 
+            for item in career_stats
+        ]
+
+        return Response({
+            "weekly_attendance": weekly_stats,
+            "lateness_percentage": round(lateness_pct, 1),
+            "attendance_by_career": career_data
+        })
+

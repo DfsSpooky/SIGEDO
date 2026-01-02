@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:flutter/foundation.dart';
 import '../services/api_service.dart';
 import '../models/teacher_data.dart'; // Import TeacherData
 
@@ -14,12 +13,12 @@ class AttendanceScreen extends StatefulWidget {
   final TeacherData? teacherData; // Optional, for checks
 
   const AttendanceScreen({
-    Key? key,
+    super.key,
     required this.actionType,
     this.courseId,
     this.courseName,
     this.teacherData,
-  }) : super(key: key);
+  });
 
   @override
   State<AttendanceScreen> createState() => _AttendanceScreenState();
@@ -92,8 +91,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               permission == LocationPermission.always) {
             // Reduced accuracy to balance speed/battery
             position = await Geolocator.getCurrentPosition(
-              desiredAccuracy: LocationAccuracy.medium,
-              timeLimit: const Duration(seconds: 5),
+              locationSettings: const LocationSettings(
+                accuracy: LocationAccuracy.medium,
+                timeLimit: Duration(seconds: 5),
+              ),
             );
           }
         }
@@ -188,7 +189,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        Colors.black.withOpacity(0.7),
+                        Colors.black.withValues(alpha: 0.7),
                         Colors.transparent,
                       ],
                       begin: Alignment.topCenter,
@@ -280,7 +281,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               height: 350,
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.3),
+                  color: Colors.white.withValues(alpha: 0.3),
                   width: 2,
                 ),
                 borderRadius: BorderRadius.circular(150),

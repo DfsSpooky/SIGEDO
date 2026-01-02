@@ -6,6 +6,7 @@ import 'dashboard_screen.dart';
 import 'notifications_screen.dart';
 import 'profile_screen.dart';
 import 'schedule_screen.dart';
+import 'director_attendance_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -18,11 +19,26 @@ class _MainScreenState extends State<MainScreen> {
   final ApiService _apiService = ApiService();
   int _unreadCount = 0;
   int _selectedIndex = 0;
+  bool _isStaff = false;
 
   @override
   void initState() {
     super.initState();
     _checkNotifications();
+    _checkPermissions();
+  }
+
+  Future<void> _checkPermissions() async {
+    try {
+      final teacherData = await _apiService.getTeacherStatus();
+      if (mounted) {
+        setState(() {
+          _isStaff = teacherData.teacher.isStaff;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error checking permissions: $e");
+    }
   }
 
   Future<void> _checkNotifications() async {
@@ -34,17 +50,9 @@ class _MainScreenState extends State<MainScreen> {
         });
       }
     } catch (e) {
-      print("Error checking notifications: $e");
+      debugPrint("Error checking notifications: $e");
     }
   }
-
-  // Update screens list to include Notifications
-  final List<Widget> _screens = const [
-    DashboardScreen(),
-    ScheduleScreen(),
-    NotificationsScreen(),
-    ProfileScreen(),
-  ];
 
   void _onItemTapped(int index) {
     setState(() {
@@ -60,14 +68,71 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    List<Widget> screens = [
+      const DashboardScreen(),
+      const ScheduleScreen(),
+      if (_isStaff) const DirectorAttendanceScreen(),
+      const NotificationsScreen(),
+      const ProfileScreen(),
+    ];
+
+    List<BottomNavigationBarItem> navItems = [
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.dashboard_outlined),
+        activeIcon: Icon(Icons.dashboard_rounded),
+        label: 'Inicio',
+      ),
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.calendar_month_outlined),
+        activeIcon: Icon(Icons.calendar_month_rounded),
+        label: 'Horario',
+      ),
+      if (_isStaff)
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.remove_red_eye_outlined),
+          activeIcon: Icon(Icons.remove_red_eye_rounded),
+          label: 'Monitoreo',
+        ),
+      BottomNavigationBarItem(
+        icon: Badge(
+          isLabelVisible: _unreadCount > 0,
+          label: Text('$_unreadCount'),
+          backgroundColor: Colors.redAccent,
+          child: const Icon(Icons.notifications_outlined),
+        ),
+        activeIcon: Badge(
+          isLabelVisible: _unreadCount > 0,
+          label: Text('$_unreadCount'),
+          backgroundColor: Colors.redAccent,
+          child: const Icon(Icons.notifications_rounded),
+        ),
+        label: 'Avisos',
+      ),
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.person_outline),
+        activeIcon: Icon(Icons.person_rounded),
+        label: 'Perfil',
+      ),
+    ];
+
+    // Safety check for index out of bounds if permissions change or reload
+    if (_selectedIndex >= screens.length) {
+      _selectedIndex = 0;
+    }
+
     return Scaffold(
       // No AppBar anymore
-      body: _screens[_selectedIndex],
+      // Use IndexedStack to preserve state
+      body: IndexedStack(
+        // Use IndexedStack to preserve state
+        index: _selectedIndex,
+        children: screens,
+      ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 20,
               offset: const Offset(0, -5),
             ),
@@ -84,42 +149,7 @@ class _MainScreenState extends State<MainScreen> {
             fontSize: 12,
           ),
           unselectedLabelStyle: GoogleFonts.outfit(fontSize: 12),
-          items: <BottomNavigationBarItem>[
-            // 1. Dashboard
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard_outlined),
-              activeIcon: Icon(Icons.dashboard_rounded),
-              label: 'Inicio',
-            ),
-            // 2. Schedule
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_month_outlined),
-              activeIcon: Icon(Icons.calendar_month_rounded),
-              label: 'Horario',
-            ),
-            // 3. Notifications
-            BottomNavigationBarItem(
-              icon: Badge(
-                isLabelVisible: _unreadCount > 0,
-                label: Text('$_unreadCount'),
-                backgroundColor: Colors.redAccent,
-                child: const Icon(Icons.notifications_outlined),
-              ),
-              activeIcon: Badge(
-                isLabelVisible: _unreadCount > 0,
-                label: Text('$_unreadCount'),
-                backgroundColor: Colors.redAccent,
-                child: const Icon(Icons.notifications_rounded),
-              ),
-              label: 'Avisos',
-            ),
-            // 4. Profile
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person_rounded),
-              label: 'Perfil',
-            ),
-          ],
+          items: navItems,
           currentIndex: _selectedIndex,
           onTap: _onItemTapped,
         ),

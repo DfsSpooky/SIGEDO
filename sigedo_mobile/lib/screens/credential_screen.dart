@@ -49,7 +49,7 @@ class CredentialScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
+                      color: Colors.black.withValues(alpha: 0.3),
                       blurRadius: 30,
                       offset: const Offset(0, 15),
                     ),
@@ -66,7 +66,7 @@ class CredentialScreen extends StatelessWidget {
                         height: 200,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: accentColor.withOpacity(0.1),
+                          color: accentColor.withValues(alpha: 0.1),
                         ),
                       ),
                     ),
@@ -78,7 +78,7 @@ class CredentialScreen extends StatelessWidget {
                         height: 150,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.blue.withOpacity(0.1),
+                          color: Colors.blue.withValues(alpha: 0.1),
                         ),
                       ),
                     ),
@@ -95,34 +95,44 @@ class CredentialScreen extends StatelessWidget {
                           // 1. HEADER (Logo + Name)
                           Row(
                             children: [
-                              Image.asset(
-                                'assets/images/logo.png',
-                                width: 40,
-                                height: 40,
-                                errorBuilder: (c, o, s) => const Icon(
-                                  Icons.school,
-                                  color: Colors.white,
-                                ),
-                              ),
+                              auth.publicConfig?.logoUrl != null
+                                  ? Image.network(
+                                      auth.publicConfig!.logoUrl!,
+                                      width: 40,
+                                      height: 40,
+                                    )
+                                  : Image.asset(
+                                      'assets/images/logo.png',
+                                      width: 40,
+                                      height: 40,
+                                      errorBuilder: (c, o, s) => const Icon(
+                                        Icons.school,
+                                        color: Colors.white,
+                                      ),
+                                    ),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
+                                    Text(
+                                      (auth.publicConfig?.institutionName ??
+                                              "UNIVERSIDAD NACIONAL")
+                                          .toUpperCase(),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.5,
+                                      ),
+                                      maxLines: 2,
+                                    ),
                                     const Text(
-                                      "UNIVERSIDAD NACIONAL",
+                                      "CARNET DIGITAL",
                                       style: TextStyle(
                                         color: Colors.white54,
                                         fontSize: 10,
                                         letterSpacing: 1,
-                                      ),
-                                    ),
-                                    const Text(
-                                      "DANIEL ALCIDES CARRIÓN",
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                   ],
@@ -143,7 +153,7 @@ class CredentialScreen extends StatelessWidget {
                               border: Border.all(color: accentColor, width: 3),
                               boxShadow: [
                                 BoxShadow(
-                                  color: accentColor.withOpacity(0.4),
+                                  color: accentColor.withValues(alpha: 0.4),
                                   blurRadius: 20,
                                 ),
                               ],
@@ -264,7 +274,7 @@ class CredentialScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(100),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 20,
                       spreadRadius: 5,
                     ),

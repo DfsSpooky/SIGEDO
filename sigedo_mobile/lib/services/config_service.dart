@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 import '../utils/constants.dart';
 
 class ConfigService {
@@ -16,11 +17,11 @@ class ConfigService {
         }
         return data;
       } else {
-        print('Error fetching config: ${response.statusCode}');
+        debugPrint('Error fetching config: ${response.statusCode}');
         return null;
       }
     } catch (e) {
-      print('Error fetching config: $e');
+      debugPrint('Error fetching config: $e');
       return null;
     }
   }

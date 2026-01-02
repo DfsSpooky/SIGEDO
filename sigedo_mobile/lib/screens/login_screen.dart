@@ -103,7 +103,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     Image.network(
                       _logoUrl!,
                       height: 48,
-                      errorBuilder: (_, __, ___) =>
+                      errorBuilder: (_, _, _) =>
                           Image.asset('assets/images/logo.png', height: 48),
                     )
                   else
@@ -281,15 +281,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                   _usernameController.text.trim(),
                                   _passwordController.text.trim(),
                                 );
-                                if (success && mounted) {
+                                if (success) {
+                                  if (!context.mounted) return;
                                   await _showBiometricSetupDialog();
-                                  if (mounted) {
-                                    Navigator.of(context).pushReplacement(
-                                      MaterialPageRoute(
-                                        builder: (_) => const MainScreen(),
-                                      ),
-                                    );
-                                  }
+                                  if (!context.mounted) return;
+                                  Navigator.of(context).pushReplacement(
+                                    MaterialPageRoute(
+                                      builder: (_) => const MainScreen(),
+                                    ),
+                                  );
                                 }
                               },
                         style: ElevatedButton.styleFrom(

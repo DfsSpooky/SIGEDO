@@ -59,8 +59,8 @@ class _SplashScreenState extends State<SplashScreen>
     // Smooth transition
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const AuthGuard(),
-        transitionsBuilder: (_, animation, __, child) {
+        pageBuilder: (_, _, _) => const AuthGuard(),
+        transitionsBuilder: (_, animation, _, child) {
           return FadeTransition(opacity: animation, child: child);
         },
         transitionDuration: const Duration(milliseconds: 800),

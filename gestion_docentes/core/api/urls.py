@@ -88,6 +88,8 @@ urlpatterns = [
     path("mobile/documents/", views.MobileDocumentsView.as_view(), name="mobile_documents"),
     path("mobile/documents/upload/", views.MobileUploadDocumentView.as_view(), name="mobile_documents_upload"),
     path("mobile/adelanto-clase/", views.MobileAdelantoClaseView.as_view(), name="mobile_adelanto_clase"),
+    path("mobile/director/attendance/", views.MobileDirectorAttendanceView.as_view(), name="mobile_director_attendance"),
+    path("mobile/director/stats/", views.MobileDirectorStatsView.as_view(), name="mobile_director_stats"),
     
     # --- Justificaciones ---
     # --- Justificaciones ---

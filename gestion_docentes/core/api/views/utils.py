@@ -80,6 +80,20 @@ def get_kiosk_data_for_docente(docente, request):
     )
     cursos_asistencia_serializer = CursoAsistenciaSerializer(asistencias, many=True)
 
+    # 5. Announcements (New)
+    from core.models import Anuncio
+    anuncios = Anuncio.objects.order_by('-fecha_publicacion')[:5]
+    anuncios_data = [
+        {
+            "id": a.id,
+            "titulo": a.titulo,
+            "contenido": a.contenido,
+            "fecha": a.fecha_publicacion.strftime("%d %b, %Y"),
+            "tipo": "info", # Default to info as model has no type field
+        }
+        for a in anuncios
+    ]
+
     response_data = {
         "status": "success",
         "qrId": str(docente.id_qr), # Ensure string format
@@ -92,6 +106,7 @@ def get_kiosk_data_for_docente(docente, request):
             "exitTime": daily_exit_time,
         },
         "courses": cursos_asistencia_serializer.data,
+        "announcements": anuncios_data,
     }
 
     return response_data

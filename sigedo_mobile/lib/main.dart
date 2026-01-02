@@ -9,6 +9,8 @@ import 'theme/app_theme.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'services/notification_service.dart';
 
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
@@ -24,12 +26,16 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(create: (_) => ThemeProvider()), // Register ThemeProvider
+        ChangeNotifierProvider(
+          create: (_) => ThemeProvider(),
+        ), // Register ThemeProvider
       ],
-      child: Consumer<ThemeProvider>( // Listen to theme changes
+      child: Consumer<ThemeProvider>(
+        // Listen to theme changes
         builder: (context, themeProvider, child) {
           return MaterialApp(
             title: 'SIGEDO Mobile',
+            navigatorKey: navigatorKey, // Add navigatorKey
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
@@ -41,5 +47,3 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-
-

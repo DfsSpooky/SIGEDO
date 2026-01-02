@@ -1,23 +1,29 @@
+import 'announcement.dart';
+
 class TeacherData {
   final TeacherInfo teacher;
   final DailyAttendance dailyAttendance;
   final List<CourseAttendance> courses;
+  final List<Announcement> announcements;
 
   TeacherData({
     required this.teacher,
     required this.dailyAttendance,
     required this.courses,
+    this.announcements = const [],
   });
 
   TeacherData copyWith({
     TeacherInfo? teacher,
     DailyAttendance? dailyAttendance,
     List<CourseAttendance>? courses,
+    List<Announcement>? announcements,
   }) {
     return TeacherData(
       teacher: teacher ?? this.teacher,
       dailyAttendance: dailyAttendance ?? this.dailyAttendance,
       courses: courses ?? this.courses,
+      announcements: announcements ?? this.announcements,
     );
   }
 
@@ -32,6 +38,11 @@ class TeacherData {
               ?.map((i) => CourseAttendance.fromJson(i))
               .toList() ??
           [],
+      announcements:
+          (json['announcements'] as List?)
+              ?.map((i) => Announcement.fromJson(i))
+              .toList() ??
+          [],
     );
   }
 }
@@ -42,6 +53,7 @@ class TeacherInfo {
   final String? photoUrl;
   final String? email; // NEW
   final String? idQr; // NEW
+  final bool isStaff; // NEW
 
   // Getters for compatibility with CredentialScreen
   String? get foto => photoUrl;
@@ -52,6 +64,7 @@ class TeacherInfo {
     this.photoUrl,
     this.email,
     this.idQr,
+    this.isStaff = false,
   });
 
   factory TeacherInfo.fromJson(Map<String, dynamic> json) {
@@ -61,6 +74,7 @@ class TeacherInfo {
       photoUrl: json['photoUrl'] ?? json['foto'], // Flexible key
       email: json['email'],
       idQr: json['id_qr'] ?? json['rfid_uid'], // Map backend field
+      isStaff: json['is_staff'] ?? false,
     );
   }
 }

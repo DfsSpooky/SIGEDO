@@ -160,7 +160,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: const Color(0xFF4F46E5).withOpacity(0.1),
+              color: const Color(0xFF4F46E5).withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: const Icon(
@@ -199,7 +199,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF4F46E5).withOpacity(0.3),
+                color: const Color(0xFF4F46E5).withValues(alpha: 0.3),
                 blurRadius: 8,
                 offset: const Offset(0, 4),
               ),
@@ -238,7 +238,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
@@ -317,7 +317,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                         decoration: BoxDecoration(
                           color: const Color(
                             0xFFEC4899,
-                          ).withOpacity(0.1), // Pink tint
+                          ).withValues(alpha: 0.1), // Pink tint
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(

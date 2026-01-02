@@ -7,6 +7,10 @@ import '../services/api_service.dart';
 import '../services/auth_service.dart'; // Import AuthService
 import '../services/biometric_service.dart';
 import '../utils/date_utils.dart';
+import '../services/config_service.dart';
+import '../models/config_model.dart';
+
+import '../services/websocket_service.dart';
 
 class AuthProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -27,6 +31,7 @@ class AuthProvider with ChangeNotifier {
     _isAuthenticated = await _authService.hasToken(); // Use AuthService
     if (_isAuthenticated) {
       await loadDashboard();
+      _initWebSocket(); // Connect WS
     }
     notifyListeners();
   }
@@ -45,6 +50,7 @@ class AuthProvider with ChangeNotifier {
       if (success) {
         _isAuthenticated = true;
         await loadDashboard();
+        _initWebSocket(); // Connect WS
       }
       return success;
     } catch (e) {
@@ -53,7 +59,7 @@ class AuthProvider with ChangeNotifier {
       } else {
         _errorMessage = "Ocurrió un error inesperado";
       }
-      print("Login error: $e");
+      debugPrint("Login error: $e");
       return false;
     } finally {
       _isLoading = false;
@@ -65,10 +71,11 @@ class AuthProvider with ChangeNotifier {
     try {
       await _authService.logout(); // Use AuthService
     } catch (e) {
-      print("Error limpiando storage: $e");
+      debugPrint("Error limpiando storage: $e");
     } finally {
       _isAuthenticated = false;
       _teacherData = null;
+      WebSocketService().disconnect(); // Close WS
       notifyListeners();
     }
   }
@@ -79,13 +86,14 @@ class AuthProvider with ChangeNotifier {
 
       // Actualizar Token FCM en segundo plano
       FirebaseMessaging.instance.getToken().then((token) {
-        if (token != null)
+        if (token != null) {
           _authService.updateFCMToken(token); // Use AuthService
+        }
       });
 
       notifyListeners();
     } catch (e) {
-      print("Error cargando dashboard: $e");
+      debugPrint("Error cargando dashboard: $e");
       // Si falla al cargar dashboard (token expirado?), cerramos sesión
       if (e.toString().contains('401')) {
         await logout();
@@ -116,7 +124,7 @@ class AuthProvider with ChangeNotifier {
       // Recargar datos para sincronizar completamente
       await loadDashboard();
     } catch (e) {
-      throw e;
+      rethrow;
     }
   }
 
@@ -195,14 +203,54 @@ class AuthProvider with ChangeNotifier {
     await _authService.saveCredentials(username, password); // Use AuthService
   }
 
+  // --- Config Publica ---
+  PublicConfig? _publicConfig;
+  PublicConfig? get publicConfig => _publicConfig;
+
+  Future<void> loadConfig() async {
+    final configMap = await ConfigService.getInstitutionConfig();
+    if (configMap != null) {
+      _publicConfig = PublicConfig.fromJson(configMap);
+      notifyListeners();
+    }
+  }
+
   Future<bool> loginWithBiometrics() async {
     final authenticated = await _biometricService.authenticate();
     if (!authenticated) return false;
 
-    final credentials = await _authService
-        .getStoredCredentials(); // Use AuthService
+    final credentials = await _authService.getStoredCredentials();
     if (credentials == null) return false;
 
     return await login(credentials['username']!, credentials['password']!);
+  }
+
+  // --- WebSocket Integration ---
+  void _initWebSocket() async {
+    try {
+      final token = await _authService.getToken();
+      if (token != null) {
+        final wsService = WebSocketService();
+        await wsService.connect(token);
+
+        // Listen for updates
+        wsService.stream?.listen((message) {
+          debugPrint("AuthProvider received WS Message: $message");
+          // Assuming 'type' field in JSON
+          if (message['type'] == 'send_notification' ||
+              message['type'] == 'attendance.update') {
+            loadDashboard(); // Auto-refresh
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint("Error initializing WebSocket: $e");
+    }
+  }
+
+  @override
+  void dispose() {
+    WebSocketService().disconnect();
+    super.dispose();
   }
 }

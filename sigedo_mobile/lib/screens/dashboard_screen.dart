@@ -13,6 +13,9 @@ import 'credential_screen.dart';
 import 'documents_screen.dart';
 import 'justification_screen.dart';
 import '../utils/date_utils.dart';
+import '../widgets/skeleton_loader.dart';
+import '../widgets/announcement_carousel.dart';
+import 'analytics_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -70,7 +73,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.9),
+                color: Colors.white.withValues(alpha: 0.9),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: const Column(
@@ -92,6 +95,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       try {
         final locationService = LocationService();
         final position = await locationService.getCurrentLocation();
+
+        if (!mounted) return;
 
         // Usar AuthProvider y pasar File + Coordenadas
         await Provider.of<AuthProvider>(context, listen: false).markAttendance(
@@ -165,10 +170,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final courses = auth.teacherData?.courses ?? [];
 
     if (auth.isLoading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(color: Color(0xFF4F46E5)),
-        ),
+      return Scaffold(
+        backgroundColor: const Color(0xFFF3F4F6),
+        body: _buildSkeletonLoader(context),
       );
     }
 
@@ -191,6 +195,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Column(
                     children: [
+                      // Announcements Carousel
+                      if (auth.teacherData?.announcements.isNotEmpty ??
+                          false) ...[
+                        AnnouncementCarousel(
+                          announcements: auth.teacherData!.announcements,
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+
                       // Daily Status Card (Glassmorphic)
                       _buildDailyStatusCard(context, dailyAttendance),
 
@@ -280,7 +293,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Text(
                   _greeting,
                   style: GoogleFonts.outfit(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                   ),
@@ -306,7 +319,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
+                  color: Colors.black.withValues(alpha: 0.2),
                   blurRadius: 15,
                   offset: const Offset(0, 5),
                 ),
@@ -354,7 +367,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF4F46E5).withOpacity(0.15),
+            color: const Color(0xFF4F46E5).withValues(alpha: 0.15),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -372,7 +385,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 width: 150,
                 height: 150,
                 decoration: BoxDecoration(
-                  color: startColor.withOpacity(0.1),
+                  color: startColor.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -416,7 +429,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: startColor.withOpacity(0.1),
+                          color: startColor.withValues(alpha: 0.1),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
@@ -438,10 +451,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     margin: const EdgeInsets.only(bottom: 24),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: startColor.withOpacity(0.08),
+                      color: startColor.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: startColor.withOpacity(0.3),
+                        color: startColor.withValues(alpha: 0.3),
                         width: 1,
                       ),
                     ),
@@ -508,7 +521,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             borderRadius: BorderRadius.circular(16),
                           ),
                           elevation: 4,
-                          shadowColor: startColor.withOpacity(0.4),
+                          shadowColor: startColor.withValues(alpha: 0.4),
                         ),
                         child: Text(
                           isEntryMarked ? "MARCAR SALIDA" : "MARCAR ENTRADA",
@@ -552,7 +565,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildQuickActions(BuildContext context) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         _buildQuickActionItem(
           context,
@@ -574,16 +586,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
             MaterialPageRoute(builder: (_) => const DocumentsScreen()),
           ),
         ),
-        _buildQuickActionItem(
-          context,
-          icon: Icons.assignment_late_outlined,
-          label: "Justificar",
-          color: const Color(0xFF14B8A6),
-          onTap: () => Navigator.push(
+        if (Provider.of<AuthProvider>(context).teacherData?.teacher.isStaff ??
+            false)
+          _buildQuickActionItem(
             context,
-            MaterialPageRoute(builder: (_) => const JustificationScreen()),
+            icon: Icons.analytics_outlined,
+            label: "Monitorear",
+            color: const Color(0xFFF59E0B),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const DirectorAnalyticsScreen(),
+              ),
+            ),
+          )
+        else
+          _buildQuickActionItem(
+            context,
+            icon: Icons.assignment_late_outlined,
+            label: "Justificar",
+            color: const Color(0xFF14B8A6),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const JustificationScreen()),
+            ),
           ),
-        ),
       ],
     );
   }
@@ -606,7 +633,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.grey.withOpacity(0.05),
+                color: Colors.grey.withValues(alpha: 0.05),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -617,7 +644,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(icon, color: color, size: 24),
@@ -642,7 +669,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final TextEditingController reasonController = TextEditingController();
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text(
           "Adelantar Clase",
           style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
@@ -658,13 +685,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 16),
             TextField(
               controller: reasonController,
-              decoration: InputDecoration(
-                labelText: "Motivo (Obligatorio)",
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-                fillColor: Colors.grey[50],
+              decoration: const InputDecoration(
+                labelText: "Motivo (Opcional)",
+                border: OutlineInputBorder(),
               ),
               maxLines: 2,
             ),
@@ -672,66 +695,72 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text("Cancelar"),
           ),
           ElevatedButton(
             onPressed: () async {
               final reason = reasonController.text.trim();
-              if (reason.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Ingrese un motivo")),
-                );
-                return;
-              }
 
-              Navigator.pop(context); // Close Dialog
-
-              // Show Loading
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (_) =>
-                    const Center(child: CircularProgressIndicator()),
-              );
+              // Show Loading (pushing a new dialog on top of the current one)
+              // Actually, better to just disable button or show loading indicator.
+              // But assuming we want to keep logic:
+              // Original code didn't show loading dialog explicitly here, it just called API.
+              // Wait, previous code had `Navigator.pop(context); // Close Loading`...
+              // Was there a loading dialog? The code viewed didn't show one being pushed.
+              // Ah, looking at line 645 `await showDialog`.
+              // The logic is:
+              // 1. Call API.
+              // 2. Pop the Adelanto Dialog.
+              // 3. Refresh Dashboard.
+              // 4. Show SnackBar.
 
               try {
+                // Use screen context for Provider
                 await Provider.of<AuthProvider>(
-                  context,
+                  context, // screen context
                   listen: false,
                 ).api.createClassAdvancement(
                   courseId: course.id,
                   reason: reason,
                 );
-                if (mounted) {
-                  Navigator.pop(context); // Close Loading
-                  // Refresh to unlock Entry button
-                  await Provider.of<AuthProvider>(
-                    context,
-                    listen: false,
-                  ).loadDashboard();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        "Adelanto registrado. Puede marcar entrada.",
-                      ),
-                    ),
-                  );
-                }
+
+                if (!dialogContext.mounted) return;
+                Navigator.pop(dialogContext); // Close Adelanto Dialog
+
+                if (!mounted) return; // Check screen mounted
+
+                // Refresh to unlock Entry button
+                await Provider.of<AuthProvider>(
+                  context, // screen context
+                  listen: false,
+                ).loadDashboard();
+
+                if (!mounted) return;
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("Adelanto registrado. Puede marcar entrada."),
+                  ),
+                );
               } catch (e) {
-                if (mounted) {
-                  Navigator.pop(context); // Close Loading
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text("Error: $e")));
+                if (!mounted) return; // Prioritize screen context for SnackBar
+                // Using dialogContext to pop? If it failed, do we close dialog?
+                // Use dialogContext.mounted check?
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext);
                 }
+
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text("Error: $e")));
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFF59E0B), // Amber
+              backgroundColor: const Color(0xFF4F46E5),
               foregroundColor: Colors.white,
             ),
-            child: const Text("Confirmar Adelanto"),
+            child: const Text("Confirmar"),
           ),
         ],
       ),
@@ -780,7 +809,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF10B981).withOpacity(0.3),
+            color: const Color(0xFF10B981).withValues(alpha: 0.3),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -791,7 +820,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               shape: BoxShape.circle,
             ),
             child: const Icon(
@@ -808,7 +837,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Text(
                   "Próxima Clase",
                   style: GoogleFonts.outfit(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -866,7 +895,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 decoration: BoxDecoration(
                   color: inProgress
                       ? Colors.white
-                      : statusColor.withOpacity(0.2),
+                      : statusColor.withValues(alpha: 0.2),
                   border: Border.all(
                     color: statusColor,
                     width: inProgress ? 4 : 2,
@@ -892,13 +921,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 borderRadius: BorderRadius.circular(20),
                 border: inProgress
                     ? Border.all(
-                        color: statusColor.withOpacity(0.3),
+                        color: statusColor.withValues(alpha: 0.3),
                         width: 1.5,
                       )
                     : null,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withOpacity(0.05),
+                    color: Colors.grey.withValues(alpha: 0.05),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -915,7 +944,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: statusColor.withOpacity(0.1),
+                          color: statusColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -1097,7 +1126,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 "assets/images/logo.png",
                 width: 80,
                 height: 80,
-                errorBuilder: (_, __, ___) =>
+                errorBuilder: (_, _, _) =>
                     const Icon(Icons.event_busy, size: 60, color: Colors.grey),
               ),
             ),
@@ -1109,6 +1138,64 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSkeletonLoader(BuildContext context) {
+    return SingleChildScrollView(
+      physics: const NeverScrollableScrollPhysics(),
+      child: Column(
+        children: [
+          // Header Skeleton
+          Container(
+            height: 200,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(36),
+                bottomRight: Radius.circular(36),
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 60),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      SkeletonWidget.rectangular(height: 16, width: 100),
+                      SizedBox(height: 8),
+                      SkeletonWidget.rectangular(height: 30, width: 200),
+                    ],
+                  ),
+                ),
+                const SkeletonWidget.circular(width: 70, height: 70),
+              ],
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+            child: Column(
+              children: const [
+                SkeletonWidget.rounded(height: 180), // Status Card
+                SizedBox(height: 24),
+                SkeletonWidget.rounded(height: 120), // Next Class
+                SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(child: SkeletonWidget.rounded(height: 100)),
+                    SizedBox(width: 8),
+                    Expanded(child: SkeletonWidget.rounded(height: 100)),
+                    SizedBox(width: 8),
+                    Expanded(child: SkeletonWidget.rounded(height: 100)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

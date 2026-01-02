@@ -46,7 +46,7 @@ class DocenteInfoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Docente
-        fields = ["name", "dni", "photoUrl", "email"]
+        fields = ["name", "dni", "photoUrl", "email", "is_staff"]
 
 
 class CursoAsistenciaSerializer(serializers.ModelSerializer):

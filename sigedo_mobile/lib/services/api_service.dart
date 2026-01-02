@@ -184,4 +184,30 @@ class ApiService {
       data: data,
     );
   }
+
+  // --- Director ---
+
+  Future<List<dynamic>> getDirectorAttendanceFeed() async {
+    try {
+      final response = await _dio.get(
+        '${AppConstants.baseUrl}/api/mobile/director/attendance/',
+      );
+      return response.data;
+    } catch (e) {
+      debugPrint("Error fetching director feed: $e");
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>> getDirectorStats() async {
+    try {
+      final response = await _dio.get(
+        '${AppConstants.baseUrl}/api/mobile/director/stats/',
+      );
+      return response.data;
+    } catch (e) {
+      debugPrint("Error fetching director stats: $e");
+      return {};
+    }
+  }
 }

@@ -1,12 +1,35 @@
 import json
-
+from urllib.parse import parse_qs
+from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
+from django.contrib.auth import get_user_model
+from rest_framework_simplejwt.tokens import AccessToken
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 
+User = get_user_model()
 
 class NotificationConsumer(AsyncWebsocketConsumer):
+    @database_sync_to_async
+    def get_user_from_token(self, token):
+        try:
+            access_token = AccessToken(token)
+            user_id = access_token['user_id']
+            return User.objects.get(id=user_id)
+        except (InvalidToken, TokenError, User.DoesNotExist):
+            return None
+
     async def connect(self):
         self.user = self.scope["user"]
+        
+        # Try Token Auth if Anonymous (e.g. Mobile App)
         if not self.user.is_authenticated:
+            query_string = self.scope.get('query_string', b'').decode()
+            params = parse_qs(query_string)
+            token = params.get('token', [None])[0]
+            if token:
+                self.user = await self.get_user_from_token(token)
+
+        if not self.user or not self.user.is_authenticated:
             await self.close()
             return
 
@@ -21,7 +44,6 @@ class NotificationConsumer(AsyncWebsocketConsumer):
 
     async def send_notification(self, event):
         # El frontend espera un payload con una clave 'type' y 'message'.
-        # Reconstruimos el payload aquí para que coincida con las expectativas del cliente.
         await self.send(
             text_data=json.dumps(
                 {"type": "send_notification", "message": event["message"]}

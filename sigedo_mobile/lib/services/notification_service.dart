@@ -1,7 +1,10 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:flutter/foundation.dart';
+
+import 'package:flutter/material.dart'; // MaterialPageRoute
+import '../main.dart'; // navigatorKey
+import '../screens/notifications_screen.dart'; // Destination
 
 // Handler background debe ser top-level
 @pragma('vm:entry-point')
@@ -41,7 +44,15 @@ class NotificationService {
           iOS: initializationSettingsDarwin,
         );
 
-    await _localNotifications.initialize(initializationSettings);
+    await _localNotifications.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: (NotificationResponse response) {
+        if (response.payload != null) {
+          debugPrint('Notification payload tapped: ${response.payload}');
+          _handleNavigation(response.payload!); // Call handler
+        }
+      },
+    );
 
     // 4. Foreground Handler
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
@@ -49,16 +60,33 @@ class NotificationService {
       debugPrint('Message data: ${message.data}');
 
       if (message.notification != null) {
-        debugPrint(
-          'Message also contained a notification: ${message.notification}',
-        );
+        // Show local notification
         _showLocalNotification(message);
+      }
+    });
+
+    // 5. Background Tap Handler
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      debugPrint('A new onMessageOpenedApp event was published!');
+      debugPrint('Message data: ${message.data}');
+      if (message.data.isNotEmpty) {
+        _handleNavigation(message.data.toString());
       }
     });
 
     // Obtener Token para pruebas
     final token = await _firebaseMessaging.getToken();
     debugPrint("FCM Token: $token");
+  }
+
+  void _handleNavigation(String payload) {
+    try {
+      navigatorKey.currentState?.push(
+        MaterialPageRoute(builder: (context) => const NotificationsScreen()),
+      );
+    } catch (e) {
+      debugPrint("Navigation error: $e");
+    }
   }
 
   Future<void> _showLocalNotification(RemoteMessage message) async {
@@ -79,6 +107,7 @@ class NotificationService {
       message.notification?.title,
       message.notification?.body,
       platformChannelSpecifics,
+      payload: message.data.toString(), // Pass data as payload
     );
   }
 }
