@@ -16,6 +16,7 @@ import '../utils/date_utils.dart';
 import '../widgets/skeleton_loader.dart';
 import '../widgets/announcement_carousel.dart';
 import 'analytics_screen.dart';
+import '../widgets/next_class_timer.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -957,7 +958,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final now = DateUtilsLima.now;
     CourseAttendance? nextCourse;
     DateTime? nextStartTime;
-    int minutesRemaining = 0;
+    // int minutesRemaining = 0; // Removed as it is unused
 
     for (var course in courses) {
       if (course.entryMarked) continue; // Already started/done
@@ -971,85 +972,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (nextStartTime == null || start.isBefore(nextStartTime)) {
           nextCourse = course;
           nextStartTime = start;
-          minutesRemaining = start.difference(now).inMinutes;
+          // minutesRemaining = start.difference(now).inMinutes; // Removed
         }
       }
     }
 
     if (nextCourse == null) return const SizedBox.shrink();
 
-    // 2. Build Card
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF10B981), Color(0xFF34D399)], // Emerald Green
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF10B981).withValues(alpha: 0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.timer_outlined,
-              color: Colors.white,
-              size: 28,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Próxima Clase",
-                  style: GoogleFonts.outfit(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  nextCourse.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.outfit(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  "En $minutesRemaining minutos",
-                  style: GoogleFonts.outfit(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+    // 2. Build Card using new Widget
+    return NextClassTimer(course: nextCourse);
   }
 
   Widget _buildCourseTimelineItem(
