@@ -353,12 +353,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
     bool isExitMarked = daily?.exitMarked ?? false;
     bool isCompleted = isEntryMarked && isExitMarked;
 
-    Color startColor = isEntryMarked
-        ? const Color(0xFF10B981)
-        : const Color(0xFFF59E0B);
+    // Define Theme Colors based on state
+    Color primaryColor;
+    Color accentColor;
+    IconData statusIcon;
+    String statusTitle;
+    String statusMessage;
 
     if (isCompleted) {
-      startColor = const Color(0xFF3B82F6);
+      primaryColor = const Color(0xFF3B82F6); // Blue
+      accentColor = const Color(0xFF60A5FA);
+      statusIcon = Icons.verified_rounded;
+      statusTitle = "Jornada Finalizada";
+      statusMessage = "¡Excelente trabajo! Has completado tu jornada de hoy.";
+    } else if (isEntryMarked) {
+      primaryColor = const Color(0xFF10B981); // Emerald
+      accentColor = const Color(0xFF34D399);
+      statusIcon = Icons.business_center_rounded;
+      statusTitle = "En Jornada";
+      statusMessage = "Tu asistencia está activa. No olvides marcar tu salida.";
+    } else {
+      primaryColor = const Color(0xFFF59E0B); // Amber
+      accentColor = const Color(0xFFFBBF24);
+      statusIcon = Icons.wb_sunny_rounded;
+      statusTitle = "Jornada Pendiente";
+      statusMessage = "¡Hola! Marca tu entrada para comenzar el día.";
     }
 
     return Container(
@@ -367,7 +386,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF4F46E5).withValues(alpha: 0.15),
+            color: primaryColor.withValues(alpha: 0.15),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -377,15 +396,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
         borderRadius: BorderRadius.circular(24),
         child: Stack(
           children: [
-            // Decorative background circle
+            // Decorative background gradients
             Positioned(
-              right: -20,
-              top: -20,
+              right: -30,
+              top: -30,
               child: Container(
                 width: 150,
                 height: 150,
                 decoration: BoxDecoration(
-                  color: startColor.withValues(alpha: 0.1),
+                  gradient: RadialGradient(
+                    colors: [
+                      primaryColor.withValues(alpha: 0.2),
+                      primaryColor.withValues(alpha: 0.0),
+                    ],
+                  ),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -396,87 +420,229 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // --- HEADER SECTION ---
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: primaryColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                "ASISTENCIA GENERAL",
+                                style: GoogleFonts.outfit(
+                                  color: primaryColor,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.0,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              statusTitle,
+                              style: GoogleFonts.outfit(
+                                color: const Color(0xFF1F2937),
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Dynamic Icon Container
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [primaryColor, accentColor],
+                          ),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: primaryColor.withValues(alpha: 0.3),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Icon(statusIcon, color: Colors.white, size: 28),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // --- PROGRESS BAR ---
+                  // Visualizes Entry -> Exit flow
+                  Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            "Asistencia General",
+                            "Progreso del día",
                             style: GoogleFonts.outfit(
                               color: Colors.grey[500],
                               fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.5,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                          const SizedBox(height: 4),
                           Text(
                             isCompleted
-                                ? "Jornada Finalizada"
-                                : (isEntryMarked
-                                      ? "En Jornada"
-                                      : "Jornada Pendiente"),
+                                ? "100%"
+                                : (isEntryMarked ? "50%" : "0%"),
                             style: GoogleFonts.outfit(
-                              color: const Color(0xFF1F2937),
-                              fontSize: 20,
+                              color: primaryColor,
+                              fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                         ],
                       ),
+                      const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.all(10),
+                        height: 8,
+                        width: double.infinity,
                         decoration: BoxDecoration(
-                          color: startColor.withValues(alpha: 0.1),
-                          shape: BoxShape.circle,
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(4),
                         ),
-                        child: Icon(
-                          isCompleted
-                              ? Icons.task_alt
-                              : (isEntryMarked
-                                    ? Icons.timer
-                                    : Icons.access_time),
-                          color: startColor,
+                        child: Row(
+                          children: [
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 500),
+                              curve: Curves.easeInOut,
+                              width: isCompleted
+                                  ? MediaQuery.of(context).size.width -
+                                        88 // Approx full width minus padding
+                                  : (isEntryMarked
+                                        ? (MediaQuery.of(context).size.width -
+                                                  88) *
+                                              0.5
+                                        : 0),
+                              // Note: Precise width calculation is tricky inside Row, simplifying with FractionallySizedBox logic manually or LayoutBuilder
+                              // Let's use Expanded for cleaner layout code:
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Better Progress Bar Implementation using Stack
+                      Stack(
+                        children: [
+                          Container(
+                            height: 8,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              return AnimatedContainer(
+                                duration: const Duration(milliseconds: 800),
+                                curve: Curves.fastOutSlowIn,
+                                height: 8,
+                                width:
+                                    constraints.maxWidth *
+                                    (isCompleted
+                                        ? 1.0
+                                        : (isEntryMarked ? 0.5 : 0.05)),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [primaryColor, accentColor],
+                                  ),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // --- INFO & TIMES ---
+                  Row(
+                    children: [
+                      // Entry Time
+                      Expanded(
+                        child: _buildTimeStatNew(
+                          "Entrada",
+                          daily?.entryTime,
+                          Icons.login_rounded,
+                          isEntryMarked
+                              ? const Color(0xFF10B981)
+                              : Colors.grey[400]!,
+                        ),
+                      ),
+
+                      // Divider
+                      Container(
+                        height: 40,
+                        width: 1,
+                        color: Colors.grey[200],
+                        margin: const EdgeInsets.symmetric(horizontal: 16),
+                      ),
+
+                      // Exit Time
+                      Expanded(
+                        child: _buildTimeStatNew(
+                          "Salida",
+                          daily?.exitTime,
+                          Icons.logout_rounded,
+                          isExitMarked
+                              ? const Color(0xFF3B82F6)
+                              : Colors.grey[400]!,
                         ),
                       ),
                     ],
                   ),
+
                   const SizedBox(height: 24),
 
-                  // --- DIDACTIC SMART TIP ---
+                  // --- SMART TIP (Didactic Message) ---
                   Container(
                     width: double.infinity,
-                    margin: const EdgeInsets.only(bottom: 24),
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: startColor.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(12),
+                      color: primaryColor.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: startColor.withValues(alpha: 0.3),
-                        width: 1,
+                        color: primaryColor.withValues(alpha: 0.2),
                       ),
                     ),
                     child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Icon(
-                          Icons.lightbulb_outline,
-                          color: startColor,
+                          Icons.tips_and_updates_outlined,
+                          color: primaryColor,
                           size: 20,
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            isCompleted
-                                ? "¡Excelente! Has completado tu jornada por hoy."
-                                : (isEntryMarked
-                                      ? "Recuerda marcar tu SALIDA antes de retirarte."
-                                      : "¡Hola! Marca tu ENTRADA para comenzar."),
+                            statusMessage,
                             style: GoogleFonts.outfit(
                               color: const Color(0xFF374151),
                               fontSize: 13,
-                              fontWeight: FontWeight.w500,
+                              height: 1.4,
                             ),
                           ),
                         ),
@@ -484,28 +650,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
 
-                  // Time Stats
-                  Row(
-                    children: [
-                      _buildTimeStat(
-                        "Entrada",
-                        daily?.entryTime,
-                        isEntryMarked,
-                      ),
-                      Container(
-                        height: 30,
-                        width: 1,
-                        color: Colors.grey[200],
-                        margin: const EdgeInsets.symmetric(horizontal: 20),
-                      ),
-                      _buildTimeStat("Salida", daily?.exitTime, isExitMarked),
-                    ],
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Action Button
-                  if (!isCompleted)
+                  // Action Button (Only if not completed)
+                  if (!isCompleted) ...[
+                    const SizedBox(height: 24),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
@@ -514,25 +661,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           null,
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: startColor,
+                          backgroundColor: primaryColor,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 18),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          elevation: 4,
-                          shadowColor: startColor.withValues(alpha: 0.4),
+                          elevation: 8,
+                          shadowColor: primaryColor.withValues(alpha: 0.4),
                         ),
-                        child: Text(
-                          isEntryMarked ? "MARCAR SALIDA" : "MARCAR ENTRADA",
-                          style: GoogleFonts.outfit(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                            letterSpacing: 1,
-                          ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              isEntryMarked ? Icons.logout : Icons.login,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              isEntryMarked
+                                  ? "MARCAR SALIDA"
+                                  : "MARCAR ENTRADA",
+                              style: GoogleFonts.outfit(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
+                  ],
                 ],
               ),
             ),
@@ -542,22 +702,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildTimeStat(String label, String? time, bool marked) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildTimeStatNew(
+    String label,
+    String? time,
+    IconData icon,
+    Color color,
+  ) {
+    bool hasTime = time != null;
+    return Row(
       children: [
-        Text(
-          label,
-          style: GoogleFonts.outfit(color: Colors.grey[400], fontSize: 12),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          marked ? (time ?? "--:--") : "--:--",
-          style: GoogleFonts.outfit(
-            color: const Color(0xFF1F2937),
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
           ),
+          child: Icon(icon, size: 18, color: color),
+        ),
+        const SizedBox(width: 12),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: GoogleFonts.outfit(
+                color: Colors.grey[500],
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            Text(
+              hasTime ? time : "--:--",
+              style: GoogleFonts.outfit(
+                color: hasTime ? const Color(0xFF1F2937) : Colors.grey[400],
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
       ],
     );
