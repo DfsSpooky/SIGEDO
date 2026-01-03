@@ -985,7 +985,8 @@ def api_get_placement_suggestions(request):
         
         docente_ocupado = set()
         carga_docente_diaria = {dia: 0 for dia in dias_semana}
-        docente_occupied_indices = {dia: set() for dia in dias_semana}
+        # Estructura: {docente_id: {dia: {indices}}}
+        docente_occupied_indices = {docente.id: {dia: set() for dia in dias_semana}}
 
         for b in bloques_docente:
             carga_docente_diaria[b.dia] += b.duracion_bloques
@@ -996,7 +997,7 @@ def api_get_placement_suggestions(request):
                     if idx < len(franjas_horarias):
                         f_id = franjas_horarias[idx].id
                         docente_ocupado.add((b.dia, f_id))
-                        docente_occupied_indices[b.dia].add(idx)
+                        docente_occupied_indices[docente.id][b.dia].add(idx)
             except (KeyError, IndexError):
                 pass
         
@@ -1004,13 +1005,10 @@ def api_get_placement_suggestions(request):
         grupo_ocupado = set()
         grupo_ocupado_detalle = {} # (dia, f_id) -> Razón
         grupos = []
-        if curso.especialidad:
-            grupos.append(curso.especialidad.grupo)
-        elif curso.tipo_curso == 'GENERAL':
-             # Si es general, ver si tiene especialidades vinculadas y sus grupos
-             esps = curso.especialidades.all()
-             for e in esps:
-                 if e.grupo: grupos.append(e.grupo)
+        # Iterar sobre todas las especialidades asociadas al curso
+        for especialidad in curso.especialidades.all():
+            if especialidad.grupo:
+                grupos.append(especialidad.grupo)
 
         semestre_cursado = curso.semestre_cursado
         
