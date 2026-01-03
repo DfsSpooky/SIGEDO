@@ -7,18 +7,9 @@ from rest_framework import status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.api.serializers import MobileMarkAttendanceSerializer
-from core.models import (
-    Asistencia,
-    AsistenciaDiaria,
-    BloqueHorario,
-    Curso,
-    Documento,
-    TipoDocumento,
-    VersionDocumento,
-    AdelantoClase,
-)
-from rest_framework.parsers import MultiPartParser, FormParser
+from core.api.serializers import DocenteInfoSerializer, CursoAsistenciaSerializer, MobileUpdateProfileSerializer, RecuperacionClaseSerializer, MobileMarkAttendanceSerializer
+from core.models import Curso, Asistencia, AsistenciaDiaria, Semestre, RecuperacionClase, AdelantoClase, Documento, VersionDocumento, TipoDocumento, Anuncio
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from core.api.views.utils import get_kiosk_data_for_docente
 
 
@@ -71,10 +62,14 @@ class MobileMarkAttendanceView(APIView):
 
         validated_data = serializer.validated_data
         action_type = validated_data["actionType"]
-        photo_base64 = validated_data["photoBase64"]
+        photo_base64 = validated_data.get("photoBase64")
+        observation = validated_data.get("observation")
         latitude = validated_data.get("latitude")
         longitude = validated_data.get("longitude")
         
+        # Handle Multipart file if present
+        photo_file_multipart = request.FILES.get('photo') 
+
         # --- VALIDACIÓN GEOLOCALIZACIÓN ---
         from django.conf import settings
         from core.models.settings import ConfiguracionInstitucion
@@ -124,16 +119,31 @@ class MobileMarkAttendanceView(APIView):
         today = timezone.localtime(timezone.now()).date()
         now = timezone.now()
 
-        try:
-            format, imgstr = photo_base64.split(";base64,")
-            ext = format.split("/")[-1]
-            photo_file = ContentFile(
-                base64.b64decode(imgstr),
-                name=f"{docente.username}_{now.timestamp()}.{ext}",
-            )
-        except:
-            return Response(
-                {"status": "error", "message": "Formato de photoBase64 inválido."},
+        photo_file = None
+        
+        # 1. Prioridad: Multipart File
+        if 'photo' in request.FILES:
+            photo_file = request.FILES['photo']
+        
+        # 2. Fallback: Base64 (Legacy/Web)
+        elif photo_base64:
+            try:
+                format, imgstr = photo_base64.split(";base64,")
+                ext = format.split("/")[-1]
+                photo_file = ContentFile(
+                    base64.b64decode(imgstr),
+                    name=f"{docente.username}_{now.timestamp()}.{ext}",
+                )
+            except:
+                return Response(
+                    {"status": "error", "message": "Formato de photoBase64 inválido."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        
+        # Validación de FOTO OBLIGATORIA para ENTRADAS
+        if action_type in ["general_entry", "course_entry"] and not photo_file:
+             return Response(
+                {"status": "error", "message": "La foto es obligatoria para marcar entrada."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -194,7 +204,8 @@ class MobileMarkAttendanceView(APIView):
                 )
 
             asistencia_diaria.hora_salida = now
-            asistencia_diaria.foto_salida = photo_file
+            if photo_file:
+                asistencia_diaria.foto_salida = photo_file
             asistencia_diaria.save()
 
             return Response(
@@ -271,19 +282,18 @@ class MobileMarkAttendanceView(APIView):
                                 status=status.HTTP_400_BAD_REQUEST,
                             )
 
-                # --- Cálculo Dinámico de Duración (Igual que en Kiosk/Web) ---
-                if bloque_del_dia:
-                    duracion_real = bloque_del_dia.get_duracion_real_minutos()
-                    duracion_minima_minutos = duracion_real - 15
+                # --- Cálculo de Hora Salida Permitida ---
+                # FIX: Usar Hora Fin Programada - 15 minutos en lugar de Duracion + Hora Entrada
+                if bloque_del_dia and bloque_del_dia.horario_fin:
+                    fin_clase_dt = timezone.make_aware(
+                        timezone.datetime.combine(today, bloque_del_dia.horario_fin)
+                    )
+                    # Permitir salir 15 minutos antes de que acabe la clase
+                    asistencia.hora_salida_permitida = fin_clase_dt - timedelta(minutes=15)
                 else:
-                    duracion_minima_minutos = 75
+                    # Fallback si no hay bloque (raro): 75 min duración por defecto
+                    asistencia.hora_salida_permitida = now + timedelta(minutes=75)
 
-                if duracion_minima_minutos < 15:
-                    duracion_minima_minutos = 15
-
-                asistencia.hora_salida_permitida = now + timedelta(
-                    minutes=duracion_minima_minutos
-                )
                 asistencia.save()
 
             elif action_type == "course_exit":
@@ -313,7 +323,10 @@ class MobileMarkAttendanceView(APIView):
                     )
 
                 asistencia.hora_salida = now
-                asistencia.foto_salida = photo_file
+                if photo_file:
+                    asistencia.foto_salida = photo_file
+                if observation:
+                    asistencia.observacion_salida = observation
                 asistencia.save()
 
             return Response(
@@ -327,6 +340,36 @@ class MobileMarkAttendanceView(APIView):
         return Response(
             {"status": "error", "message": "Tipo de acción no válida."},
             status=status.HTTP_400_BAD_REQUEST,
+        )
+
+
+class MobileUpdateProfileView(APIView):
+    """
+    API View para actualizar el perfil del docente (celular y foto).
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)
+
+    def patch(self, request, *args, **kwargs):
+        from core.api.serializers import MobileUpdateProfileSerializer
+        
+        docente = request.user
+        serializer = MobileUpdateProfileSerializer(docente, data=request.data, partial=True)
+        
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "status": "success", 
+                "message": "Perfil actualizado correctamente",
+                "data": {
+                    "celular": docente.celular,
+                    "foto": request.build_absolute_uri(docente.foto.url) if docente.foto else None
+                }
+            })
+        
+        return Response(
+            {"status": "error", "message": "Datos inválidos", "errors": serializer.errors},
+            status=status.HTTP_400_BAD_REQUEST
         )
 
 
@@ -744,4 +787,21 @@ class MobileAttendanceHistoryView(APIView):
         # Convertir a lista y ordenar
         response_list = sorted(history_by_day.values(), key=lambda x: x['date'], reverse=True)
 
-        return Response(response_list)
+
+class MobileRecuperacionClaseView(APIView):
+    """
+    API View para gestionar solicitudes de recuperación de clases.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        solicitudes = RecuperacionClase.objects.filter(docente=request.user).order_by('-fecha_creacion')
+        serializer = RecuperacionClaseSerializer(solicitudes, many=True)
+        return Response(serializer.data)
+
+    def post(self, request, *args, **kwargs):
+        serializer = RecuperacionClaseSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(docente=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

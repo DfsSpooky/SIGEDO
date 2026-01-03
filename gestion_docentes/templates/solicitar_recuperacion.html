@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Solicitar Recuperación{% endblock %}
+
+{% block breadcrumb %}Solicitar Recuperación{% endblock %}
+
+{% block content %}
+<div class="container mx-auto max-w-3xl">
+
+    <div class="text-center mb-8 animate-fade-in">
+        <h1 class="text-3xl font-bold text-base-content">
+            <i class="fas fa-clock-rotate-left text-primary mr-2"></i>Recuperación de Clases
+        </h1>
+        <p class="text-base-content/70 mt-2">Completa el formulario para agendar una reprogramación.</p>
+    </div>
+
+    <div class="card bg-base-100 shadow-xl border border-base-200 animate-fade-in">
+        <div class="card-body">
+
+            <form method="post" id="recuperacionForm">
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                <div class="alert alert-error shadow-lg mb-6 text-white">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <div>
+                        <h3 class="font-bold">Error</h3>
+                        <div class="text-xs">{{ form.non_field_errors }}</div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="form-control w-full mb-4">
+                    <label class="label" for="{{ form.curso.id_for_label }}">
+                        <span class="label-text font-semibold"><i
+                                class="fas fa-book mr-2 text-secondary"></i>Curso</span>
+                    </label>
+                    {{ form.curso }}
+                    {% if form.curso.errors %}
+                    <label class="label">
+                        <span class="label-text-alt text-error font-medium">{{ form.curso.errors.0 }}</span>
+                    </label>
+                    {% endif %}
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+
+                    <div class="form-control w-full">
+                        <label class="label" for="{{ form.fecha_a_recuperar.id_for_label }}">
+                            <span class="label-text font-semibold"><i
+                                    class="fas fa-calendar-times mr-2 text-error"></i>Fecha a Recuperar</span>
+                        </label>
+                        {{ form.fecha_a_recuperar }}
+                        {% if form.fecha_a_recuperar.errors %}
+                        <label class="label">
+                            <span class="label-text-alt text-error font-medium">{{ form.fecha_a_recuperar.errors.0
+                                }}</span>
+                        </label>
+                        {% endif %}
+                        <label class="label">
+                            <span class="label-text-alt text-base-content/60">La fecha de la clase perdida.</span>
+                        </label>
+                    </div>
+
+                    <div class="form-control w-full">
+                        <label class="label" for="{{ form.fecha_propuesta.id_for_label }}">
+                            <span class="label-text font-semibold"><i
+                                    class="fas fa-calendar-check mr-2 text-success"></i>Nueva Fecha Propuesta</span>
+                        </label>
+                        {{ form.fecha_propuesta }}
+                        {% if form.fecha_propuesta.errors %}
+                        <label class="label">
+                            <span class="label-text-alt text-error font-medium">{{ form.fecha_propuesta.errors.0
+                                }}</span>
+                        </label>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="form-control w-full mb-4">
+                    <label class="label" for="{{ form.duracion_minutos.id_for_label }}">
+                        <span class="label-text font-semibold"><i
+                                class="fas fa-hourglass-half mr-2 text-warning"></i>Duración (minutos)</span>
+                    </label>
+                    <div class="relative">
+                        {{ form.duracion_minutos }}
+                        <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                            <span class="text-gray-500 text-sm">min</span>
+                        </div>
+                    </div>
+                    {% if form.duracion_minutos.errors %}
+                    <label class="label">
+                        <span class="label-text-alt text-error font-medium">{{ form.duracion_minutos.errors.0 }}</span>
+                    </label>
+                    {% endif %}
+                </div>
+
+                <div class="form-control w-full mb-6">
+                    <label class="label" for="{{ form.motivo.id_for_label }}">
+                        <span class="label-text font-semibold"><i class="fas fa-comment-alt mr-2 text-info"></i>Motivo
+                            de la falta</span>
+                    </label>
+                    {{ form.motivo }}
+                    {% if form.motivo.errors %}
+                    <label class="label">
+                        <span class="label-text-alt text-error font-medium">{{ form.motivo.errors.0 }}</span>
+                    </label>
+                    {% endif %}
+                </div>
+
+                <div class="card-actions justify-end mt-4 pt-4 border-t border-base-200">
+                    <a href="{% url 'ver_recuperaciones' %}" class="btn btn-ghost hover:bg-base-200">
+                        Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-primary px-8">
+                        <i class="fas fa-paper-plane mr-2"></i> Enviar Solicitud
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Este script añade clases de DaisyUI a los widgets de Django automáticamente
+        // para que no tengas que instalar 'django-widget-tweaks' si no quieres.
+
+        const inputs = document.querySelectorAll('#recuperacionForm input[type="text"], #recuperacionForm input[type="number"], #recuperacionForm input[type="date"], #recuperacionForm input[type="datetime-local"]');
+        inputs.forEach(input => {
+            input.classList.add('input', 'input-bordered', 'w-full', 'focus:input-primary');
+        });
+
+        const selects = document.querySelectorAll('#recuperacionForm select');
+        selects.forEach(select => {
+            select.classList.add('select', 'select-bordered', 'w-full', 'focus:select-primary');
+        });
+
+        const textareas = document.querySelectorAll('#recuperacionForm textarea');
+        textareas.forEach(textarea => {
+            textarea.classList.add('textarea', 'textarea-bordered', 'w-full', 'h-32', 'focus:textarea-primary');
+        });
+
+        // Highlight campos con errores
+        const errorInputs = document.querySelectorAll('.text-error');
+        errorInputs.forEach(error => {
+            // Busca el input cercano para ponerle borde rojo
+            const parent = error.closest('.form-control');
+            if (parent) {
+                const input = parent.querySelector('input, select, textarea');
+                if (input) input.classList.add('input-error', 'select-error', 'textarea-error');
+            }
+        });
+    });
+</script>
+{% endblock %}

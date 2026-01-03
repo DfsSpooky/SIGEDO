@@ -1,49 +1,49 @@
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
 import 'package:provider/provider.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../providers/auth_provider.dart';
-import '../models/justification_type.dart';
 import '../theme/app_theme.dart';
+// teacher_data.dart not needed if we access via AuthProvider.teacherData
 
-class JustificationScreen extends StatefulWidget {
-  const JustificationScreen({super.key});
+class RecoveryScreen extends StatefulWidget {
+  const RecoveryScreen({super.key});
 
   @override
-  State<JustificationScreen> createState() => _JustificationScreenState();
+  State<RecoveryScreen> createState() => _RecoveryScreenState();
 }
 
-class _JustificationScreenState extends State<JustificationScreen> {
+class _RecoveryScreenState extends State<RecoveryScreen> {
   bool _isLoading = true;
-  List<dynamic> _justifications = [];
+  List<dynamic> _requests = [];
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadRequests();
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadRequests() async {
     try {
-      final data = await Provider.of<AuthProvider>(
+      final requests = await Provider.of<AuthProvider>(
         context,
         listen: false,
-      ).getJustifications();
-      if (mounted) {
-        setState(() {
-          _justifications = data;
-          _isLoading = false;
-        });
-      }
+      ).getRecoveryRequests();
+      if (!mounted) return;
+      setState(() {
+        _requests = requests;
+        _isLoading = false;
+      });
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        // Don't show error immediately on load if it's just empty or network glitch, maybe retry?
-        // But for now typical pattern:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al cargar solicitudes: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
       }
     }
   }
@@ -53,12 +53,12 @@ class _JustificationScreenState extends State<JustificationScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => _CreateJustificationSheet(
+      builder: (ctx) => _CreateRecoverySheet(
         onSuccess: () {
-          _loadData(); // Refresh list
+          _loadRequests();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Justificación enviada exitosamente'),
+              content: Text('Solicitud enviada exitosamente'),
               backgroundColor: Colors.green,
             ),
           );
@@ -69,30 +69,29 @@ class _JustificationScreenState extends State<JustificationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Stats
-    final pending = _justifications
-        .where((j) => j['estado'] == 'PENDIENTE')
+    final pendingCount = _requests
+        .where((r) => r['estado'] == 'PENDIENTE')
         .length;
-    final approved = _justifications
-        .where((j) => j['estado'] == 'APROBADO')
+    final approvedCount = _requests
+        .where((r) => r['estado'] == 'APROBADO')
         .length;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
+      backgroundColor: const Color(0xFFF3F4F6), // Light Grey
       appBar: AppBar(
         title: Text(
-          'Justificaciones',
+          'Recuperación de Clases',
           style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 20),
         ),
-        centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,
+        centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.black87),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-              onRefresh: _loadData,
+              onRefresh: _loadRequests,
               child: CustomScrollView(
                 slivers: [
                   SliverToBoxAdapter(
@@ -101,7 +100,7 @@ class _JustificationScreenState extends State<JustificationScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildStatsHeader(pending, approved),
+                          _buildStatsHeader(pendingCount, approvedCount),
                           const SizedBox(height: 24),
                           Text(
                             "Mis Solicitudes",
@@ -116,16 +115,15 @@ class _JustificationScreenState extends State<JustificationScreen> {
                       ),
                     ),
                   ),
-                  _justifications.isEmpty
+                  _requests.isEmpty
                       ? SliverFillRemaining(
                           hasScrollBody: false,
                           child: _buildEmptyState(),
                         )
                       : SliverList(
                           delegate: SliverChildBuilderDelegate(
-                            (ctx, i) =>
-                                _buildJustificationCard(_justifications[i]),
-                            childCount: _justifications.length,
+                            (ctx, i) => _buildRequestCard(_requests[i]),
+                            childCount: _requests.length,
                           ),
                         ),
                   const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
@@ -143,6 +141,7 @@ class _JustificationScreenState extends State<JustificationScreen> {
             color: Colors.white,
           ),
         ),
+        elevation: 4,
       ),
     );
   }
@@ -152,10 +151,10 @@ class _JustificationScreenState extends State<JustificationScreen> {
       children: [
         Expanded(
           child: _buildStatCard(
-            "En Revisión",
+            "Pendientes",
             pending.toString(),
             Colors.orangeAccent,
-            Icons.access_time_filled,
+            Icons.pending_actions,
           ),
         ),
         const SizedBox(width: 16),
@@ -164,7 +163,7 @@ class _JustificationScreenState extends State<JustificationScreen> {
             "Aprobadas",
             approved.toString(),
             Colors.green,
-            Icons.verified,
+            Icons.check_circle_outline,
           ),
         ),
       ],
@@ -228,18 +227,14 @@ class _JustificationScreenState extends State<JustificationScreen> {
         Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: Colors.teal[50], // Different color than Recovery
+            color: Colors.blue[50],
             shape: BoxShape.circle,
           ),
-          child: Icon(
-            Icons.assignment_turned_in_outlined,
-            size: 60,
-            color: Colors.teal[300],
-          ),
+          child: Icon(Icons.class_outlined, size: 60, color: Colors.blue[300]),
         ),
         const SizedBox(height: 24),
         Text(
-          "Sin justificaciones enviadas",
+          "Sin solicitudes recientes",
           style: GoogleFonts.outfit(
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -248,7 +243,7 @@ class _JustificationScreenState extends State<JustificationScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          "Todas tus inasistencias están en orden.\nUse el botón para crear una nueva.",
+          "Si necesitas reprogramar una clase,\npuedes solicitarlo aquí.",
           textAlign: TextAlign.center,
           style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey[500]),
         ),
@@ -256,21 +251,11 @@ class _JustificationScreenState extends State<JustificationScreen> {
     );
   }
 
-  Widget _buildJustificationCard(dynamic item) {
-    final estado = item['estado'] ?? 'PENDIENTE';
-    final fechaInicio =
-        DateTime.tryParse(item['fecha_inicio']) ?? DateTime.now();
-    final fechaFin = DateTime.tryParse(item['fecha_fin']) ?? DateTime.now();
-    // Assuming API returns 'tipo_nombre' or similar inside 'tipo' object or flattened
-    // If not flatten, let's look at `TipoJustificacionSerializer` usage in Backend.
-    // Usually Serializer sends full object or Id.
-    // Let's assume it returns ID or basic info. The ListView usually uses `JustificationSerializer`
-    // which has `tipo = TipoJustificacionSerializer()`. So it might be `item['tipo']['nombre']`.
-    // Checking `JustificationSerializer`:
-    // class JustificationSerializer(serializers.ModelSerializer):
-    //    tipo_nombre = serializers.ReadOnlyField(source='tipo.nombre')
-    // So it should be 'tipo_nombre'.
-    final tipo = item['tipo_nombre'] ?? 'Justificación';
+  Widget _buildRequestCard(dynamic req) {
+    final estado = req['estado'] ?? 'PENDIENTE';
+    final curso = req['curso_nombre'] ?? 'Curso';
+    final fechaProp = DateTime.parse(req['fecha_propuesta']);
+    final fechaOriginal = DateTime.parse(req['fecha_a_recuperar']);
 
     Color statusColor;
     IconData statusIcon;
@@ -312,7 +297,7 @@ class _JustificationScreenState extends State<JustificationScreen> {
               children: [
                 Expanded(
                   child: Text(
-                    tipo,
+                    curso,
                     style: GoogleFonts.outfit(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
@@ -347,29 +332,42 @@ class _JustificationScreenState extends State<JustificationScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(Icons.calendar_today, size: 14, color: Colors.grey[400]),
-                const SizedBox(width: 6),
-                Text(
-                  "${DateFormat('dd MMM').format(fechaInicio)} - ${DateFormat('dd MMM yyyy').format(fechaFin)}",
-                  style: GoogleFonts.outfit(
-                    fontSize: 13,
-                    color: Colors.grey[700],
-                  ),
-                ),
-              ],
+            _buildInfoRow(
+              Icons.calendar_today,
+              "Original",
+              DateFormat('dd MMM yyyy').format(fechaOriginal),
             ),
-            if (item['motivo'] != null) ...[
+            const SizedBox(height: 8),
+            _buildInfoRow(
+              Icons.next_plan,
+              "Propuesta",
+              DateFormat('dd MMM - hh:mm a').format(fechaProp),
+            ),
+            if (req['aula_solicitada'] != null) ...[
               const SizedBox(height: 8),
-              Text(
-                item['motivo'],
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.outfit(
-                  fontSize: 13,
-                  color: Colors.grey[600],
-                  fontStyle: FontStyle.italic,
+              _buildInfoRow(
+                Icons.room,
+                "Aula",
+                req['aula_solicitada'].toString(),
+              ), // Assuming ID or Name
+            ],
+            if (req['observaciones'] != null &&
+                req['observaciones'].isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.yellow[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.yellow.shade200),
+                ),
+                child: Text(
+                  "Nota: ${req['observaciones']}",
+                  style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    color: Colors.orange[800],
+                  ),
                 ),
               ),
             ],
@@ -378,85 +376,55 @@ class _JustificationScreenState extends State<JustificationScreen> {
       ),
     );
   }
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: Colors.grey[400]),
+        const SizedBox(width: 6),
+        Text(
+          "$label: ",
+          style: GoogleFonts.outfit(fontSize: 12, color: Colors.grey[600]),
+        ),
+        Text(
+          value,
+          style: GoogleFonts.outfit(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
-class _CreateJustificationSheet extends StatefulWidget {
+class _CreateRecoverySheet extends StatefulWidget {
   final VoidCallback onSuccess;
-  const _CreateJustificationSheet({required this.onSuccess});
+  const _CreateRecoverySheet({required this.onSuccess});
 
   @override
-  State<_CreateJustificationSheet> createState() =>
-      _CreateJustificationSheetState();
+  State<_CreateRecoverySheet> createState() => _CreateRecoverySheetState();
 }
 
-class _CreateJustificationSheetState extends State<_CreateJustificationSheet> {
+class _CreateRecoverySheetState extends State<_CreateRecoverySheet> {
   final _formKey = GlobalKey<FormState>();
-  DateTime _startDate = DateTime.now();
-  DateTime _endDate = DateTime.now();
-  String? _selectedTypeId;
+  int? _selectedCourseId;
+  DateTime _dateToRecover = DateTime.now();
+  DateTime _proposedDate = DateTime.now().add(const Duration(days: 1));
+  TimeOfDay _proposedTime = const TimeOfDay(hour: 18, minute: 00);
+  int _durationMinutes = 90;
   final _reasonController = TextEditingController();
-
-  File? _attachedFile;
-  String? _attachedFileName;
-  bool _isPdf = false;
-
-  bool _isLoadingTypes = true;
-  List<JustificationType> _types = [];
   bool _submitting = false;
 
   @override
-  void initState() {
-    super.initState();
-    _loadTypes();
-  }
-
-  Future<void> _loadTypes() async {
-    try {
-      final types = await Provider.of<AuthProvider>(
-        context,
-        listen: false,
-      ).getJustificationTypes();
-      if (mounted) {
-        setState(() {
-          _types = types;
-          _isLoadingTypes = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoadingTypes = false);
-      }
-    }
-  }
-
-  Future<void> _pickFile(bool isImage) async {
-    if (isImage) {
-      final picker = ImagePicker();
-      final photo = await picker.pickImage(source: ImageSource.camera);
-      if (photo != null) {
-        setState(() {
-          _attachedFile = File(photo.path);
-          _attachedFileName = "Foto adjunta";
-          _isPdf = false;
-        });
-      }
-    } else {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
-      );
-      if (result != null) {
-        setState(() {
-          _attachedFile = File(result.files.single.path!);
-          _attachedFileName = result.files.single.name;
-          _isPdf = result.files.single.extension == 'pdf';
-        });
-      }
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final teacherData = Provider.of<AuthProvider>(
+      context,
+      listen: false,
+    ).teacherData;
+    final courses = teacherData?.courses ?? [];
+
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -471,9 +439,6 @@ class _CreateJustificationSheetState extends State<_CreateJustificationSheet> {
         right: 24,
         bottom: MediaQuery.of(context).viewInsets.bottom + 24,
       ),
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.9,
-      ), // Limit height
       child: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -486,12 +451,12 @@ class _CreateJustificationSheetState extends State<_CreateJustificationSheet> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.teal[50],
+                      color: Colors.indigo[50],
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(
-                      Icons.assignment_late,
-                      color: Colors.teal,
+                      Icons.edit_calendar,
+                      color: Colors.indigo,
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -500,14 +465,14 @@ class _CreateJustificationSheetState extends State<_CreateJustificationSheet> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          "Nueva Justificación",
+                          "Nueva Solicitud",
                           style: GoogleFonts.outfit(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         Text(
-                          "Adjunta evidencia de tu falta",
+                          "Completa los datos para reprogramar",
                           style: GoogleFonts.outfit(
                             fontSize: 12,
                             color: Colors.grey,
@@ -524,58 +489,109 @@ class _CreateJustificationSheetState extends State<_CreateJustificationSheet> {
               ),
               const SizedBox(height: 24),
 
-              if (_isLoadingTypes)
-                const LinearProgressIndicator()
-              else
-                DropdownButtonFormField<String>(
-                  decoration: InputDecoration(
-                    labelText: 'Tipo de Justificación',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    prefixIcon: const Icon(Icons.category_outlined),
+              // Course Selector
+              DropdownButtonFormField<int>(
+                decoration: InputDecoration(
+                  labelText: 'Curso a Recuperar',
+                  labelStyle: GoogleFonts.outfit(fontSize: 14),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  items: _types
-                      .map(
-                        (t) => DropdownMenuItem(
-                          value: t.id.toString(),
-                          child: Text(t.nombre),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (v) => setState(() => _selectedTypeId = v),
-                  validator: (v) => v == null ? 'Seleccione tipo' : null,
+                  prefixIcon: const Icon(Icons.book_outlined),
                 ),
-
+                items: courses
+                    .map(
+                      (c) => DropdownMenuItem(
+                        value: c.id,
+                        child: Text(c.name, overflow: TextOverflow.ellipsis),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (val) => setState(() => _selectedCourseId = val),
+                validator: (v) => v == null ? 'Seleccione un curso' : null,
+              ),
               const SizedBox(height: 16),
 
-              // Date Range
+              // Fechas Row
               Row(
                 children: [
                   Expanded(
                     child: _buildDatePicker(
-                      "Desde",
-                      _startDate,
-                      (d) => setState(() => _startDate = d),
+                      "Fecha Original",
+                      _dateToRecover,
+                      Icons.calendar_month,
+                      (picked) => setState(() => _dateToRecover = picked),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: _buildDatePicker(
-                      "Hasta",
-                      _endDate,
-                      (d) => setState(() => _endDate = d),
+                      "Propuesta",
+                      _proposedDate,
+                      Icons.next_plan_outlined,
+                      (picked) => setState(() => _proposedDate = picked),
+                      startFromNow: true,
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
 
+              // Time & Duration Row
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: () async {
+                        final picked = await showTimePicker(
+                          context: context,
+                          initialTime: _proposedTime,
+                        );
+                        if (picked != null) {
+                          setState(() => _proposedTime = picked);
+                        }
+                      },
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'Hora Inicio',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          prefixIcon: const Icon(Icons.access_time),
+                        ),
+                        child: Text(
+                          _proposedTime.format(context),
+                          style: GoogleFonts.outfit(),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      initialValue: '90',
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Minutos',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        prefixIcon: const Icon(Icons.timer_outlined),
+                      ),
+                      onChanged: (v) =>
+                          _durationMinutes = int.tryParse(v) ?? 90,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Reason
               TextFormField(
                 controller: _reasonController,
                 maxLines: 3,
                 decoration: InputDecoration(
-                  labelText: 'Motivo Detallado',
+                  labelText: 'Motivo de la recuperación',
                   alignLabelWithHint: true,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -585,91 +601,9 @@ class _CreateJustificationSheetState extends State<_CreateJustificationSheet> {
                 validator: (v) =>
                     v == null || v.isEmpty ? 'Escriba un motivo' : null,
               ),
-              const SizedBox(height: 16),
-
-              // File Picker Area
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey[300]!),
-                ),
-                child: Column(
-                  children: [
-                    if (_attachedFile == null) ...[
-                      Text(
-                        "Adjuntar Evidencia (Obligatorio)",
-                        style: GoogleFonts.outfit(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              icon: const Icon(Icons.camera_alt_outlined),
-                              label: const Text("Cámara"),
-                              onPressed: () => _pickFile(true),
-                              style: OutlinedButton.styleFrom(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              icon: const Icon(Icons.upload_file),
-                              label: const Text("Archivo"),
-                              onPressed: () => _pickFile(false),
-                              style: OutlinedButton.styleFrom(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ] else ...[
-                      Row(
-                        children: [
-                          Icon(
-                            _isPdf ? Icons.picture_as_pdf : Icons.image,
-                            color: Colors.teal,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              _attachedFileName ?? "Archivo",
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.outfit(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: () =>
-                                setState(() => _attachedFile = null),
-                            icon: const Icon(
-                              Icons.delete_outline,
-                              color: Colors.red,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-
               const SizedBox(height: 24),
 
+              // Submit Button
               ElevatedButton(
                 onPressed: _submitting ? null : _submit,
                 style: ElevatedButton.styleFrom(
@@ -678,6 +612,7 @@ class _CreateJustificationSheetState extends State<_CreateJustificationSheet> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
+                  elevation: 0,
                 ),
                 child: _submitting
                     ? const SizedBox(
@@ -707,15 +642,17 @@ class _CreateJustificationSheetState extends State<_CreateJustificationSheet> {
   Widget _buildDatePicker(
     String label,
     DateTime date,
-    Function(DateTime) onPick,
-  ) {
+    IconData icon,
+    Function(DateTime) onPick, {
+    bool startFromNow = false,
+  }) {
     return InkWell(
       onTap: () async {
         final picked = await showDatePicker(
           context: context,
           initialDate: date,
-          firstDate: DateTime(2024),
-          lastDate: DateTime(2030),
+          firstDate: startFromNow ? DateTime.now() : DateTime(2024),
+          lastDate: DateTime(2026),
         );
         if (picked != null) {
           onPick(picked);
@@ -725,7 +662,7 @@ class _CreateJustificationSheetState extends State<_CreateJustificationSheet> {
         decoration: InputDecoration(
           labelText: label,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          prefixIcon: const Icon(Icons.calendar_today, size: 18),
+          prefixIcon: Icon(icon, size: 20),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 12,
             vertical: 16,
@@ -740,41 +677,43 @@ class _CreateJustificationSheetState extends State<_CreateJustificationSheet> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-    if (_attachedFile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Debe adjuntar una evidencia")),
-      );
-      return;
-    }
+    if (_formKey.currentState!.validate()) {
+      setState(() => _submitting = true);
+      try {
+        // Combine Date + Time
+        final fullProposedDate = DateTime(
+          _proposedDate.year,
+          _proposedDate.month,
+          _proposedDate.day,
+          _proposedTime.hour,
+          _proposedTime.minute,
+        );
 
-    setState(() => _submitting = true);
-    try {
-      await Provider.of<AuthProvider>(
-        context,
-        listen: false,
-      ).createJustification(
-        typeId: int.parse(_selectedTypeId!),
-        startDate: _startDate,
-        endDate: _endDate,
-        reason: _reasonController.text,
-        file: _attachedFile!,
-      );
-      if (mounted) {
-        Navigator.pop(context);
-        widget.onSuccess();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
+        await Provider.of<AuthProvider>(
           context,
-        ).showSnackBar(SnackBar(content: Text("Error: $e")));
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _submitting = false);
+          listen: false,
+        ).createRecoveryRequest(
+          courseId: _selectedCourseId!,
+          dateToRecover: _dateToRecover,
+          proposedDate: fullProposedDate,
+          durationMinutes: _durationMinutes,
+          reason: _reasonController.text,
+        );
+
+        if (mounted) {
+          Navigator.pop(context);
+          widget.onSuccess();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text("Error: $e")));
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _submitting = false);
+        }
       }
     }
   }

@@ -81,6 +81,7 @@ urlpatterns = [
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
 
     # --- API Móvil ---
+    path("mobile/profile/update/", views.MobileUpdateProfileView.as_view(), name="mobile_profile_update"),
     path("mobile/public-config/", views.MobilePublicConfigView.as_view(), name="mobile_public_config"),
     path("mobile/status/", views.MobileStatusView.as_view(), name="mobile_status"),
     path("mobile/attendance/", views.MobileMarkAttendanceView.as_view(), name="mobile_attendance"),
@@ -91,6 +92,7 @@ urlpatterns = [
     path("mobile/director/attendance/", views.MobileDirectorAttendanceView.as_view(), name="mobile_director_attendance"),
     path("mobile/director/stats/", views.MobileDirectorStatsView.as_view(), name="mobile_director_stats"),
     path("mobile/history/", views.MobileAttendanceHistoryView.as_view(), name="mobile_attendance_history"),
+    path("mobile/recuperacion-clase/", views.MobileRecuperacionClaseView.as_view(), name="mobile_recuperacion_clase"),
     
     # --- Justificaciones ---
     # --- Justificaciones ---

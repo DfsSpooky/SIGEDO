@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'dart:ui'; // For ImageFilter
 import '../providers/auth_provider.dart';
 import '../models/teacher_data.dart';
+import '../utils/image_utils.dart'; // Import ImageUtils
 
 import 'package:permission_handler/permission_handler.dart';
 import 'package:image_picker/image_picker.dart';
@@ -13,7 +14,7 @@ import 'credential_screen.dart';
 
 import 'history_screen.dart';
 import 'documents_screen.dart';
-import 'justification_screen.dart';
+
 import '../utils/date_utils.dart';
 import '../widgets/skeleton_loader.dart';
 import '../widgets/announcement_carousel.dart';
@@ -38,32 +39,138 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _handleAttendance(String actionType, int? courseId) async {
     final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final isExit = actionType.contains("exit");
 
-    // 1. Permisos de Cámara
-    var status = await Permission.camera.request();
-    if (!status.isGranted) {
-      if (mounted) {
-        scaffoldMessenger.showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Se requiere permiso de cámara para marcar asistencia.',
+    File? photoFile;
+    String? observation;
+
+    // 1. Flujo de ENTRADA (Requiere FOTO)
+    if (!isExit) {
+      // Permisos
+      var status = await Permission.camera.request();
+      if (!status.isGranted) {
+        if (mounted) {
+          scaffoldMessenger.showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Se requiere permiso de cámara para marcar asistencia.',
+              ),
             ),
+          );
+        }
+        return;
+      }
+
+      // Tomar Foto
+      final ImagePicker picker = ImagePicker();
+      final XFile? photo = await picker.pickImage(
+        source: ImageSource.camera,
+        preferredCameraDevice: CameraDevice.front,
+        maxWidth: 600,
+        imageQuality: 50,
+      );
+
+      if (photo == null) return; // Usuario canceló
+
+      final File originalFile = File(photo.path);
+      // Optimizar Imagen
+      final compressedPhoto = await ImageUtils.compressImage(originalFile);
+      photoFile = compressedPhoto ?? originalFile;
+    }
+    // 2. Flujo de SALIDA (Sin Foto, con Observación opcional)
+    else {
+      if (actionType == "course_exit") {
+        final TextEditingController reasonCtrl = TextEditingController();
+        bool? confirm = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Text(
+              "Marcar Salida",
+              style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "¿Desea marcar su salida del curso?",
+                  style: GoogleFonts.outfit(color: Colors.grey[700]),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: reasonCtrl,
+                  decoration: const InputDecoration(
+                    labelText: "Observación / Motivo (Opcional)",
+                    border: OutlineInputBorder(),
+                    hintText: "Ej. Salida anticipada por...",
+                  ),
+                  maxLines: 2,
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text("Cancelar"),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4F46E5),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text("Confirmar"),
+              ),
+            ],
           ),
         );
+        if (confirm != true) return;
+        observation = reasonCtrl.text.trim();
+        if (observation.isEmpty) observation = null;
+      } else {
+        // Salida General - Confirmación simple
+        bool? confirm = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Text(
+              "Finalizar Jornada",
+              style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+            ),
+            content: Text(
+              "¿Está seguro que desea marcar su salida general?",
+              style: GoogleFonts.outfit(color: Colors.grey[700]),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text("Cancelar"),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFEF4444),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text("Finalizar"),
+              ),
+            ],
+          ),
+        );
+        if (confirm != true) return;
       }
-      return;
     }
-
-    // 2. Tomar Foto
-    final ImagePicker picker = ImagePicker();
-    final XFile? photo = await picker.pickImage(
-      source: ImageSource.camera,
-      preferredCameraDevice: CameraDevice.front,
-      maxWidth: 600,
-      imageQuality: 50,
-    );
-
-    if (photo == null) return; // Usuario canceló
 
     // 3. Enviar al API
     if (mounted) {
@@ -101,13 +208,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         if (!mounted) return;
 
-        // Usar AuthProvider y pasar File + Coordenadas
+        // Usar AuthProvider con parámetros nombrados
         await Provider.of<AuthProvider>(context, listen: false).markAttendance(
           actionType,
-          File(photo.path), // Convertir XFile a File
           courseId,
+          photo: photoFile, // Use the potentially compressed photoFile
           latitude: position.latitude,
           longitude: position.longitude,
+          observation: observation,
         );
 
         if (mounted) {
@@ -131,6 +239,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     style: GoogleFonts.outfit(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
+                      color: const Color(0xFF1F2937),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -836,17 +945,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 builder: (_) => const DirectorAnalyticsScreen(),
               ),
             ),
-          )
-        else
-          _buildQuickActionItem(
-            context,
-            icon: Icons.assignment_late_outlined,
-            label: "Justificar",
-            color: const Color(0xFF14B8A6),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const JustificationScreen()),
-            ),
           ),
         _buildQuickActionItem(
           context,
@@ -1069,7 +1167,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ), // Removed margin, managed by Column/Stack if needed
       child: IntrinsicHeight(
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Timeline Line & Dot
             SizedBox(
@@ -1285,8 +1383,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ],
 
-                      const SizedBox(height: 16),
-
+                      const SizedBox(height: 10), // Reduced from 16
                       // Actions
                       Row(
                         children: [
@@ -1320,14 +1417,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                           ),
                                         ),
                                         padding: const EdgeInsets.symmetric(
-                                          vertical: 12,
+                                          vertical: 6, // Compacted from 10
                                         ),
                                       ),
-                                      child: Text(
-                                        "Entrada",
-                                        style: GoogleFonts.outfit(
-                                          color: statusColor,
-                                          fontWeight: FontWeight.bold,
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          "Entrada",
+                                          style: GoogleFonts.outfit(
+                                            color: statusColor,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -1351,14 +1451,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                           ),
                                         ),
                                         padding: const EdgeInsets.symmetric(
-                                          vertical: 12,
+                                          vertical: 6, // Compacted from 10
                                         ),
                                         elevation: 0,
                                       ),
-                                      child: Text(
-                                        "Adelantar Clase",
-                                        style: GoogleFonts.outfit(
-                                          fontWeight: FontWeight.bold,
+                                      child: FittedBox(
+                                        // Removed const
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          "Adelantar Clase",
+                                          style: GoogleFonts.outfit(
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -1382,14 +1486,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     padding: const EdgeInsets.symmetric(
-                                      vertical: 12,
+                                      vertical: 6, // Compacted from 10
                                     ),
                                     elevation: 2,
                                   ),
-                                  child: Text(
-                                    "Salida",
-                                    style: GoogleFonts.outfit(
-                                      fontWeight: FontWeight.bold,
+                                  child: FittedBox(
+                                    // Prevent wrap
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      "Salida",
+                                      style: GoogleFonts.outfit(
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                 ),

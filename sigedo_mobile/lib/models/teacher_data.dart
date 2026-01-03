@@ -61,6 +61,7 @@ class TeacherInfo {
   final String? email; // NEW
   final String? idQr; // NEW
   final bool isStaff; // NEW
+  final String? phone; // NEW
 
   // Getters for compatibility with CredentialScreen
   String? get foto => photoUrl;
@@ -72,7 +73,28 @@ class TeacherInfo {
     this.email,
     this.idQr,
     this.isStaff = false,
+    this.phone,
   });
+
+  TeacherInfo copyWith({
+    String? name,
+    String? dni,
+    String? photoUrl,
+    String? email,
+    String? idQr,
+    bool? isStaff,
+    String? phone,
+  }) {
+    return TeacherInfo(
+      name: name ?? this.name,
+      dni: dni ?? this.dni,
+      photoUrl: photoUrl ?? this.photoUrl,
+      email: email ?? this.email,
+      idQr: idQr ?? this.idQr,
+      isStaff: isStaff ?? this.isStaff,
+      phone: phone ?? this.phone,
+    );
+  }
 
   factory TeacherInfo.fromJson(Map<String, dynamic> json) {
     return TeacherInfo(
@@ -82,6 +104,7 @@ class TeacherInfo {
       email: json['email'],
       idQr: json['id_qr'] ?? json['rfid_uid'], // Map backend field
       isStaff: json['is_staff'] ?? false,
+      phone: json['celular'],
     );
   }
 }

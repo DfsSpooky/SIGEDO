@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 
 
-from ..models import Asistencia, BloqueHorario, Curso, Docente, Justificacion, TipoJustificacion
+from ..models import Asistencia, BloqueHorario, Curso, Docente, Justificacion, TipoJustificacion, RecuperacionClase
 from ..models.settings import ConfiguracionInstitucion
 
 class ConfiguracionInstitucionSerializer(serializers.ModelSerializer):
@@ -46,7 +46,7 @@ class DocenteInfoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Docente
-        fields = ["name", "dni", "photoUrl", "email", "is_staff"]
+        fields = ["name", "dni", "photoUrl", "email", "is_staff", "celular"]
 
 
 class CursoAsistenciaSerializer(serializers.ModelSerializer):
@@ -189,6 +189,22 @@ class RegistrarAsistenciaRfidSerializer(serializers.Serializer):
     uid = serializers.CharField(max_length=100)
 
 
+class MobileUpdateProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Docente
+        fields = ["email", "celular", "foto"]
+        extra_kwargs = {
+            "email": {"read_only": True}, # Email shouldn't be changed here easily
+            "foto": {"required": False},
+            "celular": {"required": False},
+        }
+
+    def update(self, instance, validated_data):
+        # Handle photo specifically if needed, but ModelSerializer handles it well usually
+        # If we receive a new photo, the old one is replaced.
+        return super().update(instance, validated_data)
+
+
 class MobileMarkAttendanceSerializer(serializers.Serializer):
     """
     Serializer para validar los datos de entrada al marcar una asistencia desde la App Móvil.
@@ -199,7 +215,9 @@ class MobileMarkAttendanceSerializer(serializers.Serializer):
         choices=["general_entry", "general_exit", "course_entry", "course_exit"]
     )
     courseId = serializers.IntegerField(required=False, allow_null=True)
-    photoBase64 = serializers.CharField()
+    photoBase64 = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    observation = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    photo = serializers.ImageField(required=False)  # New multipart field, allow_blank=True)
     latitude = serializers.FloatField(required=False, allow_null=True)
     longitude = serializers.FloatField(required=False, allow_null=True)
 
@@ -207,6 +225,9 @@ class MobileMarkAttendanceSerializer(serializers.Serializer):
         """
         Valida que el campo photoBase64 tenga el formato correcto de una imagen base64.
         """
+        if not value:
+            return None
+            
         try:
             format, imgstr = value.split(";base64,")
             ext = format.split("/")[-1]
@@ -217,3 +238,17 @@ class MobileMarkAttendanceSerializer(serializers.Serializer):
         except:
             raise serializers.ValidationError("Formato de photoBase64 inválido.")
         return value
+        
+class RecuperacionClaseSerializer(serializers.ModelSerializer):
+    curso_nombre = serializers.ReadOnlyField(source='curso.nombre')
+    estado_display = serializers.CharField(source='get_estado_display', read_only=True)
+
+    class Meta:
+        model = RecuperacionClase
+        fields = [
+            'id', 'curso', 'curso_nombre', 'fecha_a_recuperar', 
+            'fecha_propuesta', 'duracion_minutos', 'aula_solicitada', 
+            'motivo', 'estado', 'estado_display', 'observaciones', 'fecha_creacion'
+        ]
+        read_only_fields = ['id', 'estado', 'estado_display', 'observaciones', 'fecha_creacion']
+

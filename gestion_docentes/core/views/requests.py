@@ -2,8 +2,8 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 
-from ..forms import SolicitudIntercambioForm
-from ..models import Curso, SolicitudIntercambio
+from ..forms import SolicitudIntercambioForm, RecuperacionClaseForm
+from ..models import Curso, SolicitudIntercambio, RecuperacionClase
 
 
 @login_required
@@ -88,3 +88,23 @@ def responder_solicitud(request, solicitud_id):
         return redirect("ver_solicitudes")
 
     return render(request, "responder_solicitud.html", {"solicitud": solicitud})
+
+@login_required
+def ver_recuperaciones(request):
+    recuperaciones = RecuperacionClase.objects.filter(docente=request.user).order_by('-fecha_creacion')
+    return render(request, "ver_recuperaciones.html", {"recuperaciones": recuperaciones})
+
+@login_required
+def solicitar_recuperacion(request):
+    if request.method == "POST":
+        form = RecuperacionClaseForm(request.POST, docente=request.user)
+        if form.is_valid():
+            recuperacion = form.save(commit=False)
+            recuperacion.docente = request.user
+            recuperacion.save()
+            messages.success(request, "Solicitud de recuperación enviada correctamente.")
+            return redirect("ver_recuperaciones")
+    else:
+        form = RecuperacionClaseForm(docente=request.user)
+    
+    return render(request, "solicitar_recuperacion.html", {"form": form})

@@ -24,6 +24,7 @@ class Asistencia(models.Model):
     foto_salida = models.ImageField(
         upload_to="verificacion_cursos/salidas/%Y/%m/%d/", null=True, blank=True
     )
+    observacion_salida = models.TextField(null=True, blank=True)
     history = HistoricalRecords()
 
     class Meta:
@@ -203,5 +204,33 @@ class AdelantoClase(models.Model):
     def __str__(self):
         return f"Adelanto de {self.docente} - {self.curso} ({self.fecha})"
 
+class RecuperacionClase(models.Model):
+    ESTADOS = [
+        ("PENDIENTE", "Pendiente"),
+        ("APROBADO", "Aprobado"),
+        ("RECHAZADO", "Rechazado"),
+    ]
+
+    docente = models.ForeignKey("core.Docente", on_delete=models.CASCADE)
+    curso = models.ForeignKey("core.Curso", on_delete=models.CASCADE)
+    fecha_a_recuperar = models.DateField(help_text="Fecha de la clase que no se dictó o se dictará en otro momento")
+    fecha_propuesta = models.DateTimeField(help_text="Fecha y hora propuesta para la recuperación")
+    duracion_minutos = models.IntegerField(default=90, help_text="Duración en minutos")
+    aula_solicitada = models.ForeignKey(
+        "core.Aula", 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        help_text="Aula sugerida (opcional)"
+    )
+    motivo = models.TextField()
+    estado = models.CharField(max_length=20, choices=ESTADOS, default="PENDIENTE")
+    
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    observaciones = models.TextField(blank=True, help_text="Observaciones del administrador")
+
+    def __str__(self):
+        return f"Recuperación {self.curso} - {self.fecha_propuesta} ({self.estado})"
+
     class Meta:
-        unique_together = ["docente", "curso", "fecha"]
+        ordering = ["-fecha_creacion"]

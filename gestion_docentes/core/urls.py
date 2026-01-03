@@ -46,6 +46,11 @@ urlpatterns = [
         name="responder_solicitud",
     ),
     
+    
+    # --- Recuperación de Clases ---
+    path("recuperaciones/", views.ver_recuperaciones, name="ver_recuperaciones"),
+    path("recuperaciones/solicitar/", views.solicitar_recuperacion, name="solicitar_recuperacion"),
+    
     # --- Justificaciones ---
     path("justificaciones/", views.lista_justificaciones, name="lista_justificaciones"),
     path(

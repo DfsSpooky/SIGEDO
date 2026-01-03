@@ -1,6 +1,8 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
 
 import 'package:flutter/material.dart'; // MaterialPageRoute
 import '../main.dart'; // navigatorKey
@@ -19,6 +21,7 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   Future<void> initialize() async {
+    tz.initializeTimeZones();
     // 1. Request Permission
     NotificationSettings settings = await _firebaseMessaging.requestPermission(
       alert: true,
@@ -109,5 +112,33 @@ class NotificationService {
       platformChannelSpecifics,
       payload: message.data.toString(), // Pass data as payload
     );
+  }
+
+  Future<void> scheduleNotification({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime scheduledDate,
+  }) async {
+    await _localNotifications.zonedSchedule(
+      id,
+      title,
+      body,
+      tz.TZDateTime.from(scheduledDate, tz.local),
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'reminders_channel',
+          'Recordatorios',
+          channelDescription: 'Recordatorios de clases y asistencia',
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+      ),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+    );
+  }
+
+  Future<void> cancelAll() async {
+    await _localNotifications.cancelAll();
   }
 }

@@ -9,12 +9,15 @@ import '../services/biometric_service.dart';
 import '../utils/date_utils.dart';
 import '../services/config_service.dart';
 import '../models/config_model.dart';
+import '../services/notification_service.dart'; // Import NotificationService
 
 import '../services/websocket_service.dart';
 
 class AuthProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
-  final AuthService _authService = AuthService(); // Use AuthService
+  final AuthService _authService = AuthService();
+  final NotificationService _notificationService =
+      NotificationService(); // Instance
 
   bool _isAuthenticated = false;
   bool _isLoading = false;
@@ -91,6 +94,9 @@ class AuthProvider with ChangeNotifier {
         }
       });
 
+      // Programar Notificaciones Locales
+      _scheduleLocalNotifications();
+
       notifyListeners();
     } catch (e) {
       debugPrint("Error cargando dashboard: $e");
@@ -101,12 +107,83 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  void _scheduleLocalNotifications() async {
+    if (_teacherData == null) return;
+
+    await _notificationService.cancelAll();
+    final now = DateTime.now();
+
+    for (var course in _teacherData!.courses) {
+      // 1. Recordatorio 5 min antes de entrar
+      if (course.startTime != null && !course.entryMarked) {
+        final startDt = _parseToLocal(course.startTime!, now);
+        if (startDt != null) {
+          final scheduledTime = startDt.subtract(const Duration(minutes: 5));
+          if (scheduledTime.isAfter(now)) {
+            _notificationService.scheduleNotification(
+              id: course.id * 100 + 1,
+              title: "Clase por iniciar",
+              body:
+                  "Tu clase de ${course.name} comienza en 5 minutos en el aula ${course.classroom ?? 'S/N'}.",
+              scheduledDate: scheduledTime,
+            );
+            debugPrint(
+              "Scheduled Entry Notification for ${course.name} at $scheduledTime",
+            );
+          }
+        }
+      }
+
+      // 2. Recordatorio 15 min después de SALIR (si olvidó marcar)
+      // Ojo: Esto asume que la clase terminó y no marcó salida.
+      if (course.endTime != null && !course.exitMarked) {
+        final endDt = _parseToLocal(course.endTime!, now);
+        if (endDt != null) {
+          final scheduledTime = endDt.add(const Duration(minutes: 15));
+          // Solo programar si todavía no ha pasado ese momento (o si estamos dentro del rango razonable?)
+          // Si ya pasó hace 3 horas, no queremos notificar ahora.
+          // Pero si estamos ANTES de endDt+15, lo programamos.
+          if (scheduledTime.isAfter(now)) {
+            _notificationService.scheduleNotification(
+              id: course.id * 100 + 2,
+              title: "¿Marcaste tu salida?",
+              body:
+                  "La clase de ${course.name} terminó hace 15 minutos. No olvides registrar tu salida.",
+              scheduledDate: scheduledTime,
+            );
+            debugPrint(
+              "Scheduled Exit Notification for ${course.name} at $scheduledTime",
+            );
+          }
+        }
+      }
+    }
+  }
+
+  DateTime? _parseToLocal(String timeStr, DateTime referenceDate) {
+    try {
+      final parts = timeStr.split(':');
+      final h = int.parse(parts[0]);
+      final m = int.parse(parts[1]);
+      return DateTime(
+        referenceDate.year,
+        referenceDate.month,
+        referenceDate.day,
+        h,
+        m,
+      );
+    } catch (e) {
+      return null;
+    }
+  }
+
   Future<void> markAttendance(
     String actionType,
-    File photo,
     int? courseId, {
+    File? photo,
     double? latitude,
     double? longitude,
+    String? observation,
   }) async {
     try {
       await _apiService.markAttendance(
@@ -115,6 +192,7 @@ class AuthProvider with ChangeNotifier {
         courseId: courseId,
         latitude: latitude,
         longitude: longitude,
+        observation: observation,
       );
 
       // Actualizar estado local INMEDIATAMENTE para feedback visual rápido
@@ -168,6 +246,10 @@ class AuthProvider with ChangeNotifier {
   }
 
   // --- Justificaciones ---
+  Future<List<dynamic>> getJustifications() async {
+    return await _apiService.getJustifications();
+  }
+
   Future<List<JustificationType>> getJustificationTypes() async {
     return await _apiService.getJustificationTypes();
   }
@@ -223,6 +305,50 @@ class AuthProvider with ChangeNotifier {
     if (credentials == null) return false;
 
     return await login(credentials['username']!, credentials['password']!);
+  }
+
+  // --- Recuperación de Clases ---
+  Future<List<dynamic>> getRecoveryRequests() async {
+    return await _apiService.getRecoveryRequests();
+  }
+
+  Future<void> createRecoveryRequest({
+    required int courseId,
+    required DateTime dateToRecover,
+    required DateTime proposedDate,
+    required int durationMinutes,
+    required String reason,
+  }) async {
+    await _apiService.createRecoveryRequest(
+      courseId: courseId,
+      dateToRecover: dateToRecover,
+      proposedDate: proposedDate,
+      durationMinutes: durationMinutes,
+      reason: reason,
+    );
+  }
+
+  // --- Perfil ---
+  Future<void> updateProfile({String? phone, File? photo}) async {
+    try {
+      final response = await _apiService.updateProfile(
+        phone: phone,
+        photo: photo,
+      );
+
+      if (_teacherData != null && response['status'] == 'success') {
+        final data = response['data'];
+        _teacherData = _teacherData!.copyWith(
+          teacher: _teacherData!.teacher.copyWith(
+            phone: data['celular'],
+            photoUrl: data['foto'],
+          ),
+        );
+        notifyListeners();
+      }
+    } catch (e) {
+      rethrow;
+    }
   }
 
   // --- WebSocket Integration ---

@@ -1,4 +1,4 @@
-import 'dart:convert';
+// import 'dart:convert'; // Removed unused import
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
@@ -37,25 +37,32 @@ class ApiService {
 
   Future<void> markAttendance({
     required String actionType,
-    required File photoFile,
+    File? photoFile, // Changed to optional
     int? courseId,
     double? latitude,
     double? longitude,
+    String? observation, // New field
   }) async {
-    List<int> imageBytes = await photoFile.readAsBytes();
-    String base64Image = base64Encode(imageBytes);
-    String formattedBase64 = "data:image/jpeg;base64,$base64Image";
-
-    final data = {
+    final formData = FormData.fromMap({
       "actionType": actionType,
-      "photoBase64": formattedBase64,
       "courseId": courseId,
       "latitude": latitude,
       "longitude": longitude,
-    };
+      "observation": observation,
+    });
+
+    if (photoFile != null) {
+      String fileName = photoFile.path.split('/').last;
+      formData.files.add(
+        MapEntry(
+          "photo",
+          await MultipartFile.fromFile(photoFile.path, filename: fileName),
+        ),
+      );
+    }
 
     try {
-      await _dio.post(AppConstants.attendanceEndpoint, data: data);
+      await _dio.post(AppConstants.attendanceEndpoint, data: formData);
     } on DioException catch (e) {
       if (e.response != null && e.response!.data is Map) {
         final msg = e.response!.data['message'];
@@ -63,7 +70,7 @@ class ApiService {
           throw Exception(msg);
         }
       }
-      throw e;
+      rethrow;
     }
   }
 
@@ -92,6 +99,13 @@ class ApiService {
   }
 
   // --- Justificaciones ---
+
+  Future<List<dynamic>> getJustifications() async {
+    final response = await _dio.get(
+      '${AppConstants.baseUrl}/api/justificaciones/',
+    );
+    return response.data;
+  }
 
   Future<List<JustificationType>> getJustificationTypes() async {
     final response = await _dio.get(
@@ -236,6 +250,91 @@ class ApiService {
     } catch (e) {
       debugPrint("Error fetching history: $e");
       return [];
+    }
+  }
+
+  // --- Recuperación de Clases ---
+
+  Future<List<dynamic>> getRecoveryRequests() async {
+    try {
+      final response = await _dio.get(
+        '${AppConstants.baseUrl}/api/mobile/recuperacion-clase/',
+      );
+      return response.data;
+    } catch (e) {
+      debugPrint("Error fetching recovery requests: $e");
+      return [];
+    }
+  }
+
+  Future<void> createRecoveryRequest({
+    required int courseId,
+    required DateTime dateToRecover,
+    required DateTime proposedDate,
+    required int durationMinutes,
+    required String reason,
+    int? classroomId,
+  }) async {
+    final data = {
+      "curso": courseId,
+      "fecha_a_recuperar": dateToRecover.toIso8601String().split('T')[0],
+      "fecha_propuesta": proposedDate.toIso8601String(),
+      "duracion_minutos": durationMinutes,
+      "motivo": reason,
+      "aula_solicitada": classroomId,
+    };
+    await _dio.post(
+      '${AppConstants.baseUrl}/api/mobile/recuperacion-clase/',
+      data: data,
+    );
+  }
+
+  // --- Perfil ---
+
+  Future<Map<String, dynamic>> updateProfile({
+    String? phone,
+    File? photo,
+  }) async {
+    final token = await _storage.read(key: 'access_token');
+    if (token == null) {
+      throw Exception('No se encontró token de autenticación');
+    }
+
+    try {
+      final formData = FormData();
+
+      if (phone != null) {
+        formData.fields.add(MapEntry('celular', phone));
+      }
+
+      if (photo != null) {
+        formData.files.add(
+          MapEntry(
+            'foto',
+            await MultipartFile.fromFile(
+              photo.path,
+              filename: photo.path.split('/').last,
+            ),
+          ),
+        );
+      }
+
+      final response = await _dio.patch(
+        '${AppConstants.baseUrl}/api/mobile/profile/update/',
+        data: formData,
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'multipart/form-data',
+          },
+        ),
+      );
+
+      return response.data;
+    } on DioException catch (e) {
+      throw Exception(
+        e.response?.data['message'] ?? 'Error al actualizar perfil',
+      );
     }
   }
 }

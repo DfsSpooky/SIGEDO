@@ -41,8 +41,8 @@ class MyApp extends StatelessWidget {
             navigatorKey: navigatorKey, // Add navigatorKey
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
-            themeMode: themeProvider.themeMode, // Use dynamic theme mode
+            // darkTheme removed
+            themeMode: ThemeMode.light, // Forced Light Mode
             home: const SplashScreen(),
           );
         },

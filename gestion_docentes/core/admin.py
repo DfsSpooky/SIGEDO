@@ -14,6 +14,7 @@ from .models import (
     Administrador,
     Anuncio,
     Asistencia,
+    Aula,
     AsistenciaDiaria,
     Carrera,
     ConfiguracionInstitucion,
@@ -34,6 +35,7 @@ from .models import (
     TipoDocumento,
     TipoJustificacion,
     VersionDocumento,
+    RecuperacionClase,
 )
 
 # --- CONFIGURACIÓN DE ADMINS ---
@@ -363,6 +365,22 @@ class DiaEspecialAdmin(ModelAdmin):
         return format_html(f'<a href="{change_url}" class="button">Editar</a>')
 
 
+@admin.register(Aula)
+class AulaAdmin(ModelAdmin):
+    list_display = ("nombre", "ubicacion", "es_laboratorio", "acciones")
+    list_display_links = None
+    search_fields = ("nombre", "ubicacion")
+    search_as_command = True
+    list_filter = ("es_laboratorio",)
+
+    @admin.display(description="Acciones")
+    def acciones(self, obj):
+        change_url = reverse(
+            f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change", args=[obj.pk]
+        )
+        return format_html(f'<a href="{change_url}" class="button">Editar</a>')
+
+
 @admin.register(FranjaHoraria)
 class FranjaHorariaAdmin(ModelAdmin):
     list_display = ("__str__", "turno", "hora_inicio", "hora_fin", "acciones")
@@ -597,6 +615,79 @@ class JustificacionAdmin(ModelAdmin):
             obj.revisado_por = request.user
             obj.fecha_revision = timezone.now()
         super().save_model(request, obj, form, change)
+
+    @admin.display(description="Acciones")
+    def acciones(self, obj):
+        change_url = reverse(
+            f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change", args=[obj.pk]
+        )
+        return format_html(f'<a href="{change_url}" class="button">Revisar</a>')
+
+
+@admin.register(RecuperacionClase)
+class RecuperacionClaseAdmin(ModelAdmin):
+    list_display = (
+        "docente",
+        "curso",
+        "fecha_a_recuperar",
+        "fecha_propuesta",
+        "display_estado",
+        "acciones",
+    )
+    list_display_links = None
+    list_filter = ("estado", "fecha_propuesta")
+    search_fields = ("docente__first_name", "docente__last_name", "curso__nombre")
+    search_as_command = True
+    ordering = ("-fecha_creacion",)
+    autocomplete_fields = ["docente", "curso", "aula_solicitada"]
+    
+    fieldsets = (
+        (
+            "Detalles de la Solicitud",
+            {
+                "classes": ("tab",),
+                "fields": (
+                    "docente",
+                    "curso",
+                    "fecha_a_recuperar",
+                    "motivo",
+                ),
+            },
+        ),
+        (
+            "Propuesta de Recuperación",
+            {
+                "classes": ("tab",),
+                "fields": (
+                    "fecha_propuesta",
+                    "duracion_minutos",
+                    "aula_solicitada",
+                ),
+            },
+        ),
+        (
+            "Revisión Administrativa",
+            {
+                "classes": ("tab",),
+                "fields": (
+                    "estado",
+                    "observaciones",
+                ),
+            },
+        ),
+    )
+
+    @admin.display(description="Estado", ordering="estado")
+    def display_estado(self, obj):
+        colors = {
+            "PENDIENTE": "bg-yellow-500",
+            "APROBADO": "bg-green-500",
+            "RECHAZADO": "bg-red-500",
+        }
+        color = colors.get(obj.estado, "bg-gray-400")
+        return format_html(
+            f'<span class="px-2 py-1 text-xs font-semibold text-white rounded-full {color}">{obj.get_estado_display()}</span>'
+        )
 
     @admin.display(description="Acciones")
     def acciones(self, obj):

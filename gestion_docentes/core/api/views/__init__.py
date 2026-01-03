@@ -11,6 +11,8 @@ from .mobile import (
     MobileDirectorAttendanceView,
     MobileDirectorStatsView,
     MobileAttendanceHistoryView,
+    MobileUpdateProfileView,
+    MobileRecuperacionClaseView,
 )
 from .notifications import (
     marcar_notificacion_como_leida,

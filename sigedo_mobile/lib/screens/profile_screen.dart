@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart'; // Import Google Fonts
 import '../providers/auth_provider.dart';
-import '../providers/theme_provider.dart';
+// import theme_provider removed
 import 'login_screen.dart';
+import 'recovery_screen.dart';
+import 'justification_screen.dart';
+import 'package:image_picker/image_picker.dart'; // Import ImagePicker
+import 'dart:io'; // Import File
+import '../utils/image_utils.dart'; // Import ImageUtils
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -64,9 +69,138 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  Future<void> _showEditProfileDialog(BuildContext context, teacher) async {
+    final phoneController = TextEditingController(text: teacher?.phone ?? '');
+    File? newPhoto;
+    final picker = ImagePicker();
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: Text(
+              "Editar Perfil",
+              style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GestureDetector(
+                    onTap: () async {
+                      final XFile? image = await picker.pickImage(
+                        source: ImageSource.gallery,
+                      );
+                      if (image != null) {
+                        final File originalFile = File(image.path);
+
+                        // Optimizar imagen
+                        // Assuming ImageUtils is defined elsewhere or imported
+                        final compressedFile = await ImageUtils.compressImage(
+                          originalFile,
+                        );
+
+                        // Usar comprimida si éxito, sino original
+                        setState(
+                          () => newPhoto = compressedFile ?? originalFile,
+                        );
+                      }
+                    },
+                    child: CircleAvatar(
+                      radius: 50,
+                      backgroundColor: Colors.grey[200],
+                      backgroundImage: newPhoto != null
+                          ? FileImage(newPhoto!)
+                          : (teacher?.photoUrl != null
+                                    ? NetworkImage(teacher!.photoUrl!)
+                                    : null)
+                                as ImageProvider?,
+                      child: newPhoto == null && teacher?.photoUrl == null
+                          ? const Icon(Icons.camera_alt, size: 40)
+                          : Stack(
+                              children: [
+                                if (newPhoto != null ||
+                                    teacher?.photoUrl != null)
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.black38,
+                                      borderRadius: BorderRadius.circular(50),
+                                    ),
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.edit,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  TextFormField(
+                    controller: phoneController,
+                    decoration: InputDecoration(
+                      labelText: "Celular",
+                      prefixIcon: const Icon(Icons.phone),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    keyboardType: TextInputType.phone,
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text("Cancelar"),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  try {
+                    await Provider.of<AuthProvider>(
+                      context,
+                      listen: false,
+                    ).updateProfile(
+                      phone: phoneController.text,
+                      photo: newPhoto,
+                    );
+                    if (ctx.mounted) {
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("Perfil actualizado correctamente"),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (ctx.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text("Error: $e"),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
+                },
+                child: const Text("Guardar"),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
+    // final themeProvider = Provider.of<ThemeProvider>(context); // Unused
+    // final themeProvider removed
     final authProvider = Provider.of<AuthProvider>(context);
     final teacher = authProvider.teacherData?.teacher;
 
@@ -188,20 +322,48 @@ class ProfileScreen extends StatelessWidget {
                 children: [
                   _buildSectionTitle("Preferencias"),
                   const SizedBox(height: 10),
+
+                  // Dark Mode Switch Removed
+                  // _buildSettingsTile(
+                  //   icon: Icons.dark_mode_outlined,
+                  //   ...
+                  // ),
+                  const SizedBox(height: 30),
+                  _buildSectionTitle("Trámites"),
+                  const SizedBox(height: 10),
                   _buildSettingsTile(
-                    icon: Icons.dark_mode_outlined,
-                    iconColor: Colors.purple,
-                    title: "Modo Oscuro",
-                    subtitle: "Cambiar apariencia de la app",
-                    trailing: Switch(
-                      value: themeProvider.isDarkMode,
-                      activeThumbColor: const Color(0xFF4F46E5),
-                      onChanged: (val) => themeProvider.toggleTheme(val),
+                    icon: Icons.restore_page,
+                    iconColor: Colors.orangeAccent,
+                    title: "Recuperación de Clases",
+                    subtitle: "Solicitar y ver estado",
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const RecoveryScreen()),
                     ),
                   ),
-
+                  const SizedBox(height: 10),
+                  _buildSettingsTile(
+                    icon: Icons.assignment_late_outlined,
+                    iconColor: Colors.teal,
+                    title: "Justificar Inasistencia",
+                    subtitle: "Adjuntar certificados médicos",
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const JustificationScreen(),
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 30),
                   _buildSectionTitle("Cuenta"),
+                  const SizedBox(height: 10),
+                  _buildSettingsTile(
+                    icon: Icons.edit,
+                    iconColor: Colors.blueAccent,
+                    title: "Editar Perfil",
+                    subtitle: "Actualizar foto y celular",
+                    onTap: () => _showEditProfileDialog(context, teacher),
+                  ),
                   const SizedBox(height: 10),
                   _buildSettingsTile(
                     icon: Icons.info_outline,
