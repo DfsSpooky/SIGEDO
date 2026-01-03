@@ -26,5 +26,6 @@ from .schedules import (
     planificador_horarios,
     ver_horarios,
     vista_publica_horarios,
+    ver_horario_docente_admin,
 )
 from .utils import remove_accents

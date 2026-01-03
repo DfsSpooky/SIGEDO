@@ -256,3 +256,110 @@ def calendario_view(request):
         "semestre_activo": semestre_activo,
     }
     return render(request, "calendario.html", context)
+
+
+@staff_member_required
+def ver_horario_docente_admin(request, docente_id):
+    from ..models import Docente  # Import local to avoid circular deps if any
+
+    docente = get_object_or_404(Docente, pk=docente_id)
+    semestre_activo = Semestre.objects.filter(estado="ACTIVO").first()
+
+    # Obtener Bloques (Clases)
+    bloques_clase = BloqueHorario.objects.filter(
+        curso__docente=docente,
+        curso__semestre=semestre_activo
+    ).select_related('curso', 'franja_inicio', 'aula')
+
+    # Obtener Bloques No Lectivos
+    bloques_no_lectivos = BloqueNoLectivo.objects.filter(
+        docente=docente,
+        # Filtro de semestre opcional si BloqueNoLectivo tuviera, por ahora filtramos por vigencia si aplica
+        # Ojo: BloqueNoLectivo se define por día de semana génerico, así que asumimos vigencia actual
+    ).select_related('franja_inicio')
+
+    # Construir Grid
+    # Estructura: grid[franja_id][dia] = {'tipo': 'CLASE'|'NO_LECTIVO', 'titulo': ..., 'duracion': ...}
+    
+    franjas = list(FranjaHoraria.objects.order_by("hora_inicio"))
+    dias_semana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
+    
+    grid = {f.id: {d: None for d in dias_semana} for f in franjas}
+
+    # Helper para asignar al grid
+    def asignar_al_grid(bloque, tipo):
+        try:
+            franja_id = bloque.franja_inicio.id
+            dia = bloque.dia
+            duracion = bloque.duracion_bloques
+            
+            # Base data
+            data = {
+                'tipo': tipo,
+                'duracion': duracion,
+                'obj': bloque
+            }
+            
+            if tipo == 'CLASE':
+                data['titulo'] = bloque.curso.nombre
+                data['aula'] = bloque.aula.nombre if bloque.aula else "Sin Aula"
+            elif tipo == 'NO_LECTIVO':
+                data['titulo'] = bloque.motivo
+                data['aula'] = "-"
+
+            # Asignar a celda inicio
+            grid[franja_id][dia] = data
+            
+            # Marcar celdas ocupadas por duración > 1
+            if duracion > 1:
+                start_index = franjas.index(bloque.franja_inicio)
+                for i in range(1, duracion):
+                    if start_index + i < len(franjas):
+                        f_ocupada = franjas[start_index + i]
+                        # Marcar como ocupado por span (None o string especial, el template manejará el span)
+                        # Pero para el template con rowspan, las celdas cubiertas NO deben renderizarse o estar vacías/ocultas.
+                        # En CSS Grid con rowspan, simplemente no ponermos nada en las celdas cubiertas si el HTML estructura lo maneja,
+                        # pero mi lógica de template itera celdas.
+                        # Mi template propuesto dice: {% if bloque.duracion > 1 %} style="grid-row: span ..." {% endif %}
+                        # Eso implica que el elemento DIV cubre el espacio.
+                        # IMPORTANTE: Si usamos CSS Grid puro con celdas explicitas, necesitamos saltar las celdas cubiertas o ponerles "hidden".
+                        # En el template propuesto user:
+                        # {% with bloque=grid|get_item:franja.id|get_item:dia %} ...
+                        # Si devuelve None se renderiza vacío.
+                        # Si devuelve un objeto, se renderiza.
+                        # Si es una celda cubierta por un rowspan anterior, grid[...] debería ser un marcador especial para NO renderizar nada?
+                        # O mejor, si es cubierta, grid[...] = None?
+                        # No, si es None, renderiza hueco vacío.
+                        # Si es ocupada, necesitamos saberlo para NO pintar un hueco vacío si el span ya lo cubre visualmente?
+                        # CSS Grid autoplacement es tricky.
+                        # El template propuesto usa celdas explicitas en un grid de columnas predefinidas?
+                        # <div class="grid grid-cols-[auto_repeat(5,1fr)] ...">
+                        #    Header...
+                        #    Iteración Franjas:
+                        #       Iteración Días:
+                        #           Cell ...
+                        # Si una celda tiene rowspan 2, ocupará visualmente la siguiente fila.
+                        # La siguiente fila, en esa columna, intentará poner otra celda. 
+                        # Si ponemos un <div> ahí, Grid intentará ubicarlo en el siguiente hueco disponible? No necesariamente.
+                        # Si usamos Grid Area o posicionamiento explicito sí.
+                        # Pero con "grid-flow-row dense" o simple flow, poner un div extra empujará todo.
+                        # SOLUCIÓN: Usar "display: contents" o simplemente NO renderizar el div si está cubierto.
+                        # Pondremos un marcador 'SPAN_COVERED'
+                        grid[f_ocupada.id][dia] = 'SPAN_COVERED'
+                        
+        except (ValueError, IndexError, AttributeError):
+            pass
+
+    for b in bloques_clase:
+        asignar_al_grid(b, 'CLASE')
+        
+    for b in bloques_no_lectivos:
+        asignar_al_grid(b, 'NO_LECTIVO')
+
+    context = {
+        'docente': docente,
+        'franjas': franjas,
+        'dias_semana': dias_semana,
+        'grid': grid
+    }
+    return render(request, "admin/ver_horario_docente.html", context)

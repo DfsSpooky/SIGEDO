@@ -240,65 +240,63 @@ class BloqueHorario(models.Model):
             # La validación de campos obligatorios se hace en otra parte.
             return
 
-        # 1. Validar conflicto de Docente
+        # 1-4. Validación Unificada de Cruces (Q Objects Optimization)
+        # ---------------------------------------------------------------------
+        from django.db.models import Q
+
+        # Condiciones base: Mismo día, y superposición de horario (Start < End2 AND End > Start2)
+        q_superposicion = Q(dia=self.dia) & Q(horario_inicio__lt=end_time) & Q(horario_fin__gt=start_time)
+
+        # Filtros específicos (se aplican solo si el campo no es nulo)
+        q_docente = Q()
         if self.curso.docente:
-            conflicto_docente = (
-                BloqueHorario.objects.filter(
-                    curso__docente=self.curso.docente,
-                    dia=self.dia,
-                    horario_inicio__lt=end_time,
-                    horario_fin__gt=start_time,
-                )
-                .exclude(pk=self.pk)
-                .first()
-            )
+            q_docente = Q(curso__docente=self.curso.docente)
 
-            if conflicto_docente:
-                raise ValidationError(
-                    f"El docente {self.curso.docente} ya tiene clase asignada en este horario ({conflicto_docente.curso})."
-                )
-
-        # 2. Validar conflicto de Grupo + Semestre (Estudiantes)
-        # Iterar sobre todas las especialidades asociadas al curso
-        if self.curso.pk:  # Solo si el curso ya está guardado (tiene especialidades)
-            for especialidad in self.curso.especialidades.all():
-                if especialidad.grupo:
-                    conflicto_grupo = (
-                        BloqueHorario.objects.filter(
-                            curso__especialidades__grupo=especialidad.grupo,
-                            curso__semestre_cursado=self.curso.semestre_cursado,
-                            dia=self.dia,
-                            horario_inicio__lt=end_time,
-                            horario_fin__gt=start_time,
-                        )
-                        .exclude(pk=self.pk)
-                        .first()
-                    )
-
-                    if conflicto_grupo:
-                        raise ValidationError(
-                            f"El Grupo {especialidad.grupo} (Semestre {self.curso.semestre_cursado}) de la especialidad {especialidad.nombre} ya tiene clase asignada en este horario ({conflicto_grupo.curso})."
-                        )
-
-        # 3. Validar conflicto de Aula
+        q_aula = Q()
         if self.aula:
-            conflicto_aula = (
-                BloqueHorario.objects.filter(
-                    aula=self.aula,
-                    dia=self.dia,
-                    horario_inicio__lt=end_time,
-                    horario_fin__gt=start_time,
+            q_aula = Q(aula=self.aula)
+
+        q_grupo = Q()
+        if self.curso.pk:
+            # Obtenemos los grupos de las especialidades de este curso
+            grupos_ids = list(self.curso.especialidades.values_list('grupo__id', flat=True))
+            # Omitimos None si hubiera
+            grupos_ids = [gid for gid in grupos_ids if gid is not None]
+
+            if grupos_ids:
+                # Conflicto si:
+                # 1. El curso conflicto tiene alguna especialidad en uno de MIS grupos
+                # 2. Y es del MISMO semestre (si asumimos que un grupo cursa todo junto el semestre)
+                q_grupo = Q(
+                    curso__especialidades__grupo__id__in=grupos_ids,
+                    curso__semestre_cursado=self.curso.semestre_cursado
                 )
-                .exclude(pk=self.pk)
-                .first()
+
+        # Consulta unificada: Buscar cualquier bloque que cumpla (Superposición) Y (MismoDocente O MismoAula O MismoGrupo)
+        # Excluimos el propio bloque si ya existe (edición)
+        conflicto = BloqueHorario.objects.filter(
+            q_superposicion & (q_docente | q_aula | q_grupo)
+        ).exclude(pk=self.pk).select_related('curso', 'curso__docente', 'aula').first()
+
+        if conflicto:
+            # Determinamos cuál fue la causa para dar un mensaje error específico
+            if self.curso.docente and conflicto.curso.docente == self.curso.docente:
+                 raise ValidationError(
+                    f"El docente {self.curso.docente} ya tiene clase asignada en este horario ({conflicto.curso})."
+                )
+
+            if self.aula and conflicto.aula == self.aula:
+                 raise ValidationError(
+                    f"El aula {self.aula} ya está ocupada en este horario ({conflicto.curso})."
+                )
+
+            # Si llegamos aquí y hay conflicto, asumimos que fue por grupo (ya que las otras dos condiciones fallaron o no aplicaban)
+            # Podríamos refinar la verificación si fuera necesario, pero esto cubre el 99%
+            raise ValidationError(
+                 f"Conflicto de Grupo: Los estudiantes del semestre {self.curso.semestre_cursado} ya tienen clase ({conflicto.curso})."
             )
 
-            if conflicto_aula:
-                raise ValidationError(
-                    f"El aula {self.aula} ya está ocupada en este horario ({conflicto_aula.curso})."
-                )
-
-        # 4. Validar conflicto con Bloques No Lectivos
+        # Validación Extra: Bloques No Lectivos (Docente)
         if self.curso.docente:
             conflicto_no_lectivo = BloqueNoLectivo.objects.filter(
                 docente=self.curso.docente,

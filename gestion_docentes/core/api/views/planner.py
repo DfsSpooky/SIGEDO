@@ -3,7 +3,8 @@ import random
 from collections import defaultdict
 from datetime import datetime  # <--- NUEVO IMPORT
 
-from django.shortcuts import render # <--- NUEVO IMPORT
+from django.shortcuts import render
+from django.http import JsonResponse
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
@@ -25,6 +26,53 @@ from core.utils.responses import (
     server_error_response,
     success_response,
 )
+
+
+def calcular_puntaje(docente_id, dia, franja_idx, duracion, carga_docente_dia, docente_occupied_indices):
+    """
+    Calcula un puntaje para una asignación candidata. Menor puntaje es mejor.
+    Reglas:
+    1. Continuidad (-50 pts): Si es adyacente a un bloque existente.
+    2. Huecos (+10 pts/hora): Si deja espacios vacíos.
+    3. Dispersión (+5 pts): Si abre un día nuevo innecesariamente.
+    """
+    score = 0
+    
+    # Si no hay identificador de docente, es un "N/A", asignación aleatoria (score 0 base)
+    if not docente_id:
+        return 0
+
+    indices_ocupados = docente_occupied_indices[docente_id][dia]
+    
+    # Regla 2 y 1: Huecos y Continuidad
+    if indices_ocupados:
+        min_dist_bloque = float('inf')
+        # El bloque candidato ocupa desde franja_idx hasta franja_idx + duracion - 1
+        # Buscamos la distancia con los bloques ya ocupados
+        
+        # Simplificación: Distancia mínima entre el final de uno y el inicio de otro
+        # Como occupied_indices es un set de indices individuales, iteramos.
+        
+        candidatos_indices = set(range(franja_idx, franja_idx + duracion))
+        
+        for occ in indices_ocupados:
+            for cand in candidatos_indices:
+                dist = abs(occ - cand) - 1
+                if dist < min_dist_bloque:
+                    min_dist_bloque = dist
+        
+        # dist = 0 significa adyacente (e.g. ocupa 2, candidato 3 -> abs(2-3)-1 = 0)
+        # dist = -1 significa superposición (ya filtrado antes, no debería pasar)
+        if min_dist_bloque <= 0:
+            score -= 50 # Bonificación fuerte por continuidad
+        else:
+            score += min_dist_bloque * 10 # Penalización por huecos
+            
+    # Regla 3: Dispersión (Evitar abrir dias nuevos si no es necesario)
+    if carga_docente_dia == 0:
+        score += 5
+        
+    return score
 
 
 @staff_member_required
@@ -751,17 +799,21 @@ def generar_horario_automatico(request):
                     random.shuffle(dias_semana_ordenados)
 
                 while horas_pendientes > 0:
-                    bloque_asignado_en_iteracion = False
                     duracion_a_intentar = next(
                         (d for d in posibles_duraciones if d <= horas_pendientes), None
                     )
                     if not duracion_a_intentar:
                         break
 
-                    for dia in dias_semana_ordenados:
+                    # --- NUEVA LÓGICA: Score-based ---
+                    candidatos = []
+
+                    for dia in dias_semana: # Iteramos todos los días, el filtro de orden preferencia lo hace el score (dispersión)
+                        # Validar límites diarios
                         if docente and carga_docente[docente.id][dia] + duracion_a_intentar > 8:
                             continue
 
+                        # Validar límite de grupo para CADA grupo asociado
                         grupo_excede_limite = False
                         if semestre_cursado:
                             for grupo in grupos:
@@ -772,14 +824,15 @@ def generar_horario_automatico(request):
                         if grupo_excede_limite:
                             continue
 
+                        # Buscar en todas las franjas posibles
                         for i in range(len(franjas_horarias) - duracion_a_intentar + 1):
                             franja_inicio = franjas_horarias[i]
-                            franjas_del_bloque = franjas_horarias[
-                                i : i + duracion_a_intentar
-                            ]
+                            franjas_del_bloque = franjas_horarias[i : i + duracion_a_intentar]
 
+                            # Validaciones Dura (Hard Constraints)
                             bloque_valido = True
                             for franja in franjas_del_bloque:
+                                # Disponibilidad Docente
                                 if (
                                     docente.disponibilidad == "MANANA"
                                     and franja.turno != "MANANA"
@@ -789,13 +842,13 @@ def generar_horario_automatico(request):
                                 ):
                                     bloque_valido = False
                                     break
-
-                                if (docente.id, dia, franja.id) in horarios_ocupados[
-                                    "docente"
-                                ]:
+                                
+                                # Ocupación Docente
+                                if (docente.id, dia, franja.id) in horarios_ocupados["docente"]:
                                     bloque_valido = False
                                     break
 
+                                # Ocupación Grupo
                                 if semestre_cursado:
                                     for grupo in grupos:
                                         if (
@@ -808,41 +861,62 @@ def generar_horario_automatico(request):
                                             break
                                     if not bloque_valido:
                                         break
-
-                            if not bloque_valido:
-                                continue
-
-                            BloqueHorario.objects.create(
-                                curso=curso,
-                                dia=dia,
-                                franja_inicio=franja_inicio,
-                                duracion_bloques=duracion_a_intentar,
-                            )
-
-                            if docente:
-                                 carga_docente[docente.id][dia] += duracion_a_intentar
-                            if semestre_cursado:
-                                for grupo in grupos:
-                                    key_grupo = (grupo.id, semestre_cursado)
-                                    carga_grupo[key_grupo][dia] += duracion_a_intentar
-
-                            for franja in franjas_del_bloque:
-                                horarios_ocupados["docente"].add(
-                                    (docente.id, dia, franja.id)
+                            
+                            if bloque_valido:
+                                # Si pasa las restricciones, calculamos puntaje
+                                score = calcular_puntaje(
+                                    docente.id, 
+                                    dia, 
+                                    i, # Franja index 
+                                    duracion_a_intentar, 
+                                    carga_docente[docente.id][dia], 
+                                    docente_occupied_indices
                                 )
-                                if semestre_cursado:
-                                    for grupo in grupos:
-                                        horarios_ocupados["grupo"].add(
-                                            (grupo.id, semestre_cursado, dia, franja.id)
-                                        )
+                                candidatos.append({
+                                    'dia': dia,
+                                    'franja_inicio': franja_inicio,
+                                    'franja_index': i,
+                                    'score': score
+                                })
 
-                            horas_pendientes -= duracion_a_intentar
-                            bloque_asignado_en_iteracion = True
-                            break
-                        if bloque_asignado_en_iteracion:
-                            break
+                    # Seleccionar el mejor candidato
+                    if candidatos:
+                        # Ordenar por score ascendente (menor es mejor)
+                        candidatos.sort(key=lambda x: x['score'])
+                        mejor_opcion = candidatos[0]
+                        
+                        dia_elegido = mejor_opcion['dia']
+                        franja_inicio_elegida = mejor_opcion['franja_inicio']
+                        
+                        BloqueHorario.objects.create(
+                            curso=curso,
+                            dia=dia_elegido,
+                            franja_inicio=franja_inicio_elegida,
+                            duracion_bloques=duracion_a_intentar,
+                        )
 
-                    if not bloque_asignado_en_iteracion:
+                        # Actualizar Estructuras de Tracking
+                        franja_idx_elegida = mejor_opcion['franja_index']
+                        
+                        if docente:
+                            carga_docente[docente.id][dia_elegido] += duracion_a_intentar
+                            for idx_offset in range(duracion_a_intentar):
+                                franja_actual = franjas_horarias[franja_idx_elegida + idx_offset]
+                                horarios_ocupados["docente"].add((docente.id, dia_elegido, franja_actual.id))
+                                docente_occupied_indices[docente.id][dia_elegido].add(franja_idx_elegida + idx_offset)
+
+                        if semestre_cursado:
+                            for grupo in grupos:
+                                key_grupo = (grupo.id, semestre_cursado)
+                                carga_grupo[key_grupo][dia_elegido] += duracion_a_intentar
+                                for idx_offset in range(duracion_a_intentar):
+                                    franja_actual = franjas_horarias[franja_idx_elegida + idx_offset]
+                                    horarios_ocupados["grupo"].add((grupo.id, semestre_cursado, dia_elegido, franja_actual.id))
+
+                        horas_pendientes -= duracion_a_intentar
+                    else:
+                        # No se encontró espacio para este bloque (Backtracking idealmente, pero por ahora break)
+                        cursos_no_asignados_completamente.append(curso.nombre)
                         break
 
                 if horas_pendientes == 0:
@@ -869,6 +943,198 @@ def generar_horario_automatico(request):
         import traceback
         traceback.print_exc()
         return server_error_response(f"Ocurrió un error inesperado: {e}")
+
+
+
+@staff_member_required
+def api_get_placement_suggestions(request):
+    """
+    API para obtener sugerencias de ubicación para un curso dado.
+    Calcula el puntaje para todas las franjas posibles y devuelve las mejores y los conflictos.
+    """
+    curso_id = request.GET.get("curso_id")
+    if not curso_id:
+        return JsonResponse({"status": "error", "message": "Falta curso_id"}, status=400)
+
+    try:
+        curso = Curso.objects.get(id=curso_id)
+        docente = curso.docente
+        semestre_activo = Semestre.objects.filter(estado="ACTIVO").first()
+
+        if not docente:
+             return JsonResponse({"status": "error", "message": "El curso no tiene docente asignado (Sugerencias requieren docente)"}, status=400)
+
+        # Configuraciones Básicas
+        # Si estamos arrastrando desde "No Asignados", usamos el bloque estandar (ej. 2h o lo que quede).
+        duracion_request = request.GET.get("duracion")
+        if duracion_request:
+            duracion = int(duracion_request)
+        else:
+             duracion = min(2, curso.horas_pendientes) if curso.horas_pendientes > 0 else 2
+
+        franjas_horarias = list(FranjaHoraria.objects.order_by("hora_inicio"))
+        franja_map = {f.id: i for i, f in enumerate(franjas_horarias)}
+        dias_semana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
+
+        # --- PREPARAR DATOS DE OCUPACIÓN (Similar a auto_asignar) ---
+        # 1. Ocupación Docente
+        bloques_docente = BloqueHorario.objects.filter(
+            curso__docente=docente, 
+            curso__semestre=semestre_activo
+        ).exclude(curso__id=curso_id) 
+        
+        docente_ocupado = set()
+        carga_docente_diaria = {dia: 0 for dia in dias_semana}
+        docente_occupied_indices = {dia: set() for dia in dias_semana}
+
+        for b in bloques_docente:
+            carga_docente_diaria[b.dia] += b.duracion_bloques
+            try:
+                start_idx = franja_map[b.franja_inicio.id]
+                for i in range(b.duracion_bloques):
+                    idx = start_idx + i
+                    if idx < len(franjas_horarias):
+                        f_id = franjas_horarias[idx].id
+                        docente_ocupado.add((b.dia, f_id))
+                        docente_occupied_indices[b.dia].add(idx)
+            except (KeyError, IndexError):
+                pass
+        
+        # 2. Ocupación Grupo (si aplica)
+        grupo_ocupado = set()
+        grupo_ocupado_detalle = {} # (dia, f_id) -> Razón
+        grupos = []
+        if curso.especialidad:
+            grupos.append(curso.especialidad.grupo)
+        elif curso.tipo_curso == 'GENERAL':
+             # Si es general, ver si tiene especialidades vinculadas y sus grupos
+             esps = curso.especialidades.all()
+             for e in esps:
+                 if e.grupo: grupos.append(e.grupo)
+
+        semestre_cursado = curso.semestre_cursado
+        
+        if semestre_cursado and grupos:
+            q_grupos = Q()
+            for g in grupos:
+                q_grupos |= Q(especialidad__grupo=g) | Q(tipo_curso='GENERAL', especialidades__grupo=g)
+            
+            bloques_grupo = BloqueHorario.objects.filter(
+                q_grupos,
+                curso__semestre_cursado=semestre_cursado, # Mismo semestre
+                curso__semestre=semestre_activo
+            ).exclude(curso__id=curso_id)
+
+            for b in bloques_grupo:
+                 try:
+                    start_idx = franja_map[b.franja_inicio.id]
+                    for i in range(b.duracion_bloques):
+                        idx = start_idx + i
+                        if idx < len(franjas_horarias):
+                            f_id = franjas_horarias[idx].id
+                            key = (b.dia, f_id)
+                            grupo_ocupado.add(key)
+                            # Guardar detalle del conflicto
+                            grupo_ocupado_detalle[key] = f"Conflicto con Grupo: {b.curso.nombre}"
+                 except (KeyError, IndexError):
+                    pass
+
+
+        suggestions = []
+        conflicts = []
+
+        # --- EVALUAR TODAS LAS POSICIONES ---
+        for dia in dias_semana:
+            # Check límite diario docente
+            if carga_docente_diaria[dia] + duracion > 8:
+                 # Todo el día bloqueado
+                 for f in franjas_horarias:
+                     conflicts.append({
+                         'dia': dia,
+                         'franja_id': f.id,
+                         'razon': 'Carga diaria máxima (8h) excedida'
+                     })
+                 continue
+
+            for i in range(len(franjas_horarias) - duracion + 1):
+                franja_inicio = franjas_horarias[i]
+                franjas_del_bloque = franjas_horarias[i : i + duracion]
+                
+                # Validar el bloque entero
+                bloque_valido = True
+                razon_invalidez = None
+
+                for f in franjas_del_bloque:
+                    # 1. Disponibilidad Turno
+                    if (docente.disponibilidad == "MANANA" and f.turno != "MANANA") or \
+                       (docente.disponibilidad == "TARDE" and f.turno != "TARDE"):
+                        bloque_valido = False
+                        razon_invalidez = f"Docente solo {docente.disponibilidad}"
+                        break
+                    
+                    # 2. Ocupación Docente
+                    if (dia, f.id) in docente_ocupado:
+                        bloque_valido = False
+                        razon_invalidez = "Docente ocupado"
+                        break
+                    
+                    # 3. Ocupación Grupo
+                    if (dia, f.id) in grupo_ocupado:
+                         bloque_valido = False
+                         razon_invalidez = grupo_ocupado_detalle.get((dia, f.id), "Grupo ocupado")
+                         break
+                
+                if bloque_valido:
+                    # CALCULAR SCORE
+                    score = calcular_puntaje(
+                        docente.id, 
+                        dia, 
+                        i, 
+                        duracion, 
+                        carga_docente_diaria[dia], 
+                        docente_occupied_indices
+                    )
+                    
+                    tipo_sugerencia = 'neutral'
+                    if score <= -50: tipo_sugerencia = 'excelente'
+                    elif score < 0: tipo_sugerencia = 'buena'
+                    elif score > 0: tipo_sugerencia = 'regular' # Gaps
+                    
+                    suggestions.append({
+                        'dia': dia,
+                        'franja_id': franja_inicio.id, 
+                        'duracion': duracion, 
+                        'score': score,
+                        'tipo': tipo_sugerencia
+                    })
+                else:
+                    conflicts.append({
+                        'dia': dia,
+                        'franja_id': franja_inicio.id,
+                        'duracion': duracion,
+                        'razon': razon_invalidez
+                    })
+        
+        # Ordenar sugerencias por mejor score (menor es mejor)
+        suggestions.sort(key=lambda x: x['score'])
+        
+        # Marcar las top 3 como 'best'
+        for idx, s in enumerate(suggestions):
+            if idx < 3 and s['score'] <= 0: # Solo si son buenas/neutrales
+                 s['is_best'] = True
+
+        return JsonResponse({
+            "status": "success",
+            "suggestions": suggestions,
+            "conflicts": conflicts
+        })
+
+    except Curso.DoesNotExist:
+        return JsonResponse({"status": "error", "message": "Curso no encontrado"}, status=404)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
 
 @staff_member_required

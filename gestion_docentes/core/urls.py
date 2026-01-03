@@ -27,6 +27,8 @@ urlpatterns = [
     # --- Calendario y Horarios (Vistas Tradicionales) ---
     path("calendario/", views.calendario_view, name="calendario"),
     path("horarios/<int:carrera_id>/", views.ver_horarios, name="ver_horarios"),
+    # Vista Admin Nueva para Horario Docente Detallado
+    path("horarios/docente/<int:docente_id>/", views.ver_horario_docente_admin, name="ver_horario_docente_admin"),
     path(
         "horarios/<int:carrera_id>/generar/",
         views.generar_horarios,
@@ -83,6 +85,7 @@ urlpatterns = [
     path('api/generar-horario-automatico/', planner.generar_horario_automatico, name='api_generar_horario_automatico'),
     path('api/get-teacher-conflicts/', planner.api_get_teacher_conflicts, name='api_get_teacher_conflicts'),
     path('api/exportar-horario/', planner.api_exportar_horario, name='api_exportar_horario'),
+    path('api/get-placement-suggestions/', planner.api_get_placement_suggestions, name='api_get_placement_suggestions'),
 
     # --- Resto de la API ---
     path("api/", include("core.api.urls", namespace="api")),

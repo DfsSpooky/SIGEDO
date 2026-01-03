@@ -33,15 +33,23 @@
         /* Status Colors */
         --pm-conflict-outline: #d73a49;
         --pm-conflict-bg: rgba(215, 58, 73, 0.1);
-        --pm-pending-text: #0366d6; /* High-contrast blue for pending hours */
+        --pm-pending-text: #0366d6;
+        /* High-contrast blue for pending hours */
 
         /* Other */
         --pm-shadow: none;
         --pm-border-radius: 6px;
     }
 
-    .drop-zone.conflict-cell { background-color: hsla(var(--er)/.2) !important; outline: 2px dashed hsl(var(--er)); cursor: not-allowed; }
-    .drop-zone:not(:has(.cursor-grab)):hover { @apply bg-base-200; }
+    .drop-zone.conflict-cell {
+        background-color: hsla(var(--er)/.2) !important;
+        outline: 2px dashed hsl(var(--er));
+        cursor: not-allowed;
+    }
+
+    .drop-zone:not(:has(.cursor-grab)):hover {
+        background-color: hsl(var(--b2));
+    }
 
     /* Unassigned Course Item Styling */
     .planner-modern .unassigned-course-item {
@@ -53,19 +61,23 @@
         transition: box-shadow 0.2s ease-in-out, border-color 0.2s ease-in-out;
         cursor: grab;
     }
+
     .planner-modern .unassigned-course-item:hover {
-        box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
         border-color: var(--pm-text-link);
     }
+
     .planner-modern .unassigned-course-item .course-name {
         color: var(--pm-text-primary);
         font-weight: 600;
         margin-bottom: 0.1rem;
     }
+
     .planner-modern .unassigned-course-item .course-teacher {
         color: var(--pm-text-secondary);
         font-size: 0.75rem;
     }
+
     .planner-modern .unassigned-course-item .course-pending-hours {
         color: var(--pm-pending-text);
         font-weight: 600;
@@ -81,10 +93,12 @@
         color: var(--pm-text-primary);
         text-align: center;
     }
+
     .planner-modern .table td {
         border-color: var(--pm-border);
         transition: background-color 0.2s ease;
     }
+
     .planner-modern .drop-zone:not(:has(.cursor-grab)):hover {
         background-color: var(--pm-course-general-bg);
     }
@@ -99,19 +113,23 @@
         flex-direction: column;
         overflow: hidden;
     }
+
     .planner-modern .assigned-course-item[data-course-type='GENERAL'] {
         background-color: var(--pm-course-general-bg);
         color: var(--pm-course-general-text);
         border-color: rgba(3, 102, 214, 0.3);
     }
+
     .planner-modern .cell-general {
         background-color: rgba(241, 248, 255, 0.5) !important;
     }
+
     .planner-modern .assigned-course-item[data-course-type='ESPECIALIDAD'] {
         background-color: var(--pm-course-especialidad-bg);
         color: var(--pm-course-especialidad-text);
         border-color: rgba(186, 148, 46, 0.3);
     }
+
     .planner-modern .cell-especialidad {
         background-color: rgba(255, 251, 221, 0.5) !important;
     }
@@ -122,6 +140,7 @@
         overflow: hidden;
         text-overflow: ellipsis;
     }
+
     .planner-modern .assigned-course-item .text-xs {
         font-size: 0.75rem;
         opacity: 0.9;
@@ -134,18 +153,22 @@
         font-weight: 600;
         transition: background-color 0.2s;
     }
+
     .planner-modern .btn:hover {
         border-color: #a0a7b0;
     }
+
     .planner-modern .btn-primary {
         background-color: var(--pm-button-bg);
         color: var(--pm-button-text);
-        border-color: rgba(0,0,0,0.1);
+        border-color: rgba(0, 0, 0, 0.1);
     }
+
     .planner-modern .btn-primary:hover {
         background-color: var(--pm-button-hover-bg);
-        border-color: rgba(0,0,0,0.1);
+        border-color: rgba(0, 0, 0, 0.1);
     }
+
     .planner-modern .select {
         border-color: var(--pm-border);
         border-radius: var(--pm-border-radius);
@@ -156,6 +179,7 @@
         border-bottom: 1px solid var(--pm-border);
         margin-bottom: 1rem;
     }
+
     .planner-modern .tabs-lifted .tab {
         border: none;
         border-bottom: 2px solid transparent;
@@ -165,9 +189,11 @@
         color: var(--pm-text-secondary);
         transition: color 0.2s, border-color 0.2s;
     }
+
     .planner-modern .tabs-lifted .tab:hover {
         color: var(--pm-text-primary);
     }
+
     .planner-modern .tabs-lifted .tab.tab-active {
         color: var(--pm-text-primary);
         font-weight: 600;
@@ -178,6 +204,7 @@
     .tab-pane {
         display: none;
     }
+
     .tab-pane.active {
         display: block;
     }
@@ -189,15 +216,17 @@
         border-radius: var(--pm-border-radius);
         padding: 0.25rem;
     }
+
     .planner-modern .tabs-boxed .tab {
         color: var(--pm-text-secondary);
     }
+
     .planner-modern .tabs-boxed .tab-active {
         background-color: var(--pm-bg);
         color: var(--pm-text-primary);
         font-weight: 600;
         border-radius: var(--pm-border-radius);
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     }
 
     /* Search Input */
@@ -205,6 +234,7 @@
         border-color: var(--pm-border);
         border-radius: var(--pm-border-radius);
     }
+
     .planner-modern #course-search-input:focus {
         border-color: var(--pm-text-link);
         box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.2);
@@ -224,6 +254,7 @@
         border: 1px solid var(--pm-border);
         box-shadow: var(--pm-shadow);
     }
+
     .planner-modern .card-body {
         padding: 1rem;
     }
@@ -232,9 +263,11 @@
     .planner-modern .planner-header {
         background-color: var(--pm-surface);
         padding: 1rem;
-        margin: -1rem -1rem 1rem -1rem; /* Extend to edges of card-body padding */
+        margin: -1rem -1rem 1rem -1rem;
+        /* Extend to edges of card-body padding */
         border-bottom: 1px solid var(--pm-border);
     }
+
     .planner-modern .planner-header h1 {
         font-size: 1.25rem;
         font-weight: 600;
@@ -252,6 +285,7 @@
         border-radius: var(--pm-border-radius);
         padding: 1rem;
     }
+
     .planner-modern .planner-sidebar h3 {
         font-size: 1rem;
         font-weight: 600;
@@ -259,6 +293,7 @@
         padding-bottom: 0.75rem;
         margin-bottom: 0.75rem;
     }
+
     .planner-modern .planner-sidebar .divider {
         border-color: var(--pm-border);
     }
@@ -269,18 +304,55 @@
         border-radius: var(--pm-border-radius);
         overflow: hidden;
     }
+
     .planner-modern #trash-zone.sortable-drag-over {
         border-color: var(--pm-conflict-outline);
         color: var(--pm-conflict-outline);
         background-color: var(--pm-conflict-bg);
     }
 
-    .sortable-ghost { @apply bg-primary/30 border-2 border-primary opacity-70 rounded-lg; }
-    .droppable-cell.sortable-drag-over { @apply bg-primary/10; }
-    #trash-zone.sortable-drag-over { @apply bg-error/20 ring-2 ring-error; transform: scale(1.05); }
-    .skeleton-loader { @apply animate-pulse bg-base-200 rounded-lg; }
-    .tab-content { display: none; }
-    .tab-content.active { display: block; }
+    .sortable-ghost {
+        background-color: hsl(var(--p) / 0.3);
+        border: 2px solid hsl(var(--p));
+        opacity: 0.7;
+        border-radius: 0.5rem;
+    }
+
+    .droppable-cell.sortable-drag-over {
+        background-color: hsl(var(--p) / 0.1);
+    }
+
+    #trash-zone.sortable-drag-over {
+        background-color: hsl(var(--er) / 0.2);
+        box-shadow: 0 0 0 2px hsl(var(--er));
+        transform: scale(1.05);
+    }
+
+    .skeleton-loader {
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        background-color: hsl(var(--b2));
+        border-radius: 0.5rem;
+    }
+
+    @keyframes pulse {
+
+        0%,
+        100% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.5;
+        }
+    }
+
+    .tab-content {
+        display: none;
+    }
+
+    .tab-content.active {
+        display: block;
+    }
 
     /* SweetAlert2 Button Fix */
     .swal2-confirm {
@@ -289,20 +361,35 @@
         border-radius: var(--rounded-btn, 0.5rem);
         padding: 0.75rem 1.5rem;
     }
+
     .swal2-cancel {
         background-color: #ef4444 !important;
         color: white !important;
         border-radius: var(--rounded-btn, 0.5rem);
         padding: 0.75rem 1.5rem;
     }
-    .swal2-confirm:hover, .swal2-cancel:hover {
+
+    .swal2-confirm:hover,
+    .swal2-cancel:hover {
         opacity: 0.9;
     }
-    
+
     /* Progress Bars Colors */
-    .progress-success { --p: 142 71% 45%; } /* Green */
-    .progress-warning { --p: 41 100% 50%; } /* Yellow */
-    .progress-error { --p: 0 84% 60%; } /* Red */
+    .progress-success {
+        --p: 142 71% 45%;
+    }
+
+    /* Green */
+    .progress-warning {
+        --p: 41 100% 50%;
+    }
+
+    /* Yellow */
+    .progress-error {
+        --p: 0 84% 60%;
+    }
+
+    /* Red */
 </style>
 
 <div class="card bg-base-100 shadow-xl planner-modern">
@@ -310,15 +397,18 @@
         <div class="planner-header flex flex-wrap justify-between items-center">
             <div>
                 <h1 class="card-title">Planificador de Horarios</h1>
-                <p class="text-base-content/70">Semestre Activo: <span class="font-semibold text-primary">{{ semestre_activo.nombre }}</span></p>
+                <p class="text-base-content/70">Semestre Activo: <span class="font-semibold text-primary">{{
+                        semestre_activo.nombre }}</span></p>
             </div>
-            
+
             <div class="flex items-center gap-4 p-2 bg-base-200 rounded-box">
-                <button id="btn-export-pdf" class="btn btn-error btn-sm btn-outline text-error-content hover:bg-error hover:text-white" title="Exportar horario actual a PDF">
+                <button id="btn-export-pdf"
+                    class="btn btn-error btn-sm btn-outline text-error-content hover:bg-error hover:text-white"
+                    title="Exportar horario actual a PDF">
                     <i class="fas fa-file-pdf"></i>
                     PDF
                 </button>
-                
+
                 <div class="divider divider-horizontal mx-0"></div>
 
                 <button id="global-auto-assign-btn" class="btn btn-primary btn-sm">
@@ -326,10 +416,11 @@
                     Generar Horario Global
                 </button>
                 <div class="divider divider-horizontal"></div>
-                
+
                 <div class="form-control" title="Habilita para mover cursos generales compartidos">
                     <label class="label cursor-pointer gap-2">
-                        <span class="label-text font-semibold text-xs uppercase tracking-wide text-base-content/70 leading-3 text-right">Editar<br>Generales</span> 
+                        <span
+                            class="label-text font-semibold text-xs uppercase tracking-wide text-base-content/70 leading-3 text-right">Editar<br>Generales</span>
                         <input type="checkbox" id="toggle-general-edit" class="toggle toggle-primary toggle-sm" />
                     </label>
                 </div>
@@ -340,16 +431,25 @@
                     <select id="especialidad" class="select select-bordered select-sm">
                         <option value="" disabled selected>-- Seleccione --</option>
                         {% for esp in especialidades %}
-                        <option value="{{ esp.id }}" {% if especialidad_seleccionada_id == esp.id|stringformat:"s" %}selected{% endif %}>{{ esp.nombre }}</option>
+                        {% if especialidad_seleccionada_id|stringformat:"s" == esp.id|stringformat:"s" %}
+                        <option value="{{ esp.id }}" selected>{{ esp.nombre }}</option>
+                        {% else %}
+                        <option value="{{ esp.id }}">{{ esp.nombre }}</option>
+                        {% endif %}
                         {% endfor %}
                     </select>
                 </div>
-                 <div class="form-control">
+
+                <div class="form-control">
                     <label class="label pb-1"><span class="label-text">Semestre:</span></label>
                     <select id="semestre_cursado" class="select select-bordered select-sm">
                         <option value="" disabled selected>-- Seleccione --</option>
                         {% for sem_num in semestres_validos %}
-                        <option value="{{ sem_num }}" {% if semestre_seleccionado == sem_num|stringformat:"s" %}selected{% endif %}>Semestre {{ sem_num|roman }}</option>
+                        {% if semestre_seleccionado|stringformat:"s" == sem_num|stringformat:"s" %}
+                        <option value="{{ sem_num }}" selected>Semestre {{ sem_num|roman }}</option>
+                        {% else %}
+                        <option value="{{ sem_num }}">Semestre {{ sem_num|roman }}</option>
+                        {% endif %}
                         {% endfor %}
                     </select>
                 </div>
@@ -358,7 +458,7 @@
 
         <div id="planner-body" class="hidden">
             <div class="planner-main-grid grid grid-cols-1 lg:grid-cols-4 mt-4">
-                
+
                 <main class="lg:col-span-3">
                     <div role="tablist" class="tabs tabs-lifted" id="schedule-tabs-container">
                         <a role="tab" class="tab tab-active" data-tab-target="#schedule-morning">Turno Mañana</a>
@@ -375,7 +475,7 @@
                                     </tr>
                                 </thead>
                                 <tbody id="schedule-grid-manana">
-                                    </tbody>
+                                </tbody>
                             </table>
                         </div>
                     </div>
@@ -390,12 +490,12 @@
                                     </tr>
                                 </thead>
                                 <tbody id="schedule-grid-tarde">
-                                    </tbody>
+                                </tbody>
                             </table>
                         </div>
                     </div>
                 </main>
-                
+
                 <aside class="lg:col-span-1">
                     <div class="planner-sidebar h-full space-y-4 sticky top-24">
                         <div role="tablist" class="tabs tabs-boxed">
@@ -405,12 +505,15 @@
 
                         <div id="tab-manual" class="tab-content active space-y-4">
                             <h3 class="font-bold text-lg">Cursos por Asignar</h3>
-                            <p class="text-xs text-base-content/60 -mt-3">Arrastra un curso al horario para asignarlo.</p>
-                            <input type="text" id="course-search-input" placeholder="Buscar curso..." class="input input-bordered input-sm w-full">
+                            <p class="text-xs text-base-content/60 -mt-3">Arrastra un curso al horario para asignarlo.
+                            </p>
+                            <input type="text" id="course-search-input" placeholder="Buscar curso..."
+                                class="input input-bordered input-sm w-full">
                             <div id="unassigned-courses-container" class="space-y-2 max-h-96 overflow-y-auto pr-2">
-                                </div>
+                            </div>
                             <div class="divider"></div>
-                            <div id="trash-zone" class="p-4 text-center border-2 border-dashed border-base-300 rounded-box bg-base-200 text-base-content/70 min-h-[80px] flex flex-col justify-center items-center transition-all duration-300">
+                            <div id="trash-zone"
+                                class="p-4 text-center border-2 border-dashed border-base-300 rounded-box bg-base-200 text-base-content/70 min-h-[80px] flex flex-col justify-center items-center transition-all duration-300">
                                 <i class="fas fa-trash-alt text-2xl mb-2"></i>
                                 <p class="font-semibold text-sm">Arrastra aquí para desasignar</p>
                             </div>
@@ -418,14 +521,16 @@
 
                         <div id="tab-auto" class="tab-content space-y-4">
                             <h3 class="font-bold text-lg">Generador Automático</h3>
-                            <p class="text-xs text-base-content/60 -mt-3">Asigna automáticamente los cursos pendientes.</p>
+                            <p class="text-xs text-base-content/60 -mt-3">Asigna automáticamente los cursos pendientes.
+                            </p>
                             <button id="auto-assign-btn" class="btn btn-primary w-full">
                                 <i class="fas fa-magic"></i>
                                 Generar Horario
                             </button>
                             <div class="divider"></div>
                             <h4 class="font-semibold">Registro de Actividad</h4>
-                            <div id="auto-assign-log" class="text-xs p-2 bg-base-200 rounded-md h-48 overflow-y-auto font-mono">
+                            <div id="auto-assign-log"
+                                class="text-xs p-2 bg-base-200 rounded-md h-48 overflow-y-auto font-mono">
                                 Presiona "Generar Horario" para iniciar...
                             </div>
                         </div>
@@ -444,13 +549,13 @@
 <script>
     window.PlannerConfig = {
         csrfToken: '{{ csrf_token }}',
-        franjasManana: {{ franjas_manana_json|safe }},
-        franjasTarde: {{ franjas_tarde_json|safe }},
-        diasSemana: {{ dias_semana_json|safe }}
+        franjasManana: {{ franjas_manana_json | safe }},
+    franjasTarde: { { franjas_tarde_json | safe } },
+    diasSemana: { { dias_semana_json | safe } }
     };
 
     // --- Script simple para el botón de Exportar ---
-    document.getElementById('btn-export-pdf').addEventListener('click', function() {
+    document.getElementById('btn-export-pdf').addEventListener('click', function () {
         const especialidad = document.getElementById('especialidad').value;
         const semestre = document.getElementById('semestre_cursado').value;
 
@@ -464,11 +569,10 @@
         }
 
         // Abrir la URL de generación de PDF en una nueva pestaña
-        // Nota: Asegúrate de tener esta URL configurada en urls.py
         const url = `/api/exportar-horario/?especialidad_id=${especialidad}&semestre=${semestre}`;
         window.open(url, '_blank');
     });
 </script>
-<script src="{% static 'js/planner.js' %}"></script>
+<script src="{% static 'js/planner.js' %}?v={% now 'U' %}"></script>
 
 {% endblock %}

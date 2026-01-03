@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', function () {
-    
+
     let currentPlannerData = null;
 
     // --- API & UTILITY FUNCTIONS ---
@@ -53,7 +53,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (isAssigned) {
             div.classList.add('group', 'assigned-course-item');
-            
+
             // Lógica de Ghost Blocks
             const allowEdit = DOMElements.toggleGeneralEdit ? DOMElements.toggleGeneralEdit.checked : false;
             const isGhost = curso.tipo_curso === 'GENERAL' && !allowEdit;
@@ -65,19 +65,19 @@ document.addEventListener('DOMContentLoaded', function () {
             div.dataset.courseType = curso.tipo_curso;
 
             let icon = '';
-            
+
             if (isGhost) {
-                cellClasses = 'bg-base-300 text-base-content/60 border-base-300 cursor-not-allowed'; 
+                cellClasses = 'bg-base-300 text-base-content/60 border-base-300 cursor-not-allowed';
                 icon = '<i class="fas fa-lock fa-fw mr-2 opacity-50"></i>';
                 div.classList.add('static-course');
             } else {
                 div.classList.add('cursor-grab', 'active:cursor-grabbing');
                 if (curso.tipo_curso === 'GENERAL') {
-                     cellClasses = 'cell-general'; 
-                     icon = '<i class="fas fa-globe-americas fa-fw mr-2"></i>';
+                    cellClasses = 'cell-general';
+                    icon = '<i class="fas fa-globe-americas fa-fw mr-2"></i>';
                 } else {
-                     cellClasses = 'cell-especialidad';
-                     icon = '<i class="fas fa-graduation-cap fa-fw mr-2"></i>';
+                    cellClasses = 'cell-especialidad';
+                    icon = '<i class="fas fa-graduation-cap fa-fw mr-2"></i>';
                 }
             }
 
@@ -87,7 +87,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (startFranjaIndex !== -1) {
                 const endFranjaIndex = startFranjaIndex + curso.duracion_bloques - 1;
                 if (endFranjaIndex < allFranjas.length) {
-                    timeText = `${allFranjas[startFranjaIndex].hora_inicio.slice(0,5)} - ${allFranjas[endFranjaIndex].hora_fin.slice(0,5)}`;
+                    timeText = `${allFranjas[startFranjaIndex].hora_inicio.slice(0, 5)} - ${allFranjas[endFranjaIndex].hora_fin.slice(0, 5)}`;
                 }
             }
 
@@ -151,10 +151,10 @@ document.addEventListener('DOMContentLoaded', function () {
             const assigned = curso.horas_asignadas || 0;
             const total = curso.horas_totales || 0;
             const percent = total > 0 ? Math.round((assigned / total) * 100) : 0;
-            
+
             let progressColor = 'progress-error'; // Rojo (poco avance)
             let textColor = 'text-error';
-            
+
             if (percent >= 100) {
                 progressColor = 'progress-success'; // Verde
                 textColor = 'text-success';
@@ -187,7 +187,7 @@ document.addEventListener('DOMContentLoaded', function () {
             container.innerHTML = '';
             franjas.forEach(franja => {
                 const row = document.createElement('tr');
-                row.innerHTML = `<td class="text-center text-xs font-medium text-base-content/60 align-top h-24 p-1 border-r border-base-300">${franja.hora_inicio.slice(0,5)} - ${franja.hora_fin.slice(0,5)}</td>`;
+                row.innerHTML = `<td class="text-center text-xs font-medium text-base-content/60 align-top h-24 p-1 border-r border-base-300">${franja.hora_inicio.slice(0, 5)} - ${franja.hora_fin.slice(0, 5)}</td>`;
                 window.PlannerConfig.diasSemana.forEach(dia => {
                     row.innerHTML += `<td class="p-1 border-t border-r border-base-300 align-top relative drop-zone transition-colors duration-300" data-dia="${dia}" data-franja-id="${franja.id}"></td>`;
                 });
@@ -235,13 +235,13 @@ document.addEventListener('DOMContentLoaded', function () {
     function initializeDragAndDrop() {
         sortableInstances.forEach(s => s.destroy());
         sortableInstances = [];
-        
-        const sharedConfig = { 
-            group: 'shared', 
+
+        const sharedConfig = {
+            group: 'shared',
             animation: 150,
-            filter: '.static-course', 
+            filter: '.static-course',
             onMove: function (evt) {
-                 return !evt.related.classList.contains('static-course');
+                return !evt.related.classList.contains('static-course');
             }
         };
 
@@ -298,9 +298,9 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         };
 
-        const onStart = (evt) => highlightConflicts(evt.item);
-        const onEnd = () => clearConflicts();
-        
+        const onStart = (evt) => showSuggestionsAndConflicts(evt.item);
+        const onEnd = () => clearHighlights();
+
         sortableInstances.push(new Sortable(document.getElementById('unassigned-generales'), sharedConfig));
         sortableInstances.push(new Sortable(document.getElementById('unassigned-especialidad'), sharedConfig));
         document.querySelectorAll('.drop-zone').forEach(zone => sortableInstances.push(new Sortable(zone, { ...sharedConfig, onAdd, onStart, onEnd })));
@@ -311,13 +311,13 @@ document.addEventListener('DOMContentLoaded', function () {
     function checkTeacherFatigue(targetCell, courseData) {
         const teacherName = courseData.docente_nombre;
         const day = targetCell.dataset.dia;
-        
+
         if (!teacherName || teacherName === 'N/A' || !day) return;
 
         // Buscamos todas las celdas de ESE día en ambas grillas (mañana y tarde)
         // Nota: Esto funciona buscando por el atributo data-dia
         const allCellsOfDay = document.querySelectorAll(`td[data-dia="${day}"]`);
-        
+
         let consecutiveHours = 0;
         let maxConsecutive = 0;
 
@@ -358,7 +358,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Si detectamos fatiga (ej: > 4 horas seguidas)
         if (maxConsecutive > 4) {
-             Toast.fire({
+            Toast.fire({
                 icon: 'warning',
                 title: 'Posible Fatiga Docente',
                 text: `El docente ${teacherName} tendría ${maxConsecutive} horas consecutivas este día.`
@@ -367,7 +367,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     async function handleDeassign(courseElement) {
-        if(courseElement.classList.contains('static-course')) return;
+        if (courseElement.classList.contains('static-course')) return;
 
         const bloqueId = courseElement.dataset.bloqueId;
         if (!bloqueId) {
@@ -433,24 +433,87 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    async function highlightConflicts(item) {
-        clearConflicts();
-        const cursoId = item.dataset.cursoId;
-        const data = await callApi(`/api/get-teacher-conflicts/?curso_id=${cursoId}`);
-        if (data.conflicts) {
-            data.conflicts.forEach(c => {
-                const cell = document.querySelector(`td[data-dia="${c.dia}"][data-franja-id="${c.franja_id}"]`);
-                if (cell) {
-                    cell.classList.add('conflict-cell');
-                    cell.setAttribute('title', c.razon);
-                }
-            });
+    // --- SUGGESTIONS & CONFLICTS VISUALS ---
+    // Inject custom styles for suggestions
+    const suggestionStyles = document.createElement('style');
+    suggestionStyles.innerHTML = `
+        .suggestion-cell-best { background-color: rgba(34, 197, 94, 0.2) !important; box-shadow: inset 0 0 0 2px rgba(34, 197, 94, 0.5); }
+        .suggestion-cell-good { background-color: rgba(34, 197, 94, 0.1) !important; }
+        .conflict-cell { background-color: rgba(239, 68, 68, 0.15) !important; cursor: not-allowed; background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(239, 68, 68, 0.05) 10px, rgba(239, 68, 68, 0.05) 20px); }
+        .conflict-cell-group { background-color: rgba(234, 179, 8, 0.15) !important; cursor: not-allowed; } /* Yellowish for group conflicts? Or just Red/Orange */
+        
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+            70% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+        .suggestion-cell-best { animation: pulse-green 2s infinite; }
+    `;
+    document.head.appendChild(suggestionStyles);
+
+    async function showSuggestionsAndConflicts(item) {
+        clearHighlights();
+        const cursoId = item.dataset.cursoId || item.dataset.bloqueId; // Si es bloque moviendo, necesitamos curso_id? No, la API pide curso_id.
+        // Si estamos moviendo un bloque ya asignado, item.dataset.fullData tiene el curso_id.
+
+        let realCursoId = item.dataset.cursoId;
+        let duracion = item.dataset.duracion;
+
+        if (!realCursoId) {
+            try {
+                const data = JSON.parse(item.dataset.fullData);
+                realCursoId = data.curso_id || data.id; // data.id si viene de la lista no asignados, data.curso_id si es bloque
+            } catch (e) { }
+        }
+
+        if (!realCursoId) return;
+
+        try {
+            const data = await callApi(`/api/get-placement-suggestions/?curso_id=${realCursoId}&duracion=${duracion}`);
+
+            // 1. Highlight Conflicts (Red)
+            if (data.conflicts) {
+                data.conflicts.forEach(c => {
+                    const cell = document.querySelector(`td[data-dia="${c.dia}"][data-franja-id="${c.franja_id}"]`);
+                    if (cell) {
+                        cell.classList.add('conflict-cell');
+                        cell.dataset.conflictReason = c.razon;
+                        cell.setAttribute('title', c.razon); // Tooltip nativo
+
+                        // Si es razon de grupo, quizás usar otro color
+                        if (c.razon.includes('Grupo')) cell.classList.add('conflict-cell-group');
+                    }
+                });
+            }
+
+            // 2. Highlight Suggestions (Green)
+            if (data.suggestions) {
+                data.suggestions.forEach(s => {
+                    if (s.tipo === 'excelente' || s.is_best) {
+                        const cell = document.querySelector(`td[data-dia="${s.dia}"][data-franja-id="${s.franja_id}"]`);
+                        if (cell && !cell.classList.contains('conflict-cell')) {
+                            cell.classList.add('suggestion-cell-best');
+                            cell.setAttribute('title', 'Sugerencia Recomendada');
+                        }
+                    } else if (s.tipo === 'buena') {
+                        const cell = document.querySelector(`td[data-dia="${s.dia}"][data-franja-id="${s.franja_id}"]`);
+                        if (cell && !cell.classList.contains('conflict-cell')) {
+                            cell.classList.add('suggestion-cell-good');
+                        }
+                    }
+                });
+            }
+
+        } catch (error) {
+            console.error("Error fetching suggestions:", error);
         }
     }
-    function clearConflicts() {
-        document.querySelectorAll('.conflict-cell').forEach(c => {
-            c.classList.remove('conflict-cell');
+
+    function clearHighlights() {
+        document.querySelectorAll('.conflict-cell, .suggestion-cell-best, .suggestion-cell-good, .conflict-cell-group').forEach(c => {
+            c.classList.remove('conflict-cell', 'suggestion-cell-best', 'suggestion-cell-good', 'conflict-cell-group');
             c.removeAttribute('title');
+            delete c.dataset.conflictReason;
         });
     }
     async function handleDurationChange(bloqueId, action) {
