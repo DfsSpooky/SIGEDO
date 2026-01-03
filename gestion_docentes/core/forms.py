@@ -7,7 +7,10 @@ from .models import (
     Justificacion,
     SolicitudIntercambio,
     TipoJustificacion,
+    SolicitudIntercambio,
+    TipoJustificacion,
     VersionDocumento,
+    RecuperacionClase,
 )
 
 
@@ -108,3 +111,21 @@ class JustificacionForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["tipo"].queryset = TipoJustificacion.objects.all()
+
+class RecuperacionClaseForm(forms.ModelForm):
+    class Meta:
+        model = RecuperacionClase
+        fields = ["curso", "fecha_a_recuperar", "fecha_propuesta", "duracion_minutos", "motivo"]
+        widgets = {
+            "fecha_a_recuperar": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+            "fecha_propuesta": forms.DateTimeInput(attrs={"type": "datetime-local", "class": "form-control"}),
+            "duracion_minutos": forms.NumberInput(attrs={"class": "form-control"}),
+            "motivo": forms.Textarea(attrs={"rows": 4, "class": "form-control"}),
+            "curso": forms.Select(attrs={"class": "form-control"}),
+        }
+    
+    def __init__(self, *args, **kwargs):
+        docente = kwargs.pop('docente', None)
+        super().__init__(*args, **kwargs)
+        if docente:
+            self.fields['curso'].queryset = Curso.objects.filter(docente=docente)

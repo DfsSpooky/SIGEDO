@@ -38,7 +38,9 @@ if not firebase_admin._apps:
     except Exception as e:
         logger.error(f"Error loading Firebase credentials in signals: {e}")
 
-def send_fcm_notification(user, title, body):
+from django.utils.html import strip_tags
+
+def send_fcm_notification(user, title, body, data=None):
     """Envía una notificación Push al Token FCM del usuario."""
     if not user.fcm_token:
         return
@@ -47,11 +49,15 @@ def send_fcm_notification(user, title, body):
         if not firebase_admin._apps: 
              return # No configurado
 
+        # Limpiar etiquetas HTML del cuerpo (e.g. <div>, <strong>)
+        clean_body = strip_tags(body)
+
         message = messaging.Message(
             notification=messaging.Notification(
                 title=title,
-                body=body,
+                body=clean_body,
             ),
+            data=data if data else {},
             token=user.fcm_token,
         )
         response = messaging.send(message)
@@ -222,7 +228,10 @@ def crear_notificacion_anuncio(sender, instance, created, **kwargs):
                     "fecha_creacion": notificacion.fecha_creacion.isoformat(),
                 },
             }
+            # Prepare data payload for deep link
+            fcm_data = {"screen": "announcements", "id": str(instance.id)}
             transaction.on_commit(partial(do_broadcast, docente.id, payload))
+            transaction.on_commit(partial(send_fcm_notification, docente, "SIGEDO", message, fcm_data))
 
 
 @receiver(post_save, sender=VersionDocumento)
@@ -381,7 +390,18 @@ def broadcast_dashboard_update(data):
 
 @receiver(post_save, sender=Asistencia)
 def notificar_dashboard_asistencia(sender, instance, created, **kwargs):
-    if created or instance.hora_entrada or instance.hora_salida:
+    # Determinar tipo de evento
+    tipo = None
+    if created:
+        tipo = "entrada"
+    elif instance.hora_salida:
+        # Si ya tiene salida y NO es creado, asumimos que es el evento de salida.
+        # (Nota: esto enviará 'salida' también en ediciones posteriores, lo cual es aceptable para refrescar la UI)
+        tipo = "salida"
+    # Si no es creado y no tiene hora_salida, es una edición de entrada (no notificamos o notificamos entrada)
+    # Por ahora, solo notificamos si hay un cambio relevante de estado.
+
+    if tipo:
         data = {
             "id": instance.id,
             "docente_nombre": f"{instance.docente.first_name} {instance.docente.last_name}",
@@ -390,24 +410,30 @@ def notificar_dashboard_asistencia(sender, instance, created, **kwargs):
             "hora_salida": instance.hora_salida.strftime("%H:%M") if instance.hora_salida else "--:--",
             "foto_url": instance.foto_entrada.url if instance.foto_entrada else None,
             "estado": "Finalizado" if instance.hora_salida else "En curso",
-            "tipo": "entrada" if created else "salida",
+            "tipo": tipo,
             "es_general": False
         }
         transaction.on_commit(partial(broadcast_dashboard_update, data))
 
+
 @receiver(post_save, sender=AsistenciaDiaria)
 def notificar_dashboard_asistencia_diaria(sender, instance, created, **kwargs):
-    if created or instance.hora_salida:
-        # Lógica similar para asistencia general (sin curso)
+    tipo = None
+    if created:
+        tipo = "entrada_general"
+    elif instance.hora_salida:
+        tipo = "salida_general"
+
+    if tipo:
         data = {
             "id": f"gen_{instance.id}",
             "docente_nombre": f"{instance.docente.first_name} {instance.docente.last_name}",
-            "curso": "Control General", # Etiqueta distintiva
+            "curso": "Control General",  # Etiqueta distintiva
             "hora_entrada": instance.hora_entrada.strftime("%H:%M") if instance.hora_entrada else "--:--",
             "hora_salida": instance.hora_salida.strftime("%H:%M") if instance.hora_salida else "--:--",
             "foto_url": instance.foto_verificacion.url if instance.foto_verificacion else None,
             "estado": "Jornada Finalizada" if instance.hora_salida else "En Campus",
-            "tipo": "entrada_general" if created else "salida_general",
+            "tipo": tipo,
             "es_general": True
         }
         transaction.on_commit(partial(broadcast_dashboard_update, data))

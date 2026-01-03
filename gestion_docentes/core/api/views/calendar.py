@@ -17,10 +17,8 @@ def api_horario_docente(request):
         semestre_activo = Semestre.objects.filter(estado="ACTIVO").first()
 
         if not semestre_activo:
-            return Response(
-                {"status": "error", "message": "No hay un semestre académico activo."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+            # En lugar de error, devolvemos una lista vacía para que el calendario no falle
+            return Response([])
 
         eventos = []
 
@@ -52,6 +50,10 @@ def api_horario_docente(request):
                         "endRecur": semestre_activo.fecha_fin.isoformat(),
                         "display": "auto",
                         "color": "#367BFF",  # Un color base para las clases
+                        "specialties": ", ".join(
+                            [e.nombre for e in bloque.curso.especialidades.all()]
+                        ),
+                        "classroom": bloque.aula.nombre if bloque.aula else "Sin Aula",
                     }
                 )
 

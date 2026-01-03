@@ -21,18 +21,37 @@ class AppTheme {
         secondary: secondaryColor,
         surface: surfaceColor,
         error: errorColor,
-        background: backgroundColor,
       ),
-      
+
       // Tipografía con Google Fonts
       textTheme: TextTheme(
-        displayLarge: GoogleFonts.poppins(fontSize: 32, fontWeight: FontWeight.bold, color: primaryColor),
-        displayMedium: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.bold, color: primaryColor),
-        displaySmall: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.w600, color: primaryColor),
-        headlineMedium: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.black87),
+        displayLarge: GoogleFonts.poppins(
+          fontSize: 32,
+          fontWeight: FontWeight.bold,
+          color: primaryColor,
+        ),
+        displayMedium: GoogleFonts.poppins(
+          fontSize: 28,
+          fontWeight: FontWeight.bold,
+          color: primaryColor,
+        ),
+        displaySmall: GoogleFonts.poppins(
+          fontSize: 24,
+          fontWeight: FontWeight.w600,
+          color: primaryColor,
+        ),
+        headlineMedium: GoogleFonts.poppins(
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: Colors.black87,
+        ),
         bodyLarge: GoogleFonts.inter(fontSize: 16, color: Colors.black87),
         bodyMedium: GoogleFonts.inter(fontSize: 14, color: Colors.black87),
-        labelLarge: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+        labelLarge: GoogleFonts.inter(
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
       ),
 
       // Estilo de Cards (Removido por conflicto de tipos, se usa shape por defecto)
@@ -59,8 +78,13 @@ class AppTheme {
           foregroundColor: Colors.white,
           elevation: 4,
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          textStyle: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          textStyle: GoogleFonts.inter(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
 
@@ -85,75 +109,7 @@ class AppTheme {
       ),
     );
   }
-  // Tema Oscuro
-  static ThemeData get darkTheme {
-    return ThemeData(
-      useMaterial3: true,
-      brightness: Brightness.dark,
-      primaryColor: primaryColor,
-      scaffoldBackgroundColor: const Color(0xFF121212), // Dark Background
-      colorScheme: const ColorScheme.dark(
-        // seedColor removed, invalid in dark constructor direct usage without fromSeed
-        primary: secondaryColor, // Teal Accent for visibility in dark
-        secondary: primaryColor,
-        surface: Color(0xFF1E1E1E), // Darker Surface
-        background: Color(0xFF121212),
-        error: errorColor,
-      ),
 
-      textTheme: TextTheme(
-        displayLarge: GoogleFonts.poppins(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
-        displayMedium: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
-        displaySmall: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.w600, color: Colors.white),
-        headlineMedium: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.white70),
-        bodyLarge: GoogleFonts.inter(fontSize: 16, color: Colors.white70),
-        bodyMedium: GoogleFonts.inter(fontSize: 14, color: Colors.white70),
-        labelLarge: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
-      ),
-
-      appBarTheme: AppBarTheme(
-        backgroundColor: const Color(0xFF1E1E1E),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        titleTextStyle: GoogleFonts.poppins(
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        ),
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: secondaryColor, // Teal for actions
-          foregroundColor: Colors.black, // Dark text on teal
-          elevation: 4,
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          textStyle: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-      ),
-
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: const Color(0xFF2C2C2C),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.white10),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: secondaryColor, width: 2),
-        ),
-        contentPadding: const EdgeInsets.all(16),
-        prefixIconColor: Colors.grey,
-        hintStyle: const TextStyle(color: Colors.grey),
-      ),
-    );
-  }
+  // Tema Oscuro Removido
+  // static ThemeData get darkTheme { ... }
 }

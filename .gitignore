@@ -8,3 +8,6 @@ __pycache__/
 
 # Archivos de la base de datos local (si la tuvieras)
 db.sqlite3
+
+# Archivos de sistema
+.DS_Store

@@ -251,4 +251,8 @@ def calendario_view(request):
     """
     Muestra la página del calendario de horarios del docente.
     """
-    return render(request, "calendario.html")
+    semestre_activo = Semestre.objects.filter(estado="ACTIVO").first()
+    context = {
+        "semestre_activo": semestre_activo,
+    }
+    return render(request, "calendario.html", context)

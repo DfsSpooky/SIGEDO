@@ -1,5 +1,6 @@
-import 'dart:convert';
+// import 'dart:convert'; // Removed unused import
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/teacher_data.dart';
@@ -21,48 +22,13 @@ class ApiService {
           return handler.next(options);
         },
         onError: (DioException e, handler) {
-          // Aquí podrías agregar lógica para refrescar token si es 401
           return handler.next(e);
         },
       ),
     );
   }
 
-  Future<bool> login(String username, String password) async {
-    try {
-      final response = await _dio.post(
-        AppConstants.loginEndpoint,
-        data: {'username': username, 'password': password},
-      );
-      await _storage.write(key: 'access_token', value: response.data['access']);
-      await _storage.write(
-        key: 'refresh_token',
-        value: response.data['refresh'],
-      );
-      return true;
-    } on DioException catch (e) {
-      if (e.type == DioExceptionType.connectionTimeout || 
-          e.type == DioExceptionType.receiveTimeout ||
-          e.type == DioExceptionType.connectionError) {
-         throw Exception('Ocurrió un error de conexión con el servidor.');
-      }
-      if (e.response?.statusCode == 400 || e.response?.statusCode == 401) {
-        final Map<String, dynamic> errorData = e.response?.data is String 
-             ? jsonDecode(e.response?.data) 
-             : e.response?.data;
-        final String msg = errorData['message'] ?? 'Error en la solicitud';
-        throw Exception(msg);
-      }
-      throw Exception('Error en el servidor: ${e.response?.statusCode}');
-    } catch (e) {
-      throw Exception('Error inesperado: $e');
-    }
-  }
-
-  Future<void> logout() async {
-    await _storage.delete(key: 'access_token');
-    await _storage.delete(key: 'refresh_token');
-  }
+  // --- Dashboard & Asistencia ---
 
   Future<TeacherData> getTeacherStatus() async {
     final response = await _dio.get(AppConstants.statusEndpoint);
@@ -71,37 +37,49 @@ class ApiService {
 
   Future<void> markAttendance({
     required String actionType,
-    required File photoFile,
+    File? photoFile, // Changed to optional
     int? courseId,
     double? latitude,
     double? longitude,
+    String? observation, // New field
   }) async {
-    // 1. Convertir imagen a bytes
-    List<int> imageBytes = await photoFile.readAsBytes();
-    // 2. Base64 estándar
-    String base64Image = base64Encode(imageBytes);
-    // 3. Formato Data URI que espera Django
-    String formattedBase64 = "data:image/jpeg;base64,$base64Image";
-
-    final data = {
+    final formData = FormData.fromMap({
       "actionType": actionType,
-      "photoBase64": formattedBase64,
       "courseId": courseId,
       "latitude": latitude,
       "longitude": longitude,
-    };
+      "observation": observation,
+    });
 
-    await _dio.post(AppConstants.attendanceEndpoint, data: data);
+    if (photoFile != null) {
+      String fileName = photoFile.path.split('/').last;
+      formData.files.add(
+        MapEntry(
+          "photo",
+          await MultipartFile.fromFile(photoFile.path, filename: fileName),
+        ),
+      );
+    }
+
+    try {
+      await _dio.post(AppConstants.attendanceEndpoint, data: formData);
+    } on DioException catch (e) {
+      if (e.response != null && e.response!.data is Map) {
+        final msg = e.response!.data['message'];
+        if (msg != null) {
+          throw Exception(msg);
+        }
+      }
+      rethrow;
+    }
   }
 
-  Future<bool> hasToken() async {
-    final token = await _storage.read(key: 'access_token');
-    return token != null;
-  }
   Future<List<dynamic>> getSchedule() async {
     final response = await _dio.get(AppConstants.scheduleEndpoint);
     return response.data;
   }
+
+  // --- Notificaciones ---
 
   Future<Map<String, dynamic>> getNotifications() async {
     final response = await _dio.get(AppConstants.notificationsEndpoint);
@@ -110,17 +88,29 @@ class ApiService {
 
   Future<bool> markNotificationAsRead(int notificationId) async {
     try {
-      final response = await _dio.post('${AppConstants.baseUrl}/api/notificaciones/$notificationId/marcar-leida/');
+      final response = await _dio.post(
+        '${AppConstants.baseUrl}/api/notificaciones/$notificationId/marcar-leida/',
+      );
       return response.statusCode == 200;
     } catch (e) {
-      print("Error marking notification as read: $e");
+      debugPrint("Error marking notification as read: $e");
       return false;
     }
   }
 
   // --- Justificaciones ---
+
+  Future<List<dynamic>> getJustifications() async {
+    final response = await _dio.get(
+      '${AppConstants.baseUrl}/api/justificaciones/',
+    );
+    return response.data;
+  }
+
   Future<List<JustificationType>> getJustificationTypes() async {
-    final response = await _dio.get('${AppConstants.baseUrl}/api/tipo-justificaciones/');
+    final response = await _dio.get(
+      '${AppConstants.baseUrl}/api/tipo-justificaciones/',
+    );
     final List<dynamic> data = response.data;
     return data.map((json) => JustificationType.fromJson(json)).toList();
   }
@@ -132,41 +122,35 @@ class ApiService {
     required String reason,
     required File file,
   }) async {
-    // Convertir archivo a Base64
-    List<int> fileBytes = await file.readAsBytes();
-    String base64File = base64Encode(fileBytes);
-    
-    // Detectar extensión para el prefijo data URI (PDF o Imagen)
-    String extension = file.path.split('.').last.toLowerCase();
-    String mimeType = extension == 'pdf' ? 'application/pdf' : 'image/$extension';
-    String formattedBase64 = "data:$mimeType;base64,$base64File";
+    String fileName = file.path.split('/').last;
 
-    final data = {
+    FormData formData = FormData.fromMap({
       "tipo_id": typeId,
       "fecha_inicio": startDate.toIso8601String().split('T')[0],
       "fecha_fin": endDate.toIso8601String().split('T')[0],
       "motivo": reason,
-      "documentoBase64": formattedBase64
-    };
+      "documento_adjunto": await MultipartFile.fromFile(
+        file.path,
+        filename: fileName,
+      ),
+    });
 
-    await _dio.post('${AppConstants.baseUrl}/api/justificaciones/', data: data);
+    await _dio.post(
+      '${AppConstants.baseUrl}/api/justificaciones/',
+      data: formData,
+    );
   }
 
-  Future<void> updateFCMToken(String token) async {
-    try {
-      await _dio.post('${AppConstants.baseUrl}/api/mobile/fcm-token/', data: {'fcm_token': token});
-    } catch (e) {
-      print("Error actualizando FCM Token: $e");
-      // No lanzamos error para no interrumpir el flujo del usuario
-    }
-  }
+  // --- Documentos ---
 
   Future<List<dynamic>> getDocuments() async {
     try {
-      final response = await _dio.get('${AppConstants.baseUrl}/api/mobile/documents/');
+      final response = await _dio.get(
+        '${AppConstants.baseUrl}/api/mobile/documents/',
+      );
       return response.data;
     } catch (e) {
-      print('Error fetching documents: $e');
+      debugPrint('Error fetching documents: $e');
       return [];
     }
   }
@@ -174,7 +158,7 @@ class ApiService {
   Future<bool> uploadDocument({required int typeId, required File file}) async {
     try {
       String fileName = file.path.split('/').last;
-      
+
       FormData formData = FormData.fromMap({
         'tipo_id': typeId,
         'archivo': await MultipartFile.fromFile(file.path, filename: fileName),
@@ -187,37 +171,18 @@ class ApiService {
 
       return response.statusCode == 200;
     } catch (e) {
-      print("Error uploading document: $e");
+      debugPrint("Error uploading document: $e");
       return false;
     }
   }
 
-  // --- Biometria ---
-  Future<void> saveCredentials(String username, String password) async {
-    await _storage.write(key: 'bio_username', value: username);
-    await _storage.write(key: 'bio_password', value: password);
-  }
-
-  Future<bool> hasStoredCredentials() async {
-    final username = await _storage.read(key: 'bio_username');
-    final password = await _storage.read(key: 'bio_password');
-    return username != null && password != null;
-  }
-
-  Future<Map<String, String>?> getStoredCredentials() async {
-    if (!await hasStoredCredentials()) return null;
-    final username = await _storage.read(key: 'bio_username');
-    final password = await _storage.read(key: 'bio_password');
-    return {'username': username!, 'password': password!};
-  }
-
   // --- Recuperación de Contraseña ---
+
   Future<void> requestPasswordReset(String email) async {
-    final response = await _dio.post(
-      '${AppConstants.baseUrl}/api/auth/request-reset/',
+    await _dio.post(
+      AppConstants.passwordResetRequestEndpoint,
       data: {'email': email},
     );
-    // 200 OK significa enviado (o simulado si no existe)
   }
 
   Future<void> resetPassword({
@@ -226,12 +191,150 @@ class ApiService {
     required String newPassword,
   }) async {
     await _dio.post(
-      '${AppConstants.baseUrl}/api/auth/reset-password/',
-      data: {
-        'email': email,
-        'otp': otp,
-        'new_password': newPassword,
-      },
+      AppConstants.passwordResetConfirmEndpoint,
+      data: {'email': email, 'otp': otp, 'new_password': newPassword},
     );
+  }
+
+  // --- Adelanto de Clases ---
+
+  Future<void> createClassAdvancement({
+    required int courseId,
+    required String reason,
+  }) async {
+    final data = {"courseId": courseId, "reason": reason};
+    await _dio.post(
+      '${AppConstants.baseUrl}/api/mobile/adelanto-clase/',
+      data: data,
+    );
+  }
+
+  // --- Director ---
+
+  Future<List<dynamic>> getDirectorAttendanceFeed() async {
+    try {
+      final response = await _dio.get(
+        '${AppConstants.baseUrl}/api/mobile/director/attendance/',
+      );
+      return response.data;
+    } catch (e) {
+      debugPrint("Error fetching director feed: $e");
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>> getDirectorStats() async {
+    try {
+      final response = await _dio.get(
+        '${AppConstants.baseUrl}/api/mobile/director/stats/',
+      );
+      return response.data;
+    } catch (e) {
+      debugPrint("Error fetching director stats: $e");
+      return {};
+    }
+  }
+
+  // --- Historial ---
+
+  Future<List<dynamic>> getAttendanceHistory({int? month, int? year}) async {
+    try {
+      final response = await _dio.get(
+        '${AppConstants.baseUrl}/api/mobile/history/',
+        queryParameters: {
+          if (month != null) 'month': month,
+          if (year != null) 'year': year,
+        },
+      );
+      return response.data;
+    } catch (e) {
+      debugPrint("Error fetching history: $e");
+      return [];
+    }
+  }
+
+  // --- Recuperación de Clases ---
+
+  Future<List<dynamic>> getRecoveryRequests() async {
+    try {
+      final response = await _dio.get(
+        '${AppConstants.baseUrl}/api/mobile/recuperacion-clase/',
+      );
+      return response.data;
+    } catch (e) {
+      debugPrint("Error fetching recovery requests: $e");
+      return [];
+    }
+  }
+
+  Future<void> createRecoveryRequest({
+    required int courseId,
+    required DateTime dateToRecover,
+    required DateTime proposedDate,
+    required int durationMinutes,
+    required String reason,
+    int? classroomId,
+  }) async {
+    final data = {
+      "curso": courseId,
+      "fecha_a_recuperar": dateToRecover.toIso8601String().split('T')[0],
+      "fecha_propuesta": proposedDate.toIso8601String(),
+      "duracion_minutos": durationMinutes,
+      "motivo": reason,
+      "aula_solicitada": classroomId,
+    };
+    await _dio.post(
+      '${AppConstants.baseUrl}/api/mobile/recuperacion-clase/',
+      data: data,
+    );
+  }
+
+  // --- Perfil ---
+
+  Future<Map<String, dynamic>> updateProfile({
+    String? phone,
+    File? photo,
+  }) async {
+    final token = await _storage.read(key: 'access_token');
+    if (token == null) {
+      throw Exception('No se encontró token de autenticación');
+    }
+
+    try {
+      final formData = FormData();
+
+      if (phone != null) {
+        formData.fields.add(MapEntry('celular', phone));
+      }
+
+      if (photo != null) {
+        formData.files.add(
+          MapEntry(
+            'foto',
+            await MultipartFile.fromFile(
+              photo.path,
+              filename: photo.path.split('/').last,
+            ),
+          ),
+        );
+      }
+
+      final response = await _dio.patch(
+        '${AppConstants.baseUrl}/api/mobile/profile/update/',
+        data: formData,
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'multipart/form-data',
+          },
+        ),
+      );
+
+      return response.data;
+    } on DioException catch (e) {
+      throw Exception(
+        e.response?.data['message'] ?? 'Error al actualizar perfil',
+      );
+    }
   }
 }

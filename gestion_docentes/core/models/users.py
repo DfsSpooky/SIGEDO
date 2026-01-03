@@ -42,6 +42,12 @@ class Docente(AbstractUser):
         null=True, 
         help_text="Token de notificaciones Push (Firebase)"
     )
+    celular = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        help_text="Número de celular del docente"
+    )
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}"

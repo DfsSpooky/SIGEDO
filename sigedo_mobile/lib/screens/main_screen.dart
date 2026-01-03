@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../services/api_service.dart';
-import '../providers/auth_provider.dart';
+
 import 'dashboard_screen.dart';
 import 'notifications_screen.dart';
 import 'profile_screen.dart';
 import 'schedule_screen.dart';
+import 'director_attendance_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -17,11 +18,27 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   final ApiService _apiService = ApiService();
   int _unreadCount = 0;
+  int _selectedIndex = 0;
+  bool _isStaff = false;
 
   @override
   void initState() {
     super.initState();
     _checkNotifications();
+    _checkPermissions();
+  }
+
+  Future<void> _checkPermissions() async {
+    try {
+      final teacherData = await _apiService.getTeacherStatus();
+      if (mounted) {
+        setState(() {
+          _isStaff = teacherData.teacher.isStaff;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error checking permissions: $e");
+    }
   }
 
   Future<void> _checkNotifications() async {
@@ -33,61 +50,90 @@ class _MainScreenState extends State<MainScreen> {
         });
       }
     } catch (e) {
-      print("Error checking notifications: $e");
+      debugPrint("Error checking notifications: $e");
     }
   }
-
-  int _selectedIndex = 0;
-
-  final List<Widget> _screens = const [
-    DashboardScreen(),
-    ScheduleScreen(),
-    ProfileScreen(),
-  ];
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
+
+    // If user Taps on Notifications (index 2), refresh count when leaving or entering?
+    // Optionally refresh notifications when tapping the tab
+    if (index == 2) {
+      _checkNotifications();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Escuchar cambios de AuthProvider para logout
-    final auth = Provider.of<AuthProvider>(context, listen: false);
+    List<Widget> screens = [
+      const DashboardScreen(),
+      const ScheduleScreen(),
+      if (_isStaff) const DirectorAttendanceScreen(),
+      const NotificationsScreen(),
+      const ProfileScreen(),
+    ];
+
+    List<BottomNavigationBarItem> navItems = [
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.dashboard_outlined),
+        activeIcon: Icon(Icons.dashboard_rounded),
+        label: 'Inicio',
+      ),
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.calendar_month_outlined),
+        activeIcon: Icon(Icons.calendar_month_rounded),
+        label: 'Horario',
+      ),
+      if (_isStaff)
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.remove_red_eye_outlined),
+          activeIcon: Icon(Icons.remove_red_eye_rounded),
+          label: 'Monitoreo',
+        ),
+      BottomNavigationBarItem(
+        icon: Badge(
+          isLabelVisible: _unreadCount > 0,
+          label: Text('$_unreadCount'),
+          backgroundColor: Colors.redAccent,
+          child: const Icon(Icons.notifications_outlined),
+        ),
+        activeIcon: Badge(
+          isLabelVisible: _unreadCount > 0,
+          label: Text('$_unreadCount'),
+          backgroundColor: Colors.redAccent,
+          child: const Icon(Icons.notifications_rounded),
+        ),
+        label: 'Avisos',
+      ),
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.person_outline),
+        activeIcon: Icon(Icons.person_rounded),
+        label: 'Perfil',
+      ),
+    ];
+
+    // Safety check for index out of bounds if permissions change or reload
+    if (_selectedIndex >= screens.length) {
+      _selectedIndex = 0;
+    }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('SIGEDO Docentes'),
-        backgroundColor: Colors.indigo,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: Badge(
-              isLabelVisible: _unreadCount > 0,
-              label: Text('$_unreadCount'),
-              child: const Icon(Icons.notifications),
-            ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-              ).then((_) => _checkNotifications()); // Actualizar al volver
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => auth.logout(),
-          ),
-        ],
+      // No AppBar anymore
+      // Use IndexedStack to preserve state
+      body: IndexedStack(
+        // Use IndexedStack to preserve state
+        index: _selectedIndex,
+        children: screens,
       ),
-      body: _screens[_selectedIndex],
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 10,
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 20,
               offset: const Offset(0, -5),
             ),
           ],
@@ -96,26 +142,14 @@ class _MainScreenState extends State<MainScreen> {
           backgroundColor: Colors.white,
           elevation: 0,
           type: BottomNavigationBarType.fixed,
-          selectedItemColor: Theme.of(context).primaryColor,
-          unselectedItemColor: Colors.grey,
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
-          items: const <BottomNavigationBarItem>[
-            BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard_outlined),
-              activeIcon: Icon(Icons.dashboard),
-              label: 'Inicio',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_month_outlined),
-              activeIcon: Icon(Icons.calendar_month),
-              label: 'Horario',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
-              label: 'Perfil',
-            ),
-          ],
+          selectedItemColor: const Color(0xFF4F46E5),
+          unselectedItemColor: Colors.grey[400],
+          selectedLabelStyle: GoogleFonts.outfit(
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+          ),
+          unselectedLabelStyle: GoogleFonts.outfit(fontSize: 12),
+          items: navItems,
           currentIndex: _selectedIndex,
           onTap: _onItemTapped,
         ),

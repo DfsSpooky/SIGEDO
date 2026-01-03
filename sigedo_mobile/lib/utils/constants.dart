@@ -10,4 +10,7 @@ class AppConstants {
   static const String attendanceEndpoint = '/api/mobile/attendance/';
   static const String scheduleEndpoint = '/api/horario-docente/';
   static const String notificationsEndpoint = '/api/notificaciones/json/';
+  static const String passwordResetRequestEndpoint = '/api/password_reset/';
+  static const String passwordResetConfirmEndpoint =
+      '/api/password_reset/confirm/';
 }

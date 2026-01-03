@@ -40,6 +40,16 @@ class ConfiguracionInstitucion(models.Model):
         default=True,
         help_text="Si está activo, se validará que el docente esté dentro del campus para marcar."
     )
+    
+    hora_inicio_asistencia_general = models.TimeField(
+        default="07:00",
+        help_text="Hora desde la cual se permite marcar la Entrada General.",
+    )
+    
+    hora_fin_asistencia_general = models.TimeField(
+        default="23:00",
+        help_text="Hora hasta la cual se permite marcar la Entrada General.",
+    )
 
     class Meta:
         verbose_name = "Configuración de la Institución"

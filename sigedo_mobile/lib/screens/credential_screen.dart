@@ -12,159 +12,275 @@ class CredentialScreen extends StatelessWidget {
     final user = auth.teacherData?.teacher;
     // Use QR ID if available, otherwise fallback to DNI
     final qrData = user?.idQr ?? user?.dni ?? 'no-data';
-    
-    // Web Colors
-    final Color cardBackground = const Color(0xFF2C2A4A);
+
+    // Gradient Colors for Card
+    final List<Color> cardGradient = [
+      const Color(0xFF1A1A2E),
+      const Color(0xFF16213E),
+    ];
+    final Color accentColor = const Color(0xFFE94560);
 
     return Scaffold(
+      backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        title: const Text("Carnet Digital"),
+        title: const Text(
+          "Carnet Digital",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 0,
       ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             children: [
-              // FRONT OF CARD
+              // --- CARD CONTAINER ---
               Container(
-                width: 330,
-                // height: 520, // Dynamic height slightly better for mobile adaptation
-                constraints: const BoxConstraints(minHeight: 520),
+                width: 340,
+                height: 580,
                 decoration: BoxDecoration(
-                  color: cardBackground,
+                  gradient: LinearGradient(
+                    colors: cardGradient,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 20, offset: const Offset(0, 10))
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      blurRadius: 30,
+                      offset: const Offset(0, 15),
+                    ),
                   ],
                 ),
                 child: Stack(
                   children: [
-                     // Shape 1 (Top Left)
+                    // --- Decorative Circles ---
                     Positioned(
-                      top: -100,
-                      left: -150,
+                      top: -60,
+                      right: -60,
                       child: Container(
-                        width: 350,
-                        height: 350,
+                        width: 200,
+                        height: 200,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF4F46E5), Color(0xFF0EA5E9)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
+                          color: accentColor.withValues(alpha: 0.1),
                         ),
-                        child: ClipOval(child: Container(color: Colors.white.withOpacity(0.0))), // Blur effect hard in Flutter stack without BackdropFilter restricted area
                       ),
                     ),
-                    
-                    // Shape 2 (Bottom Right)
                     Positioned(
-                      bottom: -120,
-                      right: -150,
+                      bottom: 100,
+                      left: -50,
                       child: Container(
-                        width: 300,
-                        height: 300,
+                        width: 150,
+                        height: 150,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFD946EF), Color(0xFFF59E0B)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
+                          color: Colors.blue.withValues(alpha: 0.1),
                         ),
                       ),
                     ),
 
-                    // Content
+                    // --- CONTENT ---
                     Padding(
-                      padding: const EdgeInsets.all(25.0),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 32,
+                      ),
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          // Header (Logo placeholder)
+                          // 1. HEADER (Logo + Name)
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: Colors.white24,
-                                  borderRadius: BorderRadius.circular(20),
+                              auth.publicConfig?.logoUrl != null
+                                  ? Image.network(
+                                      auth.publicConfig!.logoUrl!,
+                                      width: 40,
+                                      height: 40,
+                                    )
+                                  : Image.asset(
+                                      'assets/images/logo.png',
+                                      width: 40,
+                                      height: 40,
+                                      errorBuilder: (c, o, s) => const Icon(
+                                        Icons.school,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      (auth.publicConfig?.institutionName ??
+                                              "UNIVERSIDAD NACIONAL")
+                                          .toUpperCase(),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.5,
+                                      ),
+                                      maxLines: 2,
+                                    ),
+                                    const Text(
+                                      "CARNET DIGITAL",
+                                      style: TextStyle(
+                                        color: Colors.white54,
+                                        fontSize: 10,
+                                        letterSpacing: 1,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                child: const Text("SIGEDO", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                              )
+                              ),
                             ],
                           ),
-                          const SizedBox(height: 40),
-                          
-                          // Profile Pic
+
+                          const SizedBox(height: 32),
+
+                          // 2. PHOTO
                           Container(
                             padding: const EdgeInsets.all(4),
-                            width: 148, 
-                            height: 148,
+                            width: 130,
+                            height: 130,
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.8),
-                              borderRadius: BorderRadius.circular(16), // Rounded square like web
+                              shape: BoxShape.circle,
+                              border: Border.all(color: accentColor, width: 3),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: accentColor.withValues(alpha: 0.4),
+                                  blurRadius: 20,
+                                ),
+                              ],
                             ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: (user?.foto != null) 
-                                ? Image.network(user!.foto!, fit: BoxFit.cover)
-                                : Container(color: Colors.grey, child: const Icon(Icons.person, size: 80, color: Colors.white)),
+                            child: ClipOval(
+                              child:
+                                  (user?.foto != null && user!.foto!.isNotEmpty)
+                                  ? Image.network(user.foto!, fit: BoxFit.cover)
+                                  : Container(
+                                      color: Colors.grey[800],
+                                      child: const Icon(
+                                        Icons.person,
+                                        size: 80,
+                                        color: Colors.white,
+                                      ),
+                                    ),
                             ),
                           ),
-                          
-                          const SizedBox(height: 20),
+
+                          const SizedBox(height: 24),
+
+                          // 3. USER INFO
                           Text(
-                            user?.name ?? "Nombre Docente",
-                            style: const TextStyle(
-                              color: Colors.white, 
-                              fontSize: 24, // 1.5rem approx
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1,
-                            ),
+                            user?.name ?? "DOCENTE",
                             textAlign: TextAlign.center,
-                          ),
-                          const Text(
-                            "DOCENTE",
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 18,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                          
-                          const SizedBox(height: 60),
-                          
-                          // QR Code (Simulating 'Reverso' functionality in same view for simplicity, like a flip)
-                          // Or simply putting it at the bottom.
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: accentColor,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Text(
+                              "DOCENTE",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                          ),
+
+                          const Spacer(),
+
+                          // 4. QR CODE AREA
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(16),
                             ),
-                            child: QrImageView(
-                              data: qrData,
-                              version: QrVersions.auto,
-                              size: 160.0,
-                              backgroundColor: Colors.white,
+                            child: Row(
+                              children: [
+                                QrImageView(
+                                  data: qrData,
+                                  version: QrVersions.auto,
+                                  size: 80.0,
+                                  padding: EdgeInsets.zero,
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        "IDENTIFICACIÓN",
+                                        style: TextStyle(
+                                          color: Colors.grey,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                      Text(
+                                        user?.dni ?? "---",
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 18,
+                                        ),
+                                      ),
+                                      const Divider(height: 12),
+                                      Text(
+                                        "Escanea este código para registrar asistencia.",
+                                        style: TextStyle(
+                                          color: Colors.grey[600],
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                           const SizedBox(height: 16),
-                           Text(
-                            "ID: ${user?.dni ?? '---'}",
-                            style: const TextStyle(color: Colors.white, fontSize: 18, letterSpacing: 2),
-                           ),
                         ],
                       ),
-                    )
+                    ),
                   ],
                 ),
               ),
-              
-              const SizedBox(height: 20),
-              const Text("Presenta este código en el lector", style: TextStyle(color: Colors.grey)),
+
+              const SizedBox(height: 30),
+
+              // Shadow/Reflection effect below card
+              Container(
+                width: 280,
+                height: 20,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(100),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 20,
+                      spreadRadius: 5,
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),

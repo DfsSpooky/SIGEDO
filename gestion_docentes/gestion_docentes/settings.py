@@ -431,6 +431,12 @@ UNFOLD = {
                         "link": reverse_lazy("admin:core_asistenciadiaria_changelist"),
                     },
                     {
+                        "title": "Recuperación de Clases",
+                        "icon": "restore",
+                        "link": reverse_lazy("admin:core_recuperacionclase_changelist"),
+                        "badge": "core.badge_callbacks.recuperaciones_badge_callback",
+                    },
+                    {
                         "title": "Solicitudes de Intercambio",
                         "icon": "swap_horiz",
                         "link": reverse_lazy(

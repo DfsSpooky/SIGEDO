@@ -18,7 +18,7 @@ from .justifications import lista_justificaciones, solicitar_justificacion
 from .kiosk import kiosco_page
 from .notifications import ver_anuncios, ver_notificaciones
 from .reports import analytics_dashboard, generar_ficha_docente, reporte_asistencia
-from .requests import responder_solicitud, solicitar_intercambio, ver_solicitudes
+from .requests import responder_solicitud, solicitar_intercambio, ver_solicitudes, ver_recuperaciones, solicitar_recuperacion
 from .reservations import DisponibilidadEquiposView, MisReservasView, cancelar_reserva
 from .schedules import (
     calendario_view,

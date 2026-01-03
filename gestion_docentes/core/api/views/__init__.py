@@ -5,7 +5,14 @@ from .mobile import (
     MobileStatusView, 
     UpdateFCMTokenView, 
     MobileDocumentsView,
-    MobileUploadDocumentView
+    MobileUploadDocumentView,
+    MobilePublicConfigView,
+    MobileAdelantoClaseView,
+    MobileDirectorAttendanceView,
+    MobileDirectorStatsView,
+    MobileAttendanceHistoryView,
+    MobileUpdateProfileView,
+    MobileRecuperacionClaseView,
 )
 from .notifications import (
     marcar_notificacion_como_leida,

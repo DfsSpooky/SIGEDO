@@ -10,6 +10,9 @@ def get_kiosk_data_for_docente(docente, request):
     Used by both QR and RFID methods to ensure consistent behavior.
     """
     today = timezone.localtime(timezone.now()).date()
+    
+    from core.models.settings import ConfiguracionInstitucion
+    Config = ConfiguracionInstitucion.load()
 
     # 1. Semestre Activo Check
     semestre_activo = Semestre.objects.filter(
@@ -80,6 +83,20 @@ def get_kiosk_data_for_docente(docente, request):
     )
     cursos_asistencia_serializer = CursoAsistenciaSerializer(asistencias, many=True)
 
+    # 5. Announcements (New)
+    from core.models import Anuncio
+    anuncios = Anuncio.objects.order_by('-fecha_publicacion')[:5]
+    anuncios_data = [
+        {
+            "id": a.id,
+            "titulo": a.titulo,
+            "contenido": a.contenido,
+            "fecha": a.fecha_publicacion.strftime("%d %b, %Y"),
+            "tipo": "info", # Default to info as model has no type field
+        }
+        for a in anuncios
+    ]
+
     response_data = {
         "status": "success",
         "qrId": str(docente.id_qr), # Ensure string format
@@ -92,6 +109,11 @@ def get_kiosk_data_for_docente(docente, request):
             "exitTime": daily_exit_time,
         },
         "courses": cursos_asistencia_serializer.data,
+        "announcements": anuncios_data,
+        "attendanceConfig": {
+            "generalEntryStartTime": Config.hora_inicio_asistencia_general.strftime("%H:%M") if Config.hora_inicio_asistencia_general else None,
+            "generalEntryEndTime": Config.hora_fin_asistencia_general.strftime("%H:%M") if Config.hora_fin_asistencia_general else None,
+        }
     }
 
     return response_data
