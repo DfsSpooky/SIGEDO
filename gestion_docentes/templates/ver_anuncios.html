@@ -1,0 +1,252 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+
+<script id="anuncios-data" type="application/json">
+    [
+        {% for anuncio in anuncios %}
+        {
+            "id": {{ anuncio.id }},
+            "titulo": "{{ anuncio.titulo|escapejs }}",
+            "contenido": "{{ anuncio.contenido|linebreaksbr|escapejs }}",
+            "tipo": "{{ anuncio.tipo|default:'GENERAL'|upper }}",
+            "fecha": "{{ anuncio.fecha_publicacion|date:'d M, Y' }}",
+            "hora": "{{ anuncio.fecha_publicacion|date:'H:i' }}",
+            "autor": "{{ anuncio.autor.first_name|default:'Administración'|escapejs }} {{ anuncio.autor.last_name|default:''|escapejs }}"
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ]
+</script>
+
+<div id="react-anuncios-root" class="min-h-screen bg-gray-50/50 p-6"></div>
+
+{% verbatim %}
+<script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    // Componente de Iconos
+    const Icon = ({ name, size = 20, className }) => {
+        const icons = {
+            'search': <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>,
+            'filter': <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>,
+            'calendar': <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>,
+            'user': <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+            'x': <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
+            'megaphone': <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>,
+            'alert-triangle': <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>,
+            'info': <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+        };
+        return icons[name] || null;
+    };
+
+    const TYPE_CONFIG = {
+        'URGENTE': { color: 'bg-red-100 text-red-700 border-red-200', icon: 'alert-triangle', label: 'Urgente' },
+        'IMPORTANTE': { color: 'bg-orange-100 text-orange-700 border-orange-200', icon: 'alert-triangle', label: 'Importante' },
+        'EVENTO': { color: 'bg-green-100 text-green-700 border-green-200', icon: 'calendar', label: 'Evento' },
+        'GENERAL': { color: 'bg-blue-100 text-blue-700 border-blue-200', icon: 'info', label: 'Información' },
+        'DEFAULT': { color: 'bg-gray-100 text-gray-700 border-gray-200', icon: 'megaphone', label: 'Aviso' }
+    };
+
+    const AnunciosBoard = () => {
+        const [anuncios, setAnuncios] = useState([]);
+        const [searchTerm, setSearchTerm] = useState("");
+        const [filterType, setFilterType] = useState("ALL");
+        const [selectedAnuncio, setSelectedAnuncio] = useState(null);
+
+        useEffect(() => {
+            try {
+                const rawData = document.getElementById('anuncios-data').textContent;
+                setAnuncios(JSON.parse(rawData));
+            } catch (e) {
+                console.error("Error cargando anuncios:", e);
+            }
+        }, []);
+
+        const filteredAnuncios = useMemo(() => {
+            return anuncios.filter(a => {
+                const matchesSearch = a.titulo.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                                      a.contenido.toLowerCase().includes(searchTerm.toLowerCase());
+                const matchesFilter = filterType === "ALL" || a.tipo === filterType;
+                return matchesSearch && matchesFilter;
+            });
+        }, [anuncios, searchTerm, filterType]);
+
+        const getTypeStyle = (tipo) => TYPE_CONFIG[tipo] || TYPE_CONFIG['DEFAULT'];
+
+        return (
+            <div className="max-w-6xl mx-auto space-y-8 animate-fade-in-up">
+                
+                {/* Header y Controles */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                            <Icon name="megaphone" className="text-blue-600" />
+                            Tablón de Anuncios
+                        </h1>
+                        <p className="text-gray-500 text-sm mt-1">Mantente al día con las últimas noticias de la institución.</p>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                        <div className="relative">
+                            <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                            <input 
+                                type="text" 
+                                placeholder="Buscar avisos..." 
+                                className="pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full sm:w-64 transition-all"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                        
+                        <div className="relative">
+                            <Icon name="filter" className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                            <select 
+                                className="pl-10 pr-8 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none cursor-pointer w-full sm:w-48"
+                                value={filterType}
+                                onChange={(e) => setFilterType(e.target.value)}
+                            >
+                                <option value="ALL">Todos los tipos</option>
+                                <option value="URGENTE">Urgentes</option>
+                                <option value="IMPORTANTE">Importantes</option>
+                                <option value="EVENTO">Eventos</option>
+                                <option value="GENERAL">Información</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Grid de Anuncios */}
+                {filteredAnuncios.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredAnuncios.map((anuncio) => {
+                            const style = getTypeStyle(anuncio.tipo);
+                            return (
+                                <div 
+                                    key={anuncio.id} 
+                                    onClick={() => setSelectedAnuncio(anuncio)}
+                                    className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition-all cursor-pointer transform hover:-translate-y-1 group flex flex-col h-full"
+                                >
+                                    <div className="p-6 flex-1">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 border ${style.color}`}>
+                                                <Icon name={style.icon} size={14} />
+                                                {style.label}
+                                            </span>
+                                            <span className="text-xs text-gray-400 font-mono">{anuncio.fecha}</span>
+                                        </div>
+                                        <h3 className="text-lg font-bold text-gray-800 mb-2 group-hover:text-blue-600 transition-colors line-clamp-2">
+                                            {anuncio.titulo}
+                                        </h3>
+                                        <div 
+                                            className="text-gray-500 text-sm line-clamp-3 mb-4"
+                                            dangerouslySetInnerHTML={{ __html: anuncio.contenido }}
+                                        ></div>
+                                    </div>
+                                    <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center text-xs text-gray-500">
+                                        <span className="flex items-center gap-1 font-medium">
+                                            <Icon name="user" size={14} />
+                                            {anuncio.autor}
+                                        </span>
+                                        <span className="text-blue-600 font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                                            Leer más &rarr;
+                                        </span>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-gray-300">
+                        <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4 text-gray-400">
+                            <Icon name="search" size={32} />
+                        </div>
+                        <h3 className="text-lg font-medium text-gray-900">No se encontraron anuncios</h3>
+                        <p className="text-gray-500 mt-1">Prueba ajustando tus filtros de búsqueda.</p>
+                        <button 
+                            onClick={() => {setSearchTerm(""); setFilterType("ALL");}}
+                            className="mt-4 text-blue-600 font-medium hover:underline"
+                        >
+                            Limpiar filtros
+                        </button>
+                    </div>
+                )}
+
+                {/* Modal de Detalle */}
+                {selectedAnuncio && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setSelectedAnuncio(null)}>
+                        <div 
+                            className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto relative animate-scale-in" 
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className={`p-6 md:p-8 ${getTypeStyle(selectedAnuncio.tipo).color.split(' ')[0]} bg-opacity-20`}>
+                                <button 
+                                    onClick={() => setSelectedAnuncio(null)}
+                                    className="absolute top-4 right-4 p-2 bg-white/50 hover:bg-white rounded-full transition-colors"
+                                >
+                                    <Icon name="x" size={20} className="text-gray-600" />
+                                </button>
+                                
+                                <div className="flex gap-2 mb-4">
+                                    <span className={`px-3 py-1 rounded-full text-xs font-bold bg-white border border-gray-200 shadow-sm text-gray-700`}>
+                                        {getTypeStyle(selectedAnuncio.tipo).label}
+                                    </span>
+                                </div>
+                                <h2 className="text-2xl md:text-3xl font-bold text-gray-900">
+                                    {selectedAnuncio.titulo}
+                                </h2>
+                            </div>
+
+                            <div className="p-6 md:p-8">
+                                <div className="flex items-center gap-4 text-sm text-gray-500 mb-6 pb-6 border-b border-gray-100">
+                                    <div className="flex items-center gap-2">
+                                        <Icon name="calendar" size={16} />
+                                        {selectedAnuncio.fecha} a las {selectedAnuncio.hora}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Icon name="user" size={16} />
+                                        Publicado por: <span className="font-semibold text-gray-700">{selectedAnuncio.autor}</span>
+                                    </div>
+                                </div>
+
+                                <div 
+                                    className="prose prose-blue max-w-none text-gray-700 leading-relaxed"
+                                    dangerouslySetInnerHTML={{ __html: selectedAnuncio.contenido }}
+                                ></div>
+                                
+                                <div className="mt-8 pt-6 border-t border-gray-100 flex justify-end">
+                                    <button 
+                                        onClick={() => setSelectedAnuncio(null)}
+                                        className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
+                                    >
+                                        Cerrar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('react-anuncios-root'));
+    root.render(<AnunciosBoard />);
+</script>
+{% endverbatim %}
+
+<style>
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+    
+    .animate-fade-in { animation: fadeIn 0.2s ease-out; }
+    .animate-fade-in-up { animation: fadeInUp 0.4s ease-out; }
+    .animate-scale-in { animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+</style>
+{% endblock %}

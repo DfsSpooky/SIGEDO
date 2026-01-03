@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+{% load template_extras %}
+
+{% block breadcrumb %}Horario Docente{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-4 animate-fade-in">
+    <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+        <div>
+            <h1 class="text-3xl font-bold text-base-content">
+                <i class="fas fa-chalkboard-teacher text-primary mr-2"></i>Horario: {{ docente.nombre_completo }}
+            </h1>
+            <p class="text-base-content/60 mt-1">
+                Visualización administrativa completa (Clases + Bloques No Lectivos).
+            </p>
+        </div>
+        <div class="flex gap-2">
+            <a href="#" onclick="window.print()" class="btn btn-outline gap-2">
+                <i class="fas fa-print"></i> Imprimir
+            </a>
+            <a href="{% url 'admin:core_docente_change' docente.id %}" class="btn btn-ghost">
+                <i class="fas fa-edit"></i> Editar Docente
+            </a>
+        </div>
+    </div>
+
+    <div class="card bg-base-100 shadow-xl border border-base-200 overflow-hidden">
+        <div class="card-body p-4">
+
+            <!-- Grid Container -->
+            <!-- 1 columna para hora + 5 columnas para días = 6 columnas -->
+            <div class="grid grid-cols-[80px_repeat(5,1fr)] gap-1 auto-rows-fr">
+
+                <!-- Encabezados -->
+                <div
+                    class="p-3 font-bold text-center opacity-50 flex items-center justify-center bg-base-200 rounded-lg">
+                    <i class="fas fa-clock"></i>
+                </div>
+                {% for dia in dias_semana %}
+                <div
+                    class="p-3 font-bold text-center bg-primary/10 text-primary rounded-lg uppercase tracking-wider text-sm flex items-center justify-center">
+                    {{ dia }}
+                </div>
+                {% endfor %}
+
+                <!-- Cuerpo del Horario -->
+                {% for franja in franjas %}
+                <!-- Columna de Hora -->
+                <div
+                    class="text-xs font-mono flex flex-col items-center justify-center bg-base-200/50 rounded p-1 text-base-content/70">
+                    <span>{{ franja.hora_inicio|date:"H:i" }}</span>
+                    <span class="opacity-50 text-[10px]">-</span>
+                    <span>{{ franja.hora_fin|date:"H:i" }}</span>
+                </div>
+
+                <!-- Columnas de Días -->
+                {% for dia in dias_semana %}
+                {% with cell=grid|get_item:franja.id|get_item:dia %}
+
+                {# Lógica de Renderizado: solo renderizar si no está cubierto por un span previo #}
+                {% if cell != 'SPAN_COVERED' %}
+                <div class="relative min-h-[80px] border border-base-200 rounded-lg p-2 transition-all hover:shadow-md flex flex-col justify-center
+                                    {% if cell %}
+                                        {# Estilos si hay contenido #}
+                                        {% if cell.tipo == 'CLASE' %} 
+                                            bg-blue-50 border-blue-200 hover:border-blue-400
+                                        {% elif cell.tipo == 'NO_LECTIVO' %} 
+                                            bg-gray-100 border-gray-300 hover:border-gray-400 opacity-90
+                                        {% endif %}
+                                    {% else %}
+                                        {# Estilo celda vacía #}
+                                        bg-base-100 hover:bg-base-200/50
+                                    {% endif %}" {# Aplicar RowSpan si es necesario #} {% if cell and cell.duracion> 1
+                    %}
+                    style="grid-row: span {{ cell.duracion }}; z-index: 10;"
+                    {% endif %}>
+
+                    {% if cell %}
+                    <div class="flex flex-col h-full justify-between">
+                        <div>
+                            {% if cell.tipo == 'CLASE' %}
+                            <span class="badge badge-xs badge-primary mb-1">Clase</span>
+                            {% else %}
+                            <span class="badge badge-xs badge-ghost mb-1">No Lectivo</span>
+                            {% endif %}
+
+                            <p class="font-bold text-sm leading-tight text-base-content">
+                                {{ cell.titulo }}
+                            </p>
+                        </div>
+
+                        <div class="mt-2 flex items-center gap-1 text-xs text-base-content/70">
+                            <i class="fas fa-map-marker-alt"></i>
+                            <span class="font-mono">{{ cell.aula }}</span>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                {% endwith %}
+                {% endfor %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
