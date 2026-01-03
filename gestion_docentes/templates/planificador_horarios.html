@@ -397,8 +397,7 @@
         <div class="planner-header flex flex-wrap justify-between items-center">
             <div>
                 <h1 class="card-title">Planificador de Horarios</h1>
-                <p class="text-base-content/70">Semestre Activo: <span class="font-semibold text-primary">{{
-                        semestre_activo.nombre }}</span></p>
+                <p class="text-base-content/70">Semestre Activo: <span class="font-semibold text-primary">{{ semestre_activo.nombre }}</span></p>
             </div>
 
             <div class="flex items-center gap-4 p-2 bg-base-200 rounded-box">
@@ -550,8 +549,8 @@
     window.PlannerConfig = {
         csrfToken: '{{ csrf_token }}',
         franjasManana: {{ franjas_manana_json | safe }},
-    franjasTarde: { { franjas_tarde_json | safe } },
-    diasSemana: { { dias_semana_json | safe } }
+    franjasTarde: {{ franjas_tarde_json | safe }},
+    diasSemana: {{ dias_semana_json | safe }}
     };
 
     // --- Script simple para el botón de Exportar ---
