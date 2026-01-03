@@ -1,4 +1,4 @@
-from .models import Documento, Justificacion, Notificacion, SolicitudIntercambio
+from .models import Documento, Justificacion, Notificacion, SolicitudIntercambio, RecuperacionClase
 
 
 def documentos_badge_callback(request):
@@ -26,6 +26,15 @@ def solicitudes_intercambio_badge_callback(request):
     """
     if request.user.is_staff:
         return SolicitudIntercambio.objects.filter(estado="pendiente").count()
+    return 0
+
+
+def recuperaciones_badge_callback(request):
+    """
+    Returns the number of recovery requests in 'PENDIENTE' state.
+    """
+    if request.user.is_staff:
+        return RecuperacionClase.objects.filter(estado="PENDIENTE").count()
     return 0
 
 

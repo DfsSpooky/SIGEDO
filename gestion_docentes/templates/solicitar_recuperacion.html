@@ -6,118 +6,203 @@
 {% block breadcrumb %}Solicitar Recuperación{% endblock %}
 
 {% block content %}
-<div class="container mx-auto max-w-3xl">
+<div class="container mx-auto px-4 max-w-6xl animate-fade-in pb-12">
 
-    <div class="text-center mb-8 animate-fade-in">
-        <h1 class="text-3xl font-bold text-base-content">
-            <i class="fas fa-clock-rotate-left text-primary mr-2"></i>Recuperación de Clases
-        </h1>
-        <p class="text-base-content/70 mt-2">Completa el formulario para agendar una reprogramación.</p>
+    <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+        <div>
+            <h1 class="text-3xl font-bold text-base-content tracking-tight">
+                Recuperación de Clases
+            </h1>
+            <p class="text-base-content/60 mt-1 text-lg">
+                Gestiona la reprogramación de tus sesiones académicas.
+            </p>
+        </div>
+        <a href="{% url 'ver_recuperaciones' %}" class="btn btn-outline gap-2 normal-case">
+            <i class="fas fa-list-ul"></i> Ver Historial
+        </a>
     </div>
 
-    <div class="card bg-base-100 shadow-xl border border-base-200 animate-fade-in">
-        <div class="card-body">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-            <form method="post" id="recuperacionForm">
-                {% csrf_token %}
+        <div class="lg:col-span-2">
+            <div class="card bg-base-100 shadow-xl border border-base-200 overflow-hidden">
+                <div class="h-2 bg-gradient-to-r from-primary to-secondary"></div>
 
-                {% if form.non_field_errors %}
-                <div class="alert alert-error shadow-lg mb-6 text-white">
-                    <i class="fas fa-exclamation-circle"></i>
-                    <div>
-                        <h3 class="font-bold">Error</h3>
-                        <div class="text-xs">{{ form.non_field_errors }}</div>
-                    </div>
-                </div>
-                {% endif %}
+                <div class="card-body p-6 md:p-8">
+                    <form method="post" id="recuperacionForm" novalidate>
+                        {% csrf_token %}
 
-                <div class="form-control w-full mb-4">
-                    <label class="label" for="{{ form.curso.id_for_label }}">
-                        <span class="label-text font-semibold"><i
-                                class="fas fa-book mr-2 text-secondary"></i>Curso</span>
-                    </label>
-                    {{ form.curso }}
-                    {% if form.curso.errors %}
-                    <label class="label">
-                        <span class="label-text-alt text-error font-medium">{{ form.curso.errors.0 }}</span>
-                    </label>
-                    {% endif %}
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-
-                    <div class="form-control w-full">
-                        <label class="label" for="{{ form.fecha_a_recuperar.id_for_label }}">
-                            <span class="label-text font-semibold"><i
-                                    class="fas fa-calendar-times mr-2 text-error"></i>Fecha a Recuperar</span>
-                        </label>
-                        {{ form.fecha_a_recuperar }}
-                        {% if form.fecha_a_recuperar.errors %}
-                        <label class="label">
-                            <span class="label-text-alt text-error font-medium">{{ form.fecha_a_recuperar.errors.0
-                                }}</span>
-                        </label>
-                        {% endif %}
-                        <label class="label">
-                            <span class="label-text-alt text-base-content/60">La fecha de la clase perdida.</span>
-                        </label>
-                    </div>
-
-                    <div class="form-control w-full">
-                        <label class="label" for="{{ form.fecha_propuesta.id_for_label }}">
-                            <span class="label-text font-semibold"><i
-                                    class="fas fa-calendar-check mr-2 text-success"></i>Nueva Fecha Propuesta</span>
-                        </label>
-                        {{ form.fecha_propuesta }}
-                        {% if form.fecha_propuesta.errors %}
-                        <label class="label">
-                            <span class="label-text-alt text-error font-medium">{{ form.fecha_propuesta.errors.0
-                                }}</span>
-                        </label>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="form-control w-full mb-4">
-                    <label class="label" for="{{ form.duracion_minutos.id_for_label }}">
-                        <span class="label-text font-semibold"><i
-                                class="fas fa-hourglass-half mr-2 text-warning"></i>Duración (minutos)</span>
-                    </label>
-                    <div class="relative">
-                        {{ form.duracion_minutos }}
-                        <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                            <span class="text-gray-500 text-sm">min</span>
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-error shadow-lg mb-6 text-white rounded-lg">
+                            <i class="fas fa-exclamation-circle"></i>
+                            <span class="font-medium">{{ form.non_field_errors }}</span>
                         </div>
-                    </div>
-                    {% if form.duracion_minutos.errors %}
-                    <label class="label">
-                        <span class="label-text-alt text-error font-medium">{{ form.duracion_minutos.errors.0 }}</span>
-                    </label>
-                    {% endif %}
-                </div>
+                        {% endif %}
 
-                <div class="form-control w-full mb-6">
-                    <label class="label" for="{{ form.motivo.id_for_label }}">
-                        <span class="label-text font-semibold"><i class="fas fa-comment-alt mr-2 text-info"></i>Motivo
-                            de la falta</span>
-                    </label>
-                    {{ form.motivo }}
-                    {% if form.motivo.errors %}
-                    <label class="label">
-                        <span class="label-text-alt text-error font-medium">{{ form.motivo.errors.0 }}</span>
-                    </label>
-                    {% endif %}
-                </div>
+                        <div class="form-control w-full mb-6 group">
+                            <label class="label font-semibold text-base-content/80 mb-1"
+                                for="{{ form.curso.id_for_label }}">
+                                Curso a Recuperar
+                            </label>
+                            <div class="join w-full shadow-sm">
+                                <span
+                                    class="join-item btn btn-square btn-ghost bg-base-200 border-base-300 pointer-events-none">
+                                    <i class="fas fa-book text-primary"></i>
+                                </span>
+                                {{ form.curso }}
+                            </div>
+                            {% if form.curso.errors %}
+                            <span class="text-error text-sm mt-1 ml-1 flex items-center gap-1">
+                                <i class="fas fa-times-circle"></i> {{ form.curso.errors.0 }}
+                            </span>
+                            {% endif %}
+                        </div>
 
-                <div class="card-actions justify-end mt-4 pt-4 border-t border-base-200">
-                    <a href="{% url 'ver_recuperaciones' %}" class="btn btn-ghost hover:bg-base-200">
-                        Cancelar
-                    </a>
-                    <button type="submit" class="btn btn-primary px-8">
-                        <i class="fas fa-paper-plane mr-2"></i> Enviar Solicitud
+                        <div class="divider text-xs text-base-content/40 font-semibold uppercase tracking-wider my-6">
+                            Detalles de la Fechas</div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            <div class="form-control w-full">
+                                <label class="label font-semibold text-base-content/80 mb-1"
+                                    for="{{ form.fecha_a_recuperar.id_for_label }}">
+                                    Fecha de la falta (Original)
+                                </label>
+                                <div class="join w-full shadow-sm">
+                                    <span
+                                        class="join-item btn btn-square btn-ghost bg-base-200 border-base-300 pointer-events-none">
+                                        <i class="fas fa-calendar-times text-error"></i>
+                                    </span>
+                                    {{ form.fecha_a_recuperar }}
+                                </div>
+                                {% if form.fecha_a_recuperar.errors %}
+                                <span class="text-error text-sm mt-1 ml-1">{{ form.fecha_a_recuperar.errors.0 }}</span>
+                                {% else %}
+                                <span class="label-text-alt text-base-content/50 mt-1 ml-1">Día que no se dictó la
+                                    clase.</span>
+                                {% endif %}
+                            </div>
+
+                            <div class="form-control w-full">
+                                <label class="label font-semibold text-base-content/80 mb-1"
+                                    for="{{ form.fecha_propuesta.id_for_label }}">
+                                    Nueva Fecha y Hora Propuesta
+                                </label>
+                                <div class="join w-full shadow-sm">
+                                    <span
+                                        class="join-item btn btn-square btn-ghost bg-base-200 border-base-300 pointer-events-none">
+                                        <i class="fas fa-calendar-check text-success"></i>
+                                    </span>
+                                    {{ form.fecha_propuesta }}
+                                </div>
+                                {% if form.fecha_propuesta.errors %}
+                                <span class="text-error text-sm mt-1 ml-1">{{ form.fecha_propuesta.errors.0 }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="form-control w-full mb-6">
+                            <label class="label font-semibold text-base-content/80 mb-1"
+                                for="{{ form.duracion_minutos.id_for_label }}">
+                                Duración de la Sesión
+                            </label>
+                            <div class="flex items-center gap-4">
+                                <div class="relative w-full md:w-1/2">
+                                    <div class="join w-full shadow-sm">
+                                        <span
+                                            class="join-item btn btn-square btn-ghost bg-base-200 border-base-300 pointer-events-none">
+                                            <i class="fas fa-hourglass-half text-warning"></i>
+                                        </span>
+                                        {{ form.duracion_minutos }}
+                                    </div>
+                                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                        <span class="text-base-content/40 text-sm font-bold">min</span>
+                                    </div>
+                                </div>
+                                <div class="hidden md:flex gap-2">
+                                    <button type="button" onclick="setDuration(45)"
+                                        class="btn btn-xs btn-ghost border-base-300">45m</button>
+                                    <button type="button" onclick="setDuration(60)"
+                                        class="btn btn-xs btn-ghost border-base-300">60m</button>
+                                    <button type="button" onclick="setDuration(90)"
+                                        class="btn btn-xs btn-ghost border-base-300">90m</button>
+                                </div>
+                            </div>
+                            {% if form.duracion_minutos.errors %}
+                            <span class="text-error text-sm mt-1 ml-1">{{ form.duracion_minutos.errors.0 }}</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="form-control w-full mb-8">
+                            <label class="label font-semibold text-base-content/80 mb-1"
+                                for="{{ form.motivo.id_for_label }}">
+                                Justificación / Motivo
+                            </label>
+                            <div class="relative">
+                                {{ form.motivo }}
+                                <div class="absolute top-3 right-3 text-base-content/30 pointer-events-none">
+                                    <i class="fas fa-pen"></i>
+                                </div>
+                            </div>
+                            {% if form.motivo.errors %}
+                            <span class="text-error text-sm mt-1 ml-1">{{ form.motivo.errors.0 }}</span>
+                            {% else %}
+                            <span class="label-text-alt text-base-content/50 mt-1 ml-1">Describe brevemente la razón de
+                                la reprogramación.</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="flex items-center justify-end gap-3 pt-4 border-t border-base-200">
+                            <a href="{% url 'dashboard' %}"
+                                class="btn btn-ghost text-base-content/70 hover:bg-base-200 normal-case">
+                                Cancelar
+                            </a>
+                            <button type="submit"
+                                class="btn btn-primary px-8 gap-2 normal-case shadow-lg shadow-primary/20 hover:scale-105 transition-transform">
+                                <i class="fas fa-paper-plane"></i> Enviar Solicitud
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="lg:col-span-1 space-y-6">
+
+            <div class="card bg-base-100 shadow-lg border border-base-200">
+                <div class="card-body p-6">
+                    <h3 class="card-title text-lg mb-4 flex items-center gap-2">
+                        <i class="fas fa-info-circle text-info"></i> Información Útil
+                    </h3>
+                    <ul class="space-y-4 text-sm text-base-content/80">
+                        <li class="flex gap-3">
+                            <div class="w-1 bg-primary rounded-full h-auto"></div>
+                            <p>La fecha propuesta debe ser posterior a la fecha actual y no debe coincidir con otros
+                                horarios asignados.</p>
+                        </li>
+                        <li class="flex gap-3">
+                            <div class="w-1 bg-secondary rounded-full h-auto"></div>
+                            <p>Las solicitudes están sujetas a la disponibilidad del aula y aprobación de la
+                                coordinación.</p>
+                        </li>
+                        <li class="flex gap-3">
+                            <div class="w-1 bg-accent rounded-full h-auto"></div>
+                            <p>Recibirás una notificación en el sistema una vez que tu solicitud sea revisada.</p>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card bg-primary text-primary-content shadow-xl">
+                <div class="card-body p-6">
+                    <h3 class="font-bold text-lg mb-2">¿Necesitas ayuda?</h3>
+                    <p class="text-sm opacity-90 mb-4">Si tienes problemas con el cruce de horarios, contacta a soporte
+                        académico.</p>
+                    <button class="btn btn-sm btn-white text-primary border-none w-full hover:bg-base-100">
+                        Contactar Soporte
                     </button>
                 </div>
-            </form>
+            </div>
+
         </div>
     </div>
 </div>
@@ -126,33 +211,55 @@
 
 {% block extra_js %}
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        // Este script añade clases de DaisyUI a los widgets de Django automáticamente
-        // para que no tengas que instalar 'django-widget-tweaks' si no quieres.
+    // Función helper para los botones de duración
+    function setDuration(minutes) {
+        const input = document.querySelector('input[name="duracion_minutos"]');
+        if (input) {
+            input.value = minutes;
+            // Disparar evento de cambio para validaciones visuales si las hubiera
+            input.dispatchEvent(new Event('input'));
+            input.focus();
+        }
+    }
 
+    document.addEventListener('DOMContentLoaded', function () {
+        // Estilización automática de widgets de Django para integrarse con DaisyUI/Tailwind
+
+        // Inputs normales (dentro de join-item)
         const inputs = document.querySelectorAll('#recuperacionForm input[type="text"], #recuperacionForm input[type="number"], #recuperacionForm input[type="date"], #recuperacionForm input[type="datetime-local"]');
         inputs.forEach(input => {
-            input.classList.add('input', 'input-bordered', 'w-full', 'focus:input-primary');
+            input.classList.add('join-item', 'input', 'input-bordered', 'w-full', 'focus:outline-none', 'bg-base-100');
+            // Quitar estilos antiguos si existen y asegurar que se vean modernos
+            input.style.borderTopLeftRadius = '0';
+            input.style.borderBottomLeftRadius = '0';
         });
 
+        // Selects
         const selects = document.querySelectorAll('#recuperacionForm select');
         selects.forEach(select => {
-            select.classList.add('select', 'select-bordered', 'w-full', 'focus:select-primary');
+            select.classList.add('join-item', 'select', 'select-bordered', 'w-full', 'focus:outline-none', 'bg-base-100');
+            select.style.borderTopLeftRadius = '0';
+            select.style.borderBottomLeftRadius = '0';
         });
 
+        // Textarea
         const textareas = document.querySelectorAll('#recuperacionForm textarea');
         textareas.forEach(textarea => {
-            textarea.classList.add('textarea', 'textarea-bordered', 'w-full', 'h-32', 'focus:textarea-primary');
+            textarea.classList.add('textarea', 'textarea-bordered', 'w-full', 'h-32', 'focus:textarea-primary', 'text-base');
         });
 
-        // Highlight campos con errores
+        // Manejo de estados de error
         const errorInputs = document.querySelectorAll('.text-error');
         errorInputs.forEach(error => {
-            // Busca el input cercano para ponerle borde rojo
             const parent = error.closest('.form-control');
             if (parent) {
                 const input = parent.querySelector('input, select, textarea');
-                if (input) input.classList.add('input-error', 'select-error', 'textarea-error');
+                if (input) {
+                    input.classList.add('input-error', 'select-error', 'textarea-error');
+                    // Añadir animación suave de shake si hay error
+                    parent.classList.add('animate-pulse');
+                    setTimeout(() => parent.classList.remove('animate-pulse'), 500);
+                }
             }
         });
     });
