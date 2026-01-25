@@ -24,7 +24,31 @@ class Asistencia(models.Model):
     foto_salida = models.ImageField(
         upload_to="verificacion_cursos/salidas/%Y/%m/%d/", null=True, blank=True
     )
-    observacion_salida = models.TextField(null=True, blank=True)
+    latitud_entrada = models.FloatField(null=True, blank=True)
+    longitud_entrada = models.FloatField(null=True, blank=True)
+    latitud_salida = models.FloatField(null=True, blank=True)
+    longitud_salida = models.FloatField(null=True, blank=True)
+    
+    justificacion = models.ForeignKey(
+        "Justificacion", 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name="asistencias_vinculadas"
+    )
+    
+    ESTADOS_ASISTENCIA = [
+        ("PRESENTE", "Presente"),
+        ("TARDANZA", "Tardanza"),
+        ("JUSTIFICADO", "Justificado"),
+        ("FALTA", "Falta"),
+    ]
+    estado = models.CharField(
+        max_length=20, 
+        choices=ESTADOS_ASISTENCIA, 
+        default="PRESENTE"
+    )
+
     history = HistoricalRecords()
 
     class Meta:
@@ -112,6 +136,18 @@ class Asistencia(models.Model):
         return False
 
 
+    def save(self, *args, **kwargs):
+        if self.justificacion:
+            self.estado = "JUSTIFICADO"
+        elif self.hora_entrada:
+            if self.es_tardanza():
+                self.estado = "TARDANZA"
+            else:
+                self.estado = "PRESENTE"
+        else:
+            self.estado = "FALTA"
+        super().save(*args, **kwargs)
+
 class AsistenciaDiaria(models.Model):
     # String reference
     docente = models.ForeignKey("core.Docente", on_delete=models.CASCADE)
@@ -180,6 +216,31 @@ class Justificacion(models.Model):
         blank=True,
         help_text="Notas internas del administrador que revisa la solicitud. Visibles solo para otros administradores.",
     )
+
+    def save(self, *args, **kwargs):
+        is_approval = False
+        if self.pk:
+            old_obj = Justificacion.objects.get(pk=self.pk)
+            if old_obj.estado != "APROBADO" and self.estado == "APROBADO":
+                is_approval = True
+        elif self.estado == "APROBADO":
+            is_approval = True
+            
+        super().save(*args, **kwargs)
+        
+        if is_approval:
+            self.vincular_asistencias()
+
+    def vincular_asistencias(self):
+        from .attendance import Asistencia
+        asistencias = Asistencia.objects.filter(
+            docente=self.docente,
+            fecha__range=[self.fecha_inicio, self.fecha_fin]
+        )
+        for asistencia in asistencias:
+            asistencia.justificacion = self
+            asistencia.estado = "JUSTIFICADO"
+            asistencia.save()
 
     def __str__(self):
         return f"Justificación de {self.docente} ({self.fecha_inicio} al {self.fecha_fin}) - {self.get_estado_display()}"

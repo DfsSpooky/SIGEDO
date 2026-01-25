@@ -37,6 +37,8 @@ ID_ENCRYPTION_KEY = os.environ.get("ID_ENCRYPTION_KEY", "").encode()
 DEBUG = os.environ.get("DEBUG", "False").lower() in ("true", "1", "t")
 
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost").split(",") + ["oversophisticated-dedra-overgross.ngrok-free.dev"]
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL_NAME = os.environ.get("GEMINI_MODEL_NAME", "gemini-1.5-flash")
 # ... cerca de ALLOWED_HOSTS ...
 
 CSRF_TRUSTED_ORIGINS = ["https://aquienpasco.lat", "https://www.aquienpasco.lat", "https://oversophisticated-dedra-overgross.ngrok-free.dev" ]

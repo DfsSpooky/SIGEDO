@@ -53,3 +53,5 @@ firebase-admin
 drf-spectacular
 django-simple-history
 django-redis
+ortools==9.8.3296
+google-generativeai

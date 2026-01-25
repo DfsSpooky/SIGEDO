@@ -87,7 +87,9 @@ def registrar_asistencia(request):
                         docente=docente,
                         curso=bloque_actual.curso,
                         fecha=now.date(),
-                        hora_entrada=now
+                        hora_entrada=now,
+                        latitud_entrada=request.POST.get("latitud"),
+                        longitud_entrada=request.POST.get("longitud")
                     )
                     
                     # --- MEJORA: Cálculo dinámico de la duración ---
@@ -128,6 +130,8 @@ def registrar_asistencia(request):
                     error_message = f"Aún no puede marcar salida. Espere {minutos} minutos más para completar el tiempo mínimo."
                 else:
                     asistencia_obj.hora_salida = now
+                    asistencia_obj.latitud_salida = request.POST.get("latitud")
+                    asistencia_obj.longitud_salida = request.POST.get("longitud")
                     asistencia_obj.save()
                     messages.success(request, f"Salida marcada correctamente a las {now.strftime('%H:%M')}")
                     return redirect("asistencia")

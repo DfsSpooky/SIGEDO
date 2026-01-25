@@ -285,7 +285,7 @@
         </div>
     </div>
 
-    {% block extra_js %}{% endblock %}
+
 
     {% if user.is_authenticated %}
     <script>
@@ -431,6 +431,7 @@
         });
     </script>
     {% endif %}
+    {% block extra_js %}{% endblock %}
 </body>
 
 </html>

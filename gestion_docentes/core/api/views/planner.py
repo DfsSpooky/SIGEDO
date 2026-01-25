@@ -1,7 +1,11 @@
 import json
 import random
+import google.generativeai as genai
 from collections import defaultdict
-from datetime import datetime  # <--- NUEVO IMPORT
+from datetime import datetime
+from django.conf import settings
+from rest_framework.views import APIView
+from core.services.or_tools_solver import HorarioSolver
 
 from django.shortcuts import render
 from django.http import JsonResponse
@@ -733,220 +737,123 @@ def generar_horario_automatico(request):
         return error_response("Método no permitido", status_code=405)
 
     try:
-        # --- TRANSACCIÓN ATÓMICA ---
-        with transaction.atomic():
-            semestre_activo = Semestre.objects.filter(estado="ACTIVO").select_for_update().first()
-            if not semestre_activo:
-                return error_response(
-                    "No hay un semestre activo configurado.", status_code=400
-                )
-
-            # 1. Reset: Borrar todos los bloques de horario existentes para el semestre activo
-            BloqueHorario.objects.filter(curso__semestre=semestre_activo).delete()
-
-            # 2. Obtener recursos y restricciones
-            cursos_a_asignar = list(
-                Curso.objects.filter(semestre=semestre_activo, docente__isnull=False)
-                .select_related("docente")
-                .prefetch_related("especialidades__grupo")
-                .annotate(num_especialidades=Count("especialidades"))
-                .order_by(
-                    "-num_especialidades", "-horas_academicas_semanales"
-                )
-            )
-            franjas_horarias = list(FranjaHoraria.objects.order_by("hora_inicio"))
-            dias_semana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
-
-            horarios_ocupados = defaultdict(set)  # (tipo, id, dia, franja_id) -> True
-            carga_docente = defaultdict(lambda: defaultdict(int)) # {docente_id: {dia: horas}}
-            carga_grupo = defaultdict(lambda: defaultdict(int))   # {(grupo_id, semestre): {dia: horas}}
-
-            # Pre-cargar Bloques No Lectivos
-            bloques_no_lectivos = BloqueNoLectivo.objects.select_related("docente")
-            for bloque in bloques_no_lectivos:
-                 try:
-                    franja_idx = franjas_horarias.index(bloque.franja_inicio)
-                    for i in range(bloque.duracion_bloques):
-                        if franja_idx + i < len(franjas_horarias):
-                            franja_ocupada = franjas_horarias[franja_idx + i]
-                            horarios_ocupados["docente"].add(
-                                (bloque.docente.id, bloque.dia, franja_ocupada.id)
-                            )
-                 except ValueError:
-                    continue
-
-            cursos_completados = 0
-            cursos_no_asignados_completamente = []
-
-            # 3. Iterar y asignar bloques
-            for curso in cursos_a_asignar:
-                horas_pendientes = curso.horas_academicas_semanales
-                docente = curso.docente
-                grupos = []
-                for especialidad in curso.especialidades.all():
-                    if especialidad.grupo:
-                        grupos.append(especialidad.grupo)
-
-                semestre_cursado = curso.semestre_cursado
-                posibles_duraciones = [3, 2, 1]
-
-                if docente:
-                    dias_semana_ordenados = sorted(
-                        dias_semana, key=lambda d: carga_docente[docente.id][d]
-                    )
-                else:
-                    dias_semana_ordenados = list(dias_semana)
-                    random.shuffle(dias_semana_ordenados)
-
-                while horas_pendientes > 0:
-                    duracion_a_intentar = next(
-                        (d for d in posibles_duraciones if d <= horas_pendientes), None
-                    )
-                    if not duracion_a_intentar:
-                        break
-
-                    # --- NUEVA LÓGICA: Score-based ---
-                    candidatos = []
-
-                    for dia in dias_semana: # Iteramos todos los días, el filtro de orden preferencia lo hace el score (dispersión)
-                        # Validar límites diarios
-                        if docente and carga_docente[docente.id][dia] + duracion_a_intentar > 8:
-                            continue
-
-                        # Validar límite de grupo para CADA grupo asociado
-                        grupo_excede_limite = False
-                        if semestre_cursado:
-                            for grupo in grupos:
-                                key_grupo = (grupo.id, semestre_cursado)
-                                if carga_grupo[key_grupo][dia] + duracion_a_intentar > 6:
-                                    grupo_excede_limite = True
-                                    break
-                        if grupo_excede_limite:
-                            continue
-
-                        # Buscar en todas las franjas posibles
-                        for i in range(len(franjas_horarias) - duracion_a_intentar + 1):
-                            franja_inicio = franjas_horarias[i]
-                            franjas_del_bloque = franjas_horarias[i : i + duracion_a_intentar]
-
-                            # Validaciones Dura (Hard Constraints)
-                            bloque_valido = True
-                            for franja in franjas_del_bloque:
-                                # Disponibilidad Docente
-                                if (
-                                    docente.disponibilidad == "MANANA"
-                                    and franja.turno != "MANANA"
-                                ) or (
-                                    docente.disponibilidad == "TARDE"
-                                    and franja.turno != "TARDE"
-                                ):
-                                    bloque_valido = False
-                                    break
-                                
-                                # Ocupación Docente
-                                if (docente.id, dia, franja.id) in horarios_ocupados["docente"]:
-                                    bloque_valido = False
-                                    break
-
-                                # Ocupación Grupo
-                                if semestre_cursado:
-                                    for grupo in grupos:
-                                        if (
-                                            grupo.id,
-                                            semestre_cursado,
-                                            dia,
-                                            franja.id,
-                                        ) in horarios_ocupados["grupo"]:
-                                            bloque_valido = False
-                                            break
-                                    if not bloque_valido:
-                                        break
-                            
-                            if bloque_valido:
-                                # Si pasa las restricciones, calculamos puntaje
-                                score = calcular_puntaje(
-                                    docente.id, 
-                                    dia, 
-                                    i, # Franja index 
-                                    duracion_a_intentar, 
-                                    carga_docente[docente.id][dia], 
-                                    docente_occupied_indices
-                                )
-                                candidatos.append({
-                                    'dia': dia,
-                                    'franja_inicio': franja_inicio,
-                                    'franja_index': i,
-                                    'score': score
-                                })
-
-                    # Seleccionar el mejor candidato
-                    if candidatos:
-                        # Ordenar por score ascendente (menor es mejor)
-                        candidatos.sort(key=lambda x: x['score'])
-                        mejor_opcion = candidatos[0]
-                        
-                        dia_elegido = mejor_opcion['dia']
-                        franja_inicio_elegida = mejor_opcion['franja_inicio']
-                        
-                        BloqueHorario.objects.create(
-                            curso=curso,
-                            dia=dia_elegido,
-                            franja_inicio=franja_inicio_elegida,
-                            duracion_bloques=duracion_a_intentar,
-                        )
-
-                        # Actualizar Estructuras de Tracking
-                        franja_idx_elegida = mejor_opcion['franja_index']
-                        
-                        if docente:
-                            carga_docente[docente.id][dia_elegido] += duracion_a_intentar
-                            for idx_offset in range(duracion_a_intentar):
-                                franja_actual = franjas_horarias[franja_idx_elegida + idx_offset]
-                                horarios_ocupados["docente"].add((docente.id, dia_elegido, franja_actual.id))
-                                docente_occupied_indices[docente.id][dia_elegido].add(franja_idx_elegida + idx_offset)
-
-                        if semestre_cursado:
-                            for grupo in grupos:
-                                key_grupo = (grupo.id, semestre_cursado)
-                                carga_grupo[key_grupo][dia_elegido] += duracion_a_intentar
-                                for idx_offset in range(duracion_a_intentar):
-                                    franja_actual = franjas_horarias[franja_idx_elegida + idx_offset]
-                                    horarios_ocupados["grupo"].add((grupo.id, semestre_cursado, dia_elegido, franja_actual.id))
-
-                        horas_pendientes -= duracion_a_intentar
-                    else:
-                        # No se encontró espacio para este bloque (Backtracking idealmente, pero por ahora break)
-                        cursos_no_asignados_completamente.append(curso.nombre)
-                        break
-
-                if horas_pendientes == 0:
-                    cursos_completados += 1
-                else:
-                    cursos_no_asignados_completamente.append(
-                        f"{curso.nombre} ({horas_pendientes}h pendientes)"
-                    )
-
-            total_cursos = len(cursos_a_asignar)
-            message = f"Proceso completado. Se asignaron completamente {cursos_completados} de {total_cursos} cursos planificables."
-            if cursos_no_asignados_completamente:
-                message += f" Cursos no asignados completamente: {', '.join(cursos_no_asignados_completamente)}."
-
-            cursos_sin_docente = Curso.objects.filter(
-                semestre=semestre_activo, docente__isnull=True
-            ).count()
-            if cursos_sin_docente > 0:
-                message += f" Hay {cursos_sin_docente} cursos sin docente asignado que no pudieron ser planificados."
-
-            return success_response(message=message)
+        solver = HorarioSolver(semestre_nombre="2026-A")
+        results = solver.solve()
+        
+        if results:
+            if solver.save_results(results):
+                return success_response(message="Horario generado con éxito usando OR-Tools.")
+            else:
+                return error_response("Error al guardar los resultados en la base de datos.")
+        else:
+            return error_response("El solver no pudo encontrar una solución factible con las restricciones dadas.")
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return server_error_response(f"Ocurrió un error inesperado: {e}")
+        return server_error_response(f"Error inesperado: {e}")
 
 
+        try:
+            # Configurar Gemini
+            genai.configure(api_key=getattr(settings, "GEMINI_API_KEY", ""))
+            model_name = getattr(settings, "GEMINI_MODEL_NAME", "gemini-flash-latest")
+            model = genai.GenerativeModel(model_name)
+            
+            # Obtener lista completa de cursos para el contexto
+            cursos_qs = Curso.objects.filter(semestre__estado="ACTIVO").select_related('docente')
+            cursos_context = "\n".join([f"- ID {c.id}: {c.nombre} (Docente: {c.docente.first_name if c.docente else 'N/A'}, Horas: {c.horas_academicas_semanales})" for c in cursos_qs])
+            
+            # Extraer parámetros usando Gemini
+            extraction_prompt = f"""
+            Eres un asistente experto en gestión de horarios académicos. Tu tarea es extraer la intención del usuario.
+            
+            CURSOS DISPONIBLES EN EL SISTEMA:
+            {cursos_context}
+            
+            TEXTO DEL USUARIO: "{prompt}"
+            
+            REQUERIMIENTOS DE EXTRACCIÓN:
+            1. **curso_id**: Identifica el ID del curso. El usuario puede decir "mueve mate" o "pasa literatura", busca el ID que mejor coincida.
+            2. **nuevo_dia**: El día destino (Lunes, Martes, Miércoles, Jueves, Viernes).
+            3. **nuevo_turno**: MANANA (8am-1pm) o TARDE (2pm-8pm). Si no se especifica, deduce según el nombre del turno.
+            
+            RESPUESTA EN FORMATO JSON ESTRICTO:
+            {{
+                "curso_id": <int>,
+                "nuevo_dia": "<string>",
+                "nuevo_turno": "<string>"
+            }}
+            """
+            try:
+                response = model.generate_content(extraction_prompt)
+            except Exception as e:
+                if "429" in str(e) or "quota" in str(e).lower():
+                    return error_response(f"El servicio de IA ha excedido su cuota temporalmente. Por favor intenta de nuevo en unos minutos. (Modelo: {model_name})")
+                raise e
 
-@staff_member_required
+            import re
+            json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
+            if not json_match:
+                return error_response(f"No logré procesar tu pedido. Intenta ser más específico, por ejemplo: 'Mueve el curso de Matemática al Lunes por la mañana'.")
+            
+            params = json.loads(json_match.group())
+            curso_id = params.get("curso_id")
+            nuevo_dia = params.get("nuevo_dia")
+            nuevo_turno = params.get("nuevo_turno")
+
+            if not curso_id or not nuevo_dia:
+                return error_response(f"No pude identificar qué curso o a qué día deseas moverlo.")
+
+            # Obtener info del curso para saber cuántas horas mover
+            try:
+                curso_obj = Curso.objects.get(id=curso_id)
+            except Curso.DoesNotExist:
+                return error_response(f"El ID de curso {curso_id} sugerido por la IA no existe. Intenta decir el nombre completo del curso.")
+
+            # Intentar resolver con la nueva restricción
+            solver = HorarioSolver(semestre_nombre="2026-A")
+            
+            # Buscar una franja que coincida con el turno
+            franjas_turno = list(FranjaHoraria.objects.filter(turno=nuevo_turno).order_by('hora_inicio'))
+            if not franjas_turno:
+                return error_response(f"No hay franjas horarias configuradas para el turno {nuevo_turno}.")
+            
+            # --- CONSTRUIR ESTADO FIJO (CONSTRAINTS) ---
+            fixed = []
+            
+            # 1. Mantener constantes el resto de los cursos
+            bloques_otros = BloqueHorario.objects.filter(curso__semestre__nombre="2026-A").exclude(curso_id=curso_id)
+            for b in bloques_otros:
+                # Expandir bloque a sus slots individuales
+                # (El solver actual asume 1 slot por fixed item, pero save_results ahora los agrupa)
+                # Necesitamos encontrar el indice de inicio y la duracion.
+                franjas_todas = solver.data['franjas']
+                try:
+                    idx_start = next(i for i, f in enumerate(franjas_todas) if f.id == b.franja_inicio_id)
+                    for offset in range(b.duracion_bloques):
+                        if idx_start + offset < len(franjas_todas):
+                            fixed.append((b.curso_id, b.dia, franjas_todas[idx_start + offset].id))
+                except StopIteration:
+                    continue
+
+            # 2. Fijar TODAS las horas del curso objetivo en el nuevo día
+            # Intentamos ponerlas de forma contigua en el turno solicitado
+            horas_a_mover = curso_obj.horas_academicas_semanales
+            for h in range(min(horas_a_mover, len(franjas_turno))):
+                fixed.append((curso_id, nuevo_dia, franjas_turno[h].id))
+
+            results = solver.solve(fixed_assignments=fixed)
+            
+            if results:
+                solver.save_results(results)
+                return success_response(message=f"¡Optimización completada! He movido todas las horas de '{curso_obj.nombre}' al {nuevo_dia} ({nuevo_turno}) y ajustado el resto para evitar conflictos.")
+            else:
+                return error_response(f"No pude mover '{curso_obj.nombre}' al {nuevo_dia} porque genera conflictos con otros cursos o con la disponibilidad del docente.")
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return server_error_response(f"Error interno en el asistente: {e}")
+
 def api_get_placement_suggestions(request):
     """
     API para obtener sugerencias de ubicación para un curso dado.

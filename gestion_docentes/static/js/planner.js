@@ -649,4 +649,59 @@ document.addEventListener('DOMContentLoaded', function () {
     if (DOMElements.especialidad && DOMElements.especialidad.value && DOMElements.semestre && DOMElements.semestre.value) {
         loadPlannerData();
     }
+
+    // --- CHATBOT LOGIC ---
+    const chatElements = {
+        container: document.querySelector('#chatbot-container'),
+        window: document.querySelector('#chatbot-window'),
+        toggleBtn: document.querySelector('#toggle-chat'),
+        closeBtn: document.querySelector('#close-chat'),
+        messages: document.querySelector('#chat-messages'),
+        input: document.querySelector('#chat-input'),
+        sendBtn: document.querySelector('#send-chat')
+    };
+
+    if (chatElements.toggleBtn) {
+        chatElements.toggleBtn.addEventListener('click', () => chatElements.window.classList.toggle('active'));
+    }
+    if (chatElements.closeBtn) {
+        chatElements.closeBtn.addEventListener('click', () => chatElements.window.classList.remove('active'));
+    }
+
+    function addChatMessage(text, type = 'ai') {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message message-${type}`;
+        msgDiv.textContent = text;
+        chatElements.messages.appendChild(msgDiv);
+        chatElements.messages.scrollTop = chatElements.messages.scrollHeight;
+    }
+
+    async function handleChatbotSendMessage() {
+        const prompt = chatElements.input.value.trim();
+        if (!prompt) return;
+
+        addChatMessage(prompt, 'user');
+        chatElements.input.value = '';
+        chatElements.sendBtn.disabled = true;
+
+        try {
+            const data = await callApi('/api/chatbot-horario/', 'POST', { prompt });
+            addChatMessage(data.message, 'ai');
+            // Si el chatbot modificó el horario, recargamos
+            if (data.status === 'success') {
+                await loadPlannerData();
+            }
+        } catch (error) {
+            addChatMessage(`Error: ${error.message}`, 'ai');
+        } finally {
+            chatElements.sendBtn.disabled = false;
+        }
+    }
+
+    if (chatElements.sendBtn) chatElements.sendBtn.addEventListener('click', handleChatbotSendMessage);
+    if (chatElements.input) {
+        chatElements.input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleChatbotSendMessage();
+        });
+    }
 });
