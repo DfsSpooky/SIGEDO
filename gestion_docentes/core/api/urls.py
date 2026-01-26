@@ -38,7 +38,7 @@ urlpatterns = [
         views.generar_horario_automatico,
         name="generar_horario_automatico",
     ),
-    path("chatbot-horario/", views.ChatbotHorarioView.as_view(), name="chatbot_horario"),
+    # path("chatbot-horario/", views.ChatbotHorarioView.as_view(), name="chatbot_horario"), 
     path(
         "get-cursos-no-asignados/",
         views.api_get_cursos_no_asignados,
