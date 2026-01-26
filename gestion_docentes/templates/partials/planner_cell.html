@@ -1,0 +1,84 @@
+{% load template_extras %}
+{% load static %}
+<td class="p-1 border-t border-r border-base-300 align-top relative drop-zone transition-colors duration-300 {% if bloque %}assigned{% endif %}"
+    data-dia="{{ dia }}" data-franja-id="{{ franja_id }}" rowspan="{{ rowspan|default:1 }}" hx-trigger="mouseenter"
+    style="{% if hidden %}display: none;{% endif %}">
+
+    {% if bloque %}
+    <div class="relative p-2 rounded-lg text-sm transition-all duration-300 border h-full flex flex-col group assigned-course-item
+        {% if es_ghost %}
+            bg-base-300 text-base-content/60 border-base-300 cursor-not-allowed static-course
+        {% else %}
+            cursor-grab active:cursor-grabbing
+            {% if bloque.curso.tipo_curso == 'GENERAL' %}cell-general{% else %}cell-especialidad{% endif %}
+        {% endif %}" data-bloque-id="{{ bloque.id }}" data-curso-id="{{ bloque.curso.id }}"
+        data-duracion="{{ bloque.duracion_bloques }}" data-course-type="{{ bloque.curso.tipo_curso }}">
+
+        <div class="flex-grow">
+            <p class="font-bold truncate pr-4" title="{{ bloque.curso.nombre }}">{{ bloque.curso.nombre }}</p>
+            <p class="text-xs opacity-70 truncate">
+                {% if bloque.curso.docente_nombre %}
+                {{ bloque.curso.docente_nombre }}
+                {% elif bloque.curso.docente %}
+                {{ bloque.curso.docente.first_name }} {{ bloque.curso.docente.last_name }}
+                {% else %}
+                N/A
+                {% endif %}
+            </p>
+        </div>
+
+        <div class="mt-2 text-xs opacity-80">
+            <div class="flex items-center">
+                {% if es_ghost %}
+                <i class="fas fa-lock fa-fw mr-2 opacity-50"></i>
+                {% else %}
+                {% if bloque.curso.tipo_curso == 'GENERAL' %}
+                <i class="fas fa-globe-americas fa-fw mr-2"></i>
+                {% else %}
+                <i class="fas fa-graduation-cap fa-fw mr-2"></i>
+                {% endif %}
+                {% endif %}
+
+                {{ bloque.curso.tipo_curso }}
+
+                {% if bloque.curso.especialidades_count > 1 %}
+                <span class="badge badge-xs badge-info ml-1" title="{{ bloque.curso.especialidades_nombres_str }}"
+                    style="cursor: help;">
+                    +{{ bloque.curso.especialidades_count|add:"-1" }}
+                </span>
+                {% endif %}
+            </div>
+            <div class="font-mono mt-1">
+                <i class="far fa-clock fa-fw mr-2 opacity-60"></i>
+                {% if time_range %}
+                {{ time_range }}
+                {% endif %}
+                ({{ bloque.duracion_bloques }}h)
+            </div>
+        </div>
+
+        {% if not es_ghost %}
+        <div
+            class="absolute top-1 right-1 flex flex-col items-center space-y-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+                class="btn btn-xs btn-square bg-base-100/50 backdrop-blur-sm border-0 text-success/80 hover:bg-base-100 hover:text-success"
+                title="Aumentar duración" hx-post="{% url 'api:ajustar_duracion' %}"
+                hx-vals='{"bloque_id": "{{ bloque.id }}", "accion": "increase"}' hx-swap="none">
+                <i class="fas fa-plus"></i>
+            </button>
+            <button
+                class="btn btn-xs btn-square bg-base-100/50 backdrop-blur-sm border-0 text-warning/80 hover:bg-base-100 hover:text-warning"
+                title="Disminuir duración" hx-post="{% url 'api:ajustar_duracion' %}"
+                hx-vals='{"bloque_id": "{{ bloque.id }}", "accion": "decrease"}' hx-swap="none">
+                <i class="fas fa-minus"></i>
+            </button>
+            <button
+                class="btn btn-xs btn-square bg-base-100/50 backdrop-blur-sm border-0 text-error/80 hover:bg-base-100 hover:text-error"
+                title="Eliminar bloque" onclick="confirmDelete('{{ bloque.id }}')">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</td>

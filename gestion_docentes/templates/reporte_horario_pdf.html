@@ -1,0 +1,116 @@
+{% load template_extras %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Horario - {{ especialidad.nombre }} Semestre {{ semestre_cursado }}</title>
+    <style>
+        body { font-family: sans-serif; font-size: 12px; color: #333; }
+        .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+        h1 { margin: 0; font-size: 18px; text-transform: uppercase; }
+        h2 { margin: 5px 0; font-size: 14px; font-weight: normal; }
+        .info { display: flex; justify-content: space-between; margin-bottom: 15px; font-weight: bold; }
+        
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed; }
+        th, td { border: 1px solid #999; padding: 5px; text-align: center; vertical-align: middle; }
+        th { background-color: #f0f0f0; font-size: 11px; }
+        
+        /* Celdas con cursos */
+        .curso-cell { background-color: #e6f3ff; border: 1px solid #0056b3; color: #003366; padding: 4px; border-radius: 4px; box-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
+        .curso-nombre { font-weight: bold; font-size: 11px; display: block; margin-bottom: 2px; }
+        .curso-docente { font-size: 10px; font-style: italic; display: block; color: #444; }
+        
+        .turno-header { background-color: #333; color: white; text-align: left; padding: 5px; font-weight: bold; margin-top: 10px; border: 1px solid #333; }
+        
+        @media print {
+            body { -webkit-print-color-adjust: exact; }
+            .no-print { display: none; }
+            @page { margin: 1cm; }
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print" style="padding: 10px; background: #eee; text-align: right; margin-bottom: 20px; border-bottom: 1px solid #ccc;">
+        <button onclick="window.print()" style="padding: 10px 20px; cursor: pointer; font-weight: bold; background: #007bff; color: white; border: none; border-radius: 4px;">🖨️ Imprimir / Guardar como PDF</button>
+    </div>
+
+    <div class="header">
+        <h1>Horario de Clases</h1>
+        <h2>{{ especialidad.nombre }} - Semestre {{ semestre_cursado }}</h2>
+    </div>
+
+    <div class="info">
+        <span>Fecha de emisión: {{ fecha_generacion|date:"d/m/Y H:i" }}</span>
+        <span>Universidad Nacional Daniel Alcides Carrión</span>
+    </div>
+
+    {% if grid_manana %}
+    <div class="turno-header">TURNO MAÑANA</div>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 80px;">Hora</th>
+                {% for dia in dias %}<th>{{ dia }}</th>{% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in grid_manana %}
+            <tr>
+                <td style="font-weight: bold; background-color: #f9f9f9;">{{ row.franja.hora_inicio|time:"H:i" }} - {{ row.franja.hora_fin|time:"H:i" }}</td>
+                {% for dia in dias %}
+                    {% with bloque=row.dias|get_item:dia %}
+                        {# AQUÍ ESTÁ LA MAGIA: Si es 'SKIP', no dibujamos nada #}
+                        {% if bloque != 'SKIP' %}
+                            <td {% if bloque and bloque.duracion_bloques > 1 %}rowspan="{{ bloque.duracion_bloques }}"{% endif %}>
+                                {% if bloque %}
+                                    <div class="curso-cell">
+                                        <span class="curso-nombre">{{ bloque.nombre }}</span>
+                                        <span class="curso-docente">{{ bloque.docente_nombre }}</span>
+                                        <span style="display:block; font-size:9px; margin-top:2px; color:#666;">({{ bloque.tipo_curso }})</span>
+                                    </div>
+                                {% endif %}
+                            </td>
+                        {% endif %}
+                    {% endwith %}
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    {% if grid_tarde %}
+    <div class="turno-header">TURNO TARDE</div>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 80px;">Hora</th>
+                {% for dia in dias %}<th>{{ dia }}</th>{% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in grid_tarde %}
+            <tr>
+                <td style="font-weight: bold; background-color: #f9f9f9;">{{ row.franja.hora_inicio|time:"H:i" }} - {{ row.franja.hora_fin|time:"H:i" }}</td>
+                {% for dia in dias %}
+                    {% with bloque=row.dias|get_item:dia %}
+                        {% if bloque != 'SKIP' %}
+                            <td {% if bloque and bloque.duracion_bloques > 1 %}rowspan="{{ bloque.duracion_bloques }}"{% endif %}>
+                                {% if bloque %}
+                                    <div class="curso-cell">
+                                        <span class="curso-nombre">{{ bloque.nombre }}</span>
+                                        <span class="curso-docente">{{ bloque.docente_nombre }}</span>
+                                        <span style="display:block; font-size:9px; margin-top:2px; color:#666;">({{ bloque.tipo_curso }})</span>
+                                    </div>
+                                {% endif %}
+                            </td>
+                        {% endif %}
+                    {% endwith %}
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</body>
+</html>

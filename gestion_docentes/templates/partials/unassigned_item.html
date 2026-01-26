@@ -1,0 +1,26 @@
+<div class="unassigned-course-item cursor-grab active:cursor-grabbing bg-base-100 border border-base-300 rounded-lg p-2 mb-2 hover:shadow-sm hover:border-primary transition-all"
+    data-curso-id="{{ curso.id }}" data-duracion="2"
+    data-full-data='{"curso_id": "{{ curso.id }}", "nombre": "{{ curso.nombre }}", "docente_nombre": "{{ curso.docente_nombre }}"}'>
+
+    <div class="flex justify-between items-start mb-1">
+        <p class="course-name truncate pr-1 font-semibold text-sm text-base-content" title="{{ curso.nombre }}">{{
+            curso.nombre }}</p>
+        {% if curso.especialidades_count > 1 %}
+        <span class="badge badge-xs badge-ghost ml-1 border-base-300" title="{{ curso.especialidades_nombres_str }}"
+            style="cursor: help;">+{{ curso.especialidades_count|add:"-1" }}</span>
+        {% endif %}
+    </div>
+    <p class="course-teacher truncate mb-2 text-xs text-base-content/70">{{ curso.docente_nombre }}</p>
+
+    <div class="w-full">
+        <div
+            class="flex justify-between text-[10px] font-bold mb-0.5
+            {% if curso.horas_asignadas == 0 %}text-error{% elif curso.horas_asignadas < curso.horas_totales %}text-warning{% else %}text-success{% endif %}">
+            <span>{{ curso.horas_pendientes }}h pendientes</span>
+        </div>
+        <progress
+            class="progress w-full h-1.5 bg-base-300 
+            {% if curso.horas_asignadas == 0 %}progress-error{% elif curso.horas_asignadas < curso.horas_totales %}progress-warning{% else %}progress-success{% endif %}"
+            value="{{ curso.horas_asignadas }}" max="{{ curso.horas_totales }}"></progress>
+    </div>
+</div>

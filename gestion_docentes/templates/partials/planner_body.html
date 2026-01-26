@@ -1,0 +1,141 @@
+{% load static %}
+{% load template_extras %}
+<div class="planner-main-grid grid grid-cols-1 lg:grid-cols-4 mt-4 animate-fade-in">
+    <main class="lg:col-span-3">
+        <div role="tablist" class="tabs tabs-lifted" id="schedule-tabs-container">
+            <a role="tab" class="tab tab-active" onclick="switchTab(event, '#schedule-morning')">Turno Mañana</a>
+            <a role="tab" class="tab" onclick="switchTab(event, '#schedule-afternoon')">Turno Tarde</a>
+        </div>
+
+        <div id="schedule-morning" class="tab-pane active">
+            <div class="schedule-container">
+                <table class="table table-fixed w-full">
+                    <thead>
+                        <tr>
+                            <th class="w-32">Horas</th>
+                            {% for dia in dias_semana %}<th>{{dia}}</th>{% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in grid_manana %}
+                        <tr>
+                            <td
+                                class="text-center text-xs font-medium text-base-content/60 align-top h-24 p-1 border-r border-base-300">
+                                {{ row.franja.hora_inicio|time:"H:i" }} - {{ row.franja.hora_fin|time:"H:i" }}
+                            </td>
+                            {% for dia in dias_semana %}
+                            {% with cell=row.cells|get_item:dia %}
+                            {% include "partials/planner_cell.html" with bloque=cell.bloque dia=dia
+                            franja_id=row.franja.id rowspan=cell.rowspan hidden=cell.hidden es_ghost=False %}
+                            {% endwith %}
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="schedule-afternoon" class="tab-pane">
+            <div class="schedule-container">
+                <table class="table table-fixed w-full">
+                    <thead>
+                        <tr>
+                            <th class="w-32">Horas</th>
+                            {% for dia in dias_semana %}<th>{{dia}}</th>{% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in grid_tarde %}
+                        <tr>
+                            <td
+                                class="text-center text-xs font-medium text-base-content/60 align-top h-24 p-1 border-r border-base-300">
+                                {{ row.franja.hora_inicio|time:"H:i" }} - {{ row.franja.hora_fin|time:"H:i" }}
+                            </td>
+                            {% for dia in dias_semana %}
+                            {% with cell=row.cells|get_item:dia %}
+                            {% include "partials/planner_cell.html" with bloque=cell.bloque dia=dia
+                            franja_id=row.franja.id rowspan=cell.rowspan hidden=cell.hidden es_ghost=False %}
+                            {% endwith %}
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <aside class="lg:col-span-1">
+        <div class="planner-sidebar h-full space-y-4 sticky top-24">
+            <div role="tablist" class="tabs tabs-boxed">
+                <a role="tab" class="tab tab-active" onclick="switchSidebarTab(event, 'manual')">Manual</a>
+                <a role="tab" class="tab" onclick="switchSidebarTab(event, 'auto')">Automático</a>
+            </div>
+
+            <div id="tab-manual" class="tab-content active space-y-4">
+                <h3 class="font-bold text-lg">Cursos por Asignar</h3>
+
+                <div class="collapse collapse-arrow bg-base-200/50">
+                    <input type="checkbox" checked />
+                    <div class="collapse-title text-md font-medium">
+                        Generales ({{ cursos_pendientes.generales|length }})
+                    </div>
+                    <div class="collapse-content">
+                        <div id="unassigned-generales" class="space-y-2 pt-2">
+                            {% for curso in cursos_pendientes.generales %}
+                            {% include "partials/unassigned_item.html" with curso=curso %}
+                            {% empty %}
+                            <p class="text-xs text-base-content/50 p-2">No hay cursos pendientes.</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="collapse collapse-arrow bg-base-200/50">
+                    <input type="checkbox" checked />
+                    <div class="collapse-title text-md font-medium">
+                        Especialidad ({{ cursos_pendientes.especialidad|length }})
+                    </div>
+                    <div class="collapse-content">
+                        <div id="unassigned-especialidad" class="space-y-2 pt-2">
+                            {% for curso in cursos_pendientes.especialidad %}
+                            {% include "partials/unassigned_item.html" with curso=curso %}
+                            {% empty %}
+                            <p class="text-xs text-base-content/50 p-2">No hay cursos pendientes.</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+                <div id="trash-zone"
+                    class="p-4 text-center border-2 border-dashed border-base-300 rounded-box bg-base-200 text-base-content/70 min-h-[80px] flex flex-col justify-center items-center">
+                    <i class="fas fa-trash-alt text-2xl mb-2"></i>
+                    <p class="font-semibold text-sm">Arrastra aquí para desasignar</p>
+                </div>
+            </div>
+
+            <div id="tab-auto" class="tab-content space-y-4">
+                <h3 class="font-bold text-lg">Generador Automático</h3>
+                <p class="text-xs text-base-content/60">Funcionalidad en reestructuración.</p>
+            </div>
+        </div>
+    </aside>
+</div>
+
+<script>
+    function switchTab(evt, targetId) {
+        document.querySelectorAll('#schedule-tabs-container .tab').forEach(t => t.classList.remove('tab-active'));
+        evt.target.classList.add('tab-active');
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+        document.querySelector(targetId).classList.add('active');
+    }
+
+    function switchSidebarTab(evt, targetName) {
+        document.querySelectorAll('.planner-sidebar .tabs .tab').forEach(t => t.classList.remove('tab-active'));
+        evt.target.classList.add('tab-active');
+        document.getElementById('tab-manual').classList.toggle('active', targetName === 'manual');
+        document.getElementById('tab-auto').classList.toggle('active', targetName === 'auto');
+    }
+</script>

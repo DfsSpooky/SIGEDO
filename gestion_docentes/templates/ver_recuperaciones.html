@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+{% block title %}Recuperaciones de Clases{% endblock %}
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-gray-800">Mis Recuperaciones de Clase</h1>
+        <a href="{% url 'solicitar_recuperacion' %}"
+            class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition duration-200">
+            <i class="fas fa-plus mr-2"></i> Solicitar Recuperación
+        </a>
+    </div>
+
+    {% if messages %}
+    {% for message in messages %}
+    <div
+        class="mb-4 p-4 rounded {% if message.tags == 'error' %}bg-red-100 text-red-700{% else %}bg-green-100 text-green-700{% endif %}">
+        {{ message }}
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <div class="bg-white shadow rounded-lg overflow-hidden">
+        <table class="min-w-full leading-normal">
+            <thead>
+                <tr>
+                    <th
+                        class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Curso
+                    </th>
+                    <th
+                        class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Clase Original
+                    </th>
+                    <th
+                        class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Propuesta
+                    </th>
+                    <th
+                        class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Estado
+                    </th>
+                    <th
+                        class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Acciones
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for recuperacion in recuperaciones %}
+                <tr>
+                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                        <p class="text-gray-900 whitespace-no-wrap font-semibold">
+                            {{ recuperacion.curso.nombre }}
+                        </p>
+                    </td>
+                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                        <p class="text-gray-900 whitespace-no-wrap">
+                            {{ recuperacion.fecha_a_recuperar }}
+                        </p>
+                    </td>
+                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                        <p class="text-gray-900 whitespace-no-wrap">
+                            {{ recuperacion.fecha_propuesta|date:"d M Y H:i" }}
+                            <br>
+                            <span class="text-gray-500 text-xs">{{ recuperacion.duracion_minutos }} min {% if
+                                recuperacion.aula_solicitada %}- {{ recuperacion.aula_solicitada.nombre }}{% endif
+                                %}</span>
+                        </p>
+                    </td>
+                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                        <span
+                            class="relative inline-block px-3 py-1 font-semibold leading-tight
+                                {% if recuperacion.estado == 'PENDIENTE' %}text-yellow-900{% elif recuperacion.estado == 'APROBADO' %}text-green-900{% else %}text-red-900{% endif %}">
+                            <span aria-hidden
+                                class="absolute inset-0 opacity-50 rounded-full 
+                                    {% if recuperacion.estado == 'PENDIENTE' %}bg-yellow-200{% elif recuperacion.estado == 'APROBADO' %}bg-green-200{% else %}bg-red-200{% endif %}">
+                            </span>
+                            <span class="relative">{{ recuperacion.get_estado_display }}</span>
+                        </span>
+                    </td>
+                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                        {% if recuperacion.observaciones %}
+                        <button onclick="alert('Observación: {{ recuperacion.observaciones }}')"
+                            class="text-blue-600 hover:text-blue-900">
+                            Ver Obs.
+                        </button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="px-5 py-5 border-b border-gray-200 bg-white text-sm text-center">
+                        No tienes solicitudes de recuperación registradas.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
