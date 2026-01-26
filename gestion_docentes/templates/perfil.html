@@ -1,123 +1,232 @@
 {% extends 'base.html' %}
 {% load static %}
-{% block title %}Mi Perfil - {{ user.first_name }}{% endblock %}
 
 {% block content %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-<div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+<script src="https://unpkg.com/lucide@latest"></script>
 
-    <div class="lg:col-span-4 space-y-8">
-        
-        <div class="card bg-base-100 shadow-xl sticky top-8">
-            <div class="card-body items-center text-center">
-                <div class="avatar online">
-                    <div class="w-24 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2">
-                        <img src="{% if user.foto %}{{ user.foto.url }}{% else %}{% static 'placeholder.png' %}{% endif %}" alt="Foto de {{ user.first_name }}">
+<script id="user-data" type="application/json">
+    {
+        "username": "{{ user.username }}",
+        "firstName": "{{ user.first_name }}",
+        "lastName": "{{ user.last_name }}",
+        "email": "{{ user.email }}",
+        "dni": "{{ user.dni|default:'No registrado' }}",
+        "role": "{% if user.is_superuser %}Super Administrador{% elif user.is_staff %}Administrativo{% else %}Docente{% endif %}",
+        "availability": "{{ user.get_disponibilidad_display|default:'No especificada' }}",
+        "rfid": "{{ user.rfid_uid|default:'Sin asignar' }}",
+        "lastLogin": "{{ user.last_login|date:'d M, Y H:i' }}",
+        "dateJoined": "{{ user.date_joined|date:'d M, Y' }}",
+        "photoUrl": "{% if user.foto %}{{ user.foto.url }}{% else %}https://ui-avatars.com/api/?name={{ user.first_name }}+{{ user.last_name }}&background=0D8ABC&color=fff&size=200{% endif %}",
+        "specialties": [
+            {% for esp in user.especialidades.all %}
+                "{{ esp.nombre }}"{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ]
+    }
+</script>
+
+<div id="react-profile-root" class="min-h-screen bg-gray-50 p-4 sm:p-8 font-sans"></div>
+
+<script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // Iconos como componentes simples (SVG directos para evitar dependencias extra)
+    const UserIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
+    const MailIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>;
+    const KeyIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>;
+    const ClockIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
+    const BadgeCheckIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500"><path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.78 4.78 4 4 0 0 1-6.74 0 4 4 0 0 1-4.78-4.78 2 2 0 0 0 0-2.83Z"/><path d="m9 12 2 2 4-4"/></svg>;
+    const LockIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>;
+
+    // Componente Principal
+    const UserProfile = () => {
+        const [userData, setUserData] = useState(null);
+        const [activeTab, setActiveTab] = useState('overview');
+
+        useEffect(() => {
+            // Leer datos del script JSON inyectado por Django
+            const dataElement = document.getElementById('user-data');
+            if (dataElement) {
+                setUserData(JSON.parse(dataElement.textContent));
+            }
+        }, []);
+
+        if (!userData) return <div className="flex justify-center items-center h-64 text-gray-500">Cargando perfil...</div>;
+
+        return (
+            <div className="max-w-5xl mx-auto animate-fade-in-up">
+                {/* Header Card con Gradiente */}
+                <div className="relative mb-8 bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
+                    <div className="h-32 bg-gradient-to-r from-blue-600 to-indigo-700"></div>
+                    
+                    <div className="px-6 pb-6">
+                        <div className="flex flex-col sm:flex-row items-center sm:items-end -mt-12 mb-4">
+                            <div className="relative">
+                                <img 
+                                    src={userData.photoUrl} 
+                                    alt="Profile" 
+                                    className="w-32 h-32 rounded-full border-4 border-white shadow-md object-cover bg-white"
+                                />
+                                <div className="absolute bottom-2 right-2 bg-green-500 w-5 h-5 rounded-full border-2 border-white shadow-sm" title="Activo"></div>
+                            </div>
+                            
+                            <div className="mt-4 sm:mt-0 sm:ml-6 text-center sm:text-left flex-1">
+                                <h1 className="text-3xl font-bold text-gray-900 flex items-center justify-center sm:justify-start gap-2">
+                                    {userData.firstName} {userData.lastName}
+                                    <BadgeCheckIcon />
+                                </h1>
+                                <p className="text-gray-500 font-medium text-lg">@{userData.username}</p>
+                                <div className="flex flex-wrap gap-2 mt-2 justify-center sm:justify-start">
+                                    <span className="bg-blue-50 text-blue-700 text-xs px-3 py-1 rounded-full font-semibold border border-blue-100">
+                                        {userData.role}
+                                    </span>
+                                    <span className="bg-purple-50 text-purple-700 text-xs px-3 py-1 rounded-full font-semibold border border-purple-100">
+                                        DNI: {userData.dni}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="mt-6 sm:mt-0 flex gap-3">
+                                <button className="bg-gray-900 hover:bg-gray-800 text-white px-5 py-2.5 rounded-lg shadow-lg text-sm font-medium transition-all duration-200 transform hover:-translate-y-0.5 flex items-center gap-2">
+                                    Editar Perfil
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Navegación de Pestañas */}
+                        <div className="border-t border-gray-100 mt-6 pt-1 flex gap-6 text-sm font-medium text-gray-500">
+                            <button 
+                                onClick={() => setActiveTab('overview')}
+                                className={`pb-3 border-b-2 transition-colors duration-200 flex items-center gap-2 ${activeTab === 'overview' ? 'border-blue-600 text-blue-600' : 'border-transparent hover:text-gray-700'}`}
+                            >
+                                <UserIcon /> Información General
+                            </button>
+                            <button 
+                                onClick={() => setActiveTab('security')}
+                                className={`pb-3 border-b-2 transition-colors duration-200 flex items-center gap-2 ${activeTab === 'security' ? 'border-blue-600 text-blue-600' : 'border-transparent hover:text-gray-700'}`}
+                            >
+                                <KeyIcon /> Seguridad
+                            </button>
+                        </div>
                     </div>
                 </div>
-                <h2 class="card-title text-2xl mt-4">{{ user.first_name }} {{ user.last_name }}</h2>
-                <p class="text-base-content/70">DNI: {{ user.dni }}</p>
-                <div class="divider">Especialidades</div>
-                <div class="flex flex-wrap justify-center gap-2">
-                    {% for especialidad in user.especialidades.all %}
-                        <div class="badge badge-info badge-outline">{{ especialidad.nombre }}</div>
-                    {% empty %}
-                        <p class="text-sm text-base-content/50">Sin especialidades asignadas.</p>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
 
-        <div class="card bg-base-100 shadow-xl">
-            <div class="card-body">
-                <h3 class="card-title">Estado de mi Carpeta ({{ total_documentos }} Doc(s))</h3>
-                <canvas id="documentosChart"></canvas>
-            </div>
-        </div>
+                {/* Contenido Principal */}
+                {activeTab === 'overview' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
 
-    </div>
-    <div class="lg:col-span-8">
-        <div class="card bg-base-100 shadow-xl">
-            <div class="card-body">
-                <h3 class="card-title mb-6">Actividad Reciente</h3>
-                
-                <ul class="timeline timeline-snap-icon max-md:timeline-compact timeline-vertical">
-                    {% for item in timeline %}
-                    <li>
-                        <div class="timeline-middle">
-                            {% if item.tipo == 'asistencia_entrada' %}<i class="fas fa-sign-in-alt bg-success text-success-content text-xl p-2 rounded-full"></i>
-                            {% elif item.tipo == 'asistencia_salida' %}<i class="fas fa-sign-out-alt bg-error text-error-content text-xl p-2 rounded-full"></i>
-                            {% elif item.tipo == 'documento' %}<i class="fas fa-file-upload bg-info text-info-content text-xl p-2 rounded-full"></i>
-                            {% endif %}
-                        </div>
-                        <div class="timeline-end mb-10 p-4 bg-base-200 rounded-lg shadow">
-                            <time class="font-mono italic text-sm opacity-70">{{ item.fecha|date:"d/m/Y, h:i A" }}</time>
-                            <div class="text-lg font-black">{{ item.texto }}</div>
-                            {% if item.tipo == 'documento' and item.documento.estado == 'OBSERVADO' %}
-                                <div class="mt-2 text-warning font-semibold">
-                                    <i class="fas fa-exclamation-triangle mr-1"></i> Este documento tiene observaciones.
-                                    <a href="{% url 'lista_documentos' %}" class="link link-warning ml-2">Revisar</a>
+                        {/* Columna Izquierda: Detalles */}
+                        <div className="lg:col-span-2 space-y-6">
+                            {/* Tarjeta Información */}
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 transition-shadow hover:shadow-md">
+                                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                    Información Personal
+                                </h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Nombre Completo</label>
+                                        <p className="text-gray-900 font-medium">{userData.firstName} {userData.lastName}</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Correo Electrónico</label>
+                                        <p className="text-gray-900 font-medium flex items-center gap-2">
+                                            {userData.email}
+                                        </p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Fecha de Registro</label>
+                                        <p className="text-gray-900 font-medium">{userData.dateJoined}</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Último Acceso</label>
+                                        <p className="text-gray-900 font-medium">{userData.lastLogin}</p>
+                                    </div>
                                 </div>
-                            {% endif %}
+                            </div>
+
+                             {/* Tarjeta Especialidades */}
+                             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 transition-shadow hover:shadow-md">
+                                <h3 className="text-lg font-bold text-gray-800 mb-4">Especialidades Académicas</h3>
+                                {userData.specialties.length > 0 ? (
+                                    <div className="flex flex-wrap gap-2">
+                                        {userData.specialties.map((esp, idx) => (
+                                            <span key={idx} className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-lg text-sm font-medium border border-indigo-100 shadow-sm">
+                                                {esp}
+                                            </span>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-gray-400 italic text-sm">No hay especialidades asignadas.</p>
+                                )}
+                            </div>
                         </div>
-                        <hr/>
-                    </li>
-                    {% empty %}
-                    <li class="text-center p-8 text-base-content/60">
-                        <i class="fas fa-history fa-2x mb-4"></i><br>
-                        No hay actividad reciente para mostrar.
-                    </li>
-                    {% endfor %}
-                </ul>
+
+                        {/* Columna Derecha: Stats y Accesos */}
+                        <div className="space-y-6">
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                                <h3 className="text-sm font-semibold text-gray-400 uppercase mb-4 tracking-wide">Disponibilidad</h3>
+                                <div className="flex items-center justify-between bg-gray-50 p-4 rounded-lg border border-gray-100">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-green-100 text-green-600 rounded-lg">
+                                            <ClockIcon />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-gray-500 font-medium">Turno Actual</p>
+                                            <p className="text-gray-900 font-bold">{userData.availability}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl shadow-lg p-6 text-white relative overflow-hidden">
+                                <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-white opacity-10 rounded-full blur-xl"></div>
+                                <h3 className="text-lg font-bold mb-1">Tarjeta RFID</h3>
+                                <p className="text-gray-400 text-sm mb-4">Identificador único de acceso</p>
+                                <div className="font-mono text-xl tracking-wider bg-black bg-opacity-30 p-3 rounded-lg text-center border border-gray-700">
+                                    {userData.rfid}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Contenido Seguridad */}
+                {activeTab === 'security' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-fade-in">
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                <LockIcon /> Contraseña y Acceso
+                            </h3>
+                            <p className="text-gray-600 text-sm mb-6">
+                                Mantén tu cuenta segura actualizando tu contraseña periódicamente.
+                            </p>
+                            <a
+                                href="/admin/password_change/"
+                                className="inline-flex justify-center items-center gap-2 w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors shadow-sm"
+                            >
+                                Cambiar Contraseña
+                            </a>
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 opacity-70">
+                            <h3 className="text-lg font-bold text-gray-800 mb-4">Registro de Actividad</h3>
+                            <p className="text-gray-500 text-sm italic">
+                                El historial de inicios de sesión estará disponible próximamente.
+                            </p>
+                        </div>
+                    </div>
+                )}
             </div>
-        </div>
-    </div>
-    </div>
+        );
+    };
 
-
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const ctx = document.getElementById('documentosChart');
-        if (!ctx) return;
-
-        const data = {
-            labels: {{ documentos_labels_json|safe }},
-            datasets: [{
-                label: 'Cantidad de Documentos',
-                data: {{ documentos_status_json|safe }},
-                backgroundColor: [
-                    'rgba(34, 197, 94, 0.6)',  // APROBADO (Verde)
-                    'rgba(245, 158, 11, 0.6)', // EN_REVISION (Ámbar)
-                    'rgba(239, 68, 68, 0.6)',   // OBSERVADO (Rojo)
-                    'rgba(59, 130, 246, 0.6)'  // RECIBIDO (Azul)
-                ],
-                borderColor: [
-                    'rgba(34, 197, 94, 1)',
-                    'rgba(245, 158, 11, 1)',
-                    'rgba(239, 68, 68, 1)',
-                    'rgba(59, 130, 246, 1)'
-                ],
-                borderWidth: 1
-            }]
-        };
-
-        new Chart(ctx, {
-            type: 'doughnut', // Tipo de gráfico: dona
-            data: data,
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        position: 'top',
-                    },
-                    title: {
-                        display: false,
-                        text: 'Estado de Documentos'
-                    }
-                }
-            }
-        });
-    });
+    // Montar la aplicación
+    const root = ReactDOM.createRoot(document.getElementById('react-profile-root'));
+    root.render(<UserProfile />);
 </script>
 {% endblock %}

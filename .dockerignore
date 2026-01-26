@@ -1,0 +1,22 @@
+# Secrets
+.env
+
+# Git
+.git
+.gitignore
+
+# Docker
+docker-compose.yml
+Dockerfile
+.dockerignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# Dependencies
+venv/
+.venv/
+env/

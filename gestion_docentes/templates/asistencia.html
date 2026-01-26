@@ -1,35 +1,64 @@
 {% extends 'base.html' %}
 {% block title %}Asistencia{% endblock %}
 {% block content %}
-    <h1 class="text-2xl font-bold mb-4">Registrar Asistencia</h1>
-    {% if error %}
-        <p class="text-red-500">{{ error }}</p>
-    {% elif curso_actual %}
-        <p class="mb-4">Curso actual: {{ curso_actual.nombre }} ({{ curso_actual.horario_inicio|time:"H:i" }} - {{ curso_actual.horario_fin|time:"H:i" }})</p>
-        
-        {% if asistencia %}
-            <div class="mb-4 p-4 border rounded {% if asistencia.hora_salida %}bg-green-100 border-green-300{% elif asistencia.hora_entrada %}bg-yellow-100 border-yellow-300{% endif %}">
-                <p><strong>Entrada:</strong> {{ asistencia.hora_entrada|time:"H:i"|default:"No marcada" }}</p>
-                <p><strong>Salida:</strong> {{ asistencia.hora_salida|time:"H:i"|default:"No marcada" }}</p>
-            </div>
-        {% endif %}
+<h1 class="text-2xl font-bold mb-4">Registrar Asistencia</h1>
+{% if error %}
+<p class="text-red-500">{{ error }}</p>
+{% elif bloque_actual %}
+<p class="mb-4">Curso actual: {{ bloque_actual.curso.nombre }} ({{ bloque_actual.horario_inicio|time:"H:i" }} - {{
+    bloque_actual.horario_fin|time:"H:i" }})</p>
 
-        <form method="post" class="space-y-4">
-            {% csrf_token %}
-            {% if asistencia and asistencia.hora_entrada and not asistencia.hora_salida %}
-                <p class="text-center font-semibold">Muestre este QR al encargado o estudiante para validar.</p>
-                <img src="{{ asistencia.qr_code.url }}" alt="Código QR de Asistencia" class="mx-auto w-48 h-48 border">
-                <button type="submit" name="accion" value="salida" class="w-full bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Marcar Salida</button>
-            {% elif not asistencia or not asistencia.hora_entrada %}
-                 <button type="submit" name="accion" value="entrada" class="w-full bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Marcar Entrada</button>
-            {% endif %}
-        </form>
+{% if asistencia %}
+<div
+    class="mb-4 p-4 border rounded {% if asistencia.hora_salida %}bg-green-100 border-green-300{% elif asistencia.hora_entrada %}bg-yellow-100 border-yellow-300{% endif %}">
+    <p><strong>Entrada:</strong> {{ asistencia.hora_entrada|time:"H:i"|default:"No marcada" }}</p>
+    <p><strong>Salida:</strong> {{ asistencia.hora_salida|time:"H:i"|default:"No marcada" }}</p>
+</div>
+{% endif %}
 
-        {% if proximo_curso %}
-            <p class="mt-4">Próximo curso: {{ proximo_curso.nombre }} a las {{ proximo_curso.horario_inicio|time:"H:i" }}</p>
-        {% endif %}
-
-    {% else %}
-        <p>No hay cursos programados en este momento.</p>
+<form method="post" class="space-y-4">
+    {% csrf_token %}
+    <input type="hidden" name="latitud" id="latitud">
+    <input type="hidden" name="longitud" id="longitud">
+    {% if asistencia and asistencia.hora_entrada and not asistencia.hora_salida %}
+    <p class="text-center font-semibold">Muestre este QR al encargado o estudiante para validar.</p>
+    <img src="{{ asistencia.qr_code.url }}" alt="Código QR de Asistencia" class="mx-auto w-48 h-48 border">
+    <button type="submit" name="accion" value="salida"
+        class="w-full bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Marcar Salida</button>
+    {% elif not asistencia or not asistencia.hora_entrada %}
+    <button type="submit" name="accion" value="entrada"
+        class="w-full bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Marcar Entrada</button>
     {% endif %}
+</form>
+
+{# La lógica para proximo_curso fue movida al dashboard, esta parte ya no es necesaria aquí #}
+{% else %}
+<p>No hay cursos programados en este momento.</p>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(function (position) {
+                document.getElementById('latitud').value = position.coords.latitude;
+                document.getElementById('longitud').value = position.coords.longitude;
+            }, function (error) {
+                console.warn("Error capturando ubicación: ", error.message);
+            });
+        }
+    });
+
+    // Validar ubicación antes de enviar
+    document.querySelector('form').addEventListener('submit', function (e) {
+        const lat = document.getElementById('latitud').value;
+        const lon = document.getElementById('longitud').value;
+        if (!lat || !lon) {
+            // No bloqueamos por ahora para no afectar usuarios sin GPS, 
+            // pero podríamos mostrar un warning o exigir en el futuro.
+            console.warn("No se pudo obtener la ubicación para el registro.");
+        }
+    });
+</script>
 {% endblock %}

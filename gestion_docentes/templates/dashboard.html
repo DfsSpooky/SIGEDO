@@ -1,122 +1,267 @@
 {% extends 'base.html' %}
-{% block title %}Dashboard{% endblock %}
-{% block breadcrumb %}Dashboard{% endblock %}
+{% load static %}
 
 {% block content %}
-<div class="mb-6">
-    <h1 class="text-2xl md:text-3xl font-semibold text-base-content">Bienvenido, {{ user.first_name }}</h1>
-    <p class="text-base-content/70">Aquí tienes un resumen de tu actividad y próximos eventos.</p>
-</div>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
 
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-    <div class="card bg-base-100 shadow-lg">
-        <div class="card-body">
-            <div class="flex items-center gap-4">
-                <div class="bg-primary/10 text-primary p-3 rounded-full">
-                    <i class="fas fa-chalkboard-teacher text-2xl"></i>
-                </div>
-                <div>
-                    <p class="text-base-content/70">Cursos Programados Hoy</p>
-                    <p class="text-2xl font-bold">{{ cursos_hoy_count }}</p>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="card bg-base-100 shadow-lg">
-        <div class="card-body">
-            <div class="flex items-center gap-4">
-                <div class="bg-success/10 text-success p-3 rounded-full">
-                    <i class="fas fa-user-check text-2xl"></i>
-                </div>
-                <div>
-                    <p class="text-base-content/70">Asistencias Marcadas</p>
-                    <p class="text-2xl font-bold">{{ asistencias_count }}</p>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="card {% if documentos_observados_count > 0 %}bg-warning/10{% else %}bg-base-100{% endif %} shadow-lg">
-        <div class="card-body">
-            <div class="flex items-center gap-4">
-                <div class="{% if documentos_observados_count > 0 %}text-warning{% else %}text-base-content/70{% endif %} p-3 rounded-full">
-                    <i class="fas fa-file-circle-exclamation text-2xl"></i>
-                </div>
-                <div>
-                    <p class="text-base-content/70">Documentos Observados</p>
-                    <p class="text-2xl font-bold">{{ documentos_observados_count }}</p>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-    
-    <div class="lg:col-span-2 space-y-8">
-        
-        <div class="card bg-primary text-primary-content shadow-xl">
-            <div class="card-body">
-                <h2 class="card-title text-xl"><i class="fas fa-hourglass-half mr-2"></i> Próxima Clase Hoy</h2>
-                {% if proximo_curso %}
-                    <p class="text-3xl font-bold mt-2">{{ proximo_curso.nombre }}</p>
-                    <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                        <p><i class="fas fa-clock fa-fw mr-2 opacity-70"></i> <strong>Hora:</strong> {{ proximo_curso.horario_inicio|time:"h:i A" }} - {{ proximo_curso.horario_fin|time:"h:i A" }}</p>
-                        <p><i class="fas fa-book fa-fw mr-2 opacity-70"></i> <strong>Carrera:</strong> {{ proximo_curso.carrera.nombre }}</p>
-                    </div>
-                {% else %}
-                    <div class="text-center py-8">
-                        <i class="fas fa-coffee fa-3x opacity-50"></i>
-                        <p class="mt-4 text-lg">No tienes más clases programadas para hoy.</p>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
+<script id="dashboard-data" type="application/json">
+    {
+        "user": {
+            "name": "{{ user.first_name|escapejs }} {{ user.last_name|escapejs }}",
+            "role": "{% if user.is_superuser %}Super Admin{% elif user.is_staff %}Administrativo{% else %}Docente{% endif %}",
+            "avatar": "{% if user.foto %}{{ user.foto.url }}{% else %}https://ui-avatars.com/api/?name={{ user.first_name|urlencode }}+{{ user.last_name|urlencode }}&background=0D8ABC&color=fff{% endif %}"
+        },
+        "stats": {
+            "cursos": "{{ total_cursos|default:'0' }}",
+            "justificaciones": "{{ total_justificaciones|default:'0' }}",
+            "asistenciaPromedio": "{{ asistencia_promedio|default:'0' }}%",
+            "alertas": "{{ alertas_count|default:'0' }}"
+        },
+        "nextClass": {
+            "hasClase": {% if proxima_clase %}true{% else %}false{% endif %},
+            "nombre": "{{ proxima_clase.nombre|default:'Sin clases pendientes'|escapejs }}",
+            "horario": "{{ proxima_clase.horario|default:'--:--'|escapejs }}",
+            "aula": "{{ proxima_clase.aula|default:'Virtual / Por asignar'|escapejs }}",
+            "tema": "Sesión Regular"
+        },
+        "notifications": [
+            {% for anuncio in anuncios_recientes %}
+            {
+                "id": {{ anuncio.id|default:0 }},
+                "titulo": "{{ anuncio.titulo|default:'Sin título'|escapejs }}",
+                "fecha": "{{ anuncio.fecha_publicacion|date:'d M' }}",
+                "tipo": "{{ anuncio.tipo|default:'info'|escapejs }}"
+            }{% if not forloop.last %},{% endif %}
+            {% empty %}
+            { "id": 0, "titulo": "No hay anuncios recientes", "fecha": "Hoy", "tipo": "info" }
+            {% endfor %}
+        ],
+        "quickActions": [
+            { 
+                "label": "Marcar Asistencia", 
+                "icon": "check-circle", 
+                "url": "{% url 'asistencia' %}", 
+                "color": "bg-green-100 text-green-600" 
+            },
+            { 
+                "label": "Mis Reservas", 
+                "icon": "calendar-check", 
+                "url": "{% url 'reservas:mis_reservas' %}", 
+                "color": "bg-blue-100 text-blue-600" 
+            },
+            { 
+                "label": "Reportes", 
+                "icon": "bar-chart-2", 
+                "url": "{% url 'reporte_asistencia' %}", 
+                "color": "bg-purple-100 text-purple-600" 
+            },
+            { 
+                "label": "Justificaciones", 
+                "icon": "file-text", 
+                "url": "{% url 'lista_justificaciones' %}", 
+                "color": "bg-orange-100 text-orange-600" 
+            }
+        ]
+    }
+</script>
 
-        <div class="card bg-base-100 shadow-xl">
-            <div class="card-body">
-                <h2 class="card-title text-xl mb-4">Actividad Reciente</h2>
-                <ul class="space-y-4">
-                    {% for item in actividad_reciente %}
-                    <li class="flex items-center gap-4">
-                        <div class="bg-base-200 p-3 rounded-full">
-                            <i class="fas {% if item.tipo == 'asistencia' %}fa-user-check text-success{% else %}fa-file-alt text-info{% endif %}"></i>
-                        </div>
-                        <div class="flex-grow">
-                            <p>{{ item.texto }}</p>
-                            <p class="text-xs text-base-content/60">{{ item.fecha|timesince }} atrás</p>
-                        </div>
-                    </li>
-                    {% empty %}
-                    <li class="text-center text-base-content/60 py-4">No hay actividad reciente.</li>
-                    {% endfor %}
-                </ul>
-            </div>
-        </div>
-    </div>
-    <div class="lg:col-span-1 space-y-8">
-        <div class="card bg-base-100 shadow-xl">
-            <div class="card-body">
-                <h2 class="card-title text-xl mb-4">Accesos Rápidos</h2>
-                <div class="space-y-2">
-                    <a href="{% url 'perfil' %}" class="btn btn-ghost justify-start w-full"><i class="fas fa-user-circle fa-fw mr-2"></i> Mi Perfil</a>
-                    <a href="{% url 'lista_documentos' %}" class="btn btn-ghost justify-start w-full"><i class="fas fa-folder-open fa-fw mr-2"></i> Mi Carpeta Pedagógica</a>
-                    <a href="{% url 'asistencia' %}" class="btn btn-ghost justify-start w-full"><i class="fas fa-fingerprint fa-fw mr-2"></i> Registrar Asistencia</a>
+<div id="react-dashboard-root" class="min-h-screen bg-gray-50/50 p-6"></div>
+
+<script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const Icon = ({ name, size = 20, className }) => {
+        const icons = {
+            'users': <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+            'book-open': <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>,
+            'activity': <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>,
+            'bell': <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>,
+            'clock': <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+            'map-pin': <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>,
+            'arrow-right': <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>,
+            'check-circle': <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>,
+            'calendar-check': <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="m9 16 2 2 4-4"/></svg>,
+            'bar-chart-2': <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg>,
+            'file-text': <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>
+        };
+        return icons[name] || <span className="text-xs">{name}</span>;
+    };
+
+    const Dashboard = () => {
+        const [data, setData] = useState(null);
+        const [error, setError] = useState(null);
+        const [currentDate, setCurrentDate] = useState(new Date());
+
+        useEffect(() => {
+            try {
+                const rawDataElement = document.getElementById('dashboard-data');
+                if (!rawDataElement) throw new Error("No data element found");
+                
+                // Limpiamos el contenido por si acaso hay espacios invisibles
+                const cleanData = rawDataElement.textContent.trim();
+                const jsonData = JSON.parse(cleanData);
+                setData(jsonData);
+            } catch (e) {
+                console.error("Error parsing dashboard data", e);
+                setError(e.toString());
+            }
+            const timer = setInterval(() => setCurrentDate(new Date()), 60000);
+            return () => clearInterval(timer);
+        }, []);
+
+        if (error) return (
+            <div className="flex items-center justify-center h-64 bg-red-50 text-red-700 p-4 rounded-lg m-8 border border-red-200">
+                <div>
+                    <h3 className="font-bold">Error de carga</h3>
+                    <p className="text-sm mt-1">{error}</p>
+                    <p className="text-xs mt-2 text-red-500">Intenta recargar la página. Si persiste, contacta a soporte.</p>
                 </div>
             </div>
-        </div>
-        <div class="card bg-base-100 shadow-xl">
-            <div class="card-body">
-                <h2 class="card-title text-xl mb-4">Mis Horarios</h2>
-                {% if carreras %}
-                    <ul class="space-y-2">
-                    {% for carrera in carreras %}
-                        <li><a href="{% url 'ver_horarios' carrera.id %}" class="link link-primary">{{ carrera.nombre }}</a></li>
-                    {% endfor %}
-                    </ul>
-                {% else %}
-                    <p class="text-sm text-base-content/60">No tienes cursos asignados.</p>
-                {% endif %}
+        );
+
+        if (!data) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
+
+        const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        const formattedDate = currentDate.toLocaleDateString('es-ES', dateOptions);
+
+        return (
+            <div className="max-w-7xl mx-auto space-y-8 animate-fade-in-up">
+                
+                {/* Header */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h1 className="text-3xl font-bold text-gray-800 tracking-tight">
+                            Hola, <span className="text-blue-600">{data.user.name.split(' ')[0]}</span> 👋
+                        </h1>
+                        <p className="text-gray-500 mt-1 capitalize">{formattedDate}</p>
+                    </div>
+                    <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-100">
+                        <img src={data.user.avatar} alt="Avatar" className="w-10 h-10 rounded-full border border-gray-200" />
+                        <div className="text-sm">
+                            <p className="font-semibold text-gray-700">{data.user.role}</p>
+                            <div className="flex items-center gap-1">
+                                <span className="relative flex h-2 w-2">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                </span>
+                                <span className="text-gray-500 text-xs font-medium">En línea</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Stats Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 transition-transform hover:-translate-y-1">
+                        <div className="p-3 bg-blue-50 text-blue-600 rounded-xl"><Icon name="book-open" size={24} /></div>
+                        <div><p className="text-gray-500 text-sm font-medium">Cursos Asignados</p><h3 className="text-2xl font-bold text-gray-800">{data.stats.cursos}</h3></div>
+                    </div>
+                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 transition-transform hover:-translate-y-1">
+                        <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl"><Icon name="file-text" size={24} /></div>
+                        <div><p className="text-gray-500 text-sm font-medium">Justificaciones</p><h3 className="text-2xl font-bold text-gray-800">{data.stats.justificaciones}</h3></div>
+                    </div>
+                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 transition-transform hover:-translate-y-1">
+                        <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl"><Icon name="activity" size={24} /></div>
+                        <div><p className="text-gray-500 text-sm font-medium">Asistencia Prom.</p><h3 className="text-2xl font-bold text-gray-800">{data.stats.asistenciaPromedio}</h3></div>
+                    </div>
+                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 transition-transform hover:-translate-y-1">
+                        <div className="p-3 bg-orange-50 text-orange-600 rounded-xl"><Icon name="bell" size={24} /></div>
+                        <div><p className="text-gray-500 text-sm font-medium">Alertas</p><h3 className="text-2xl font-bold text-gray-800">{data.stats.alertas}</h3></div>
+                    </div>
+                </div>
+
+                {/* Main Content */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    
+                    {/* Left Column */}
+                    <div className="lg:col-span-2 space-y-6">
+                        
+                        {/* Next Class Card */}
+                        <div className="relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-700 rounded-3xl shadow-lg text-white p-8">
+                            <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-white opacity-10 rounded-full blur-2xl"></div>
+                            <div className="relative z-10">
+                                <div className="flex items-center justify-between mb-6">
+                                    <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm border border-white/10">Ahora / Siguiente</span>
+                                    <Icon name="clock" className="opacity-80" />
+                                </div>
+                                
+                                {data.nextClass.hasClase ? (
+                                    <>
+                                        <h2 className="text-3xl font-bold mb-2">{data.nextClass.nombre}</h2>
+                                        <p className="text-blue-100 text-lg mb-6">{data.nextClass.tema}</p>
+                                        <div className="flex flex-wrap gap-4">
+                                            <div className="flex items-center gap-2 bg-black/20 px-4 py-2 rounded-lg backdrop-blur-sm"><Icon name="clock" size={18} /><span className="font-mono">{data.nextClass.horario}</span></div>
+                                            <div className="flex items-center gap-2 bg-black/20 px-4 py-2 rounded-lg backdrop-blur-sm"><Icon name="map-pin" size={18} /><span>{data.nextClass.aula}</span></div>
+                                        </div>
+                                        <div className="mt-8">
+                                            <a href="{% url 'asistencia' %}" className="inline-flex items-center gap-2 bg-white text-blue-700 hover:bg-blue-50 px-6 py-3 rounded-xl font-bold shadow-md transition-colors">
+                                                Iniciar Clase y Asistencia <Icon name="arrow-right" size={18} />
+                                            </a>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="text-center py-6">
+                                        <h2 className="text-2xl font-bold opacity-90">¡Todo libre por ahora!</h2>
+                                        <p className="text-blue-100 mt-2">No tienes clases programadas próximamente.</p>
+                                        <div className="mt-6">
+                                            <a href="{% url 'calendario' %}" className="inline-block bg-white/20 hover:bg-white/30 px-5 py-2 rounded-lg text-sm transition-colors">Ver Horario Completo</a>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Quick Actions */}
+                        <div>
+                            <h3 className="text-lg font-bold text-gray-800 mb-4">Accesos Rápidos</h3>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                {data.quickActions.map((action, idx) => (
+                                    <a key={idx} href={action.url} className="flex flex-col items-center justify-center p-6 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-100 transition-all group">
+                                        <div className={`p-3 rounded-full mb-3 ${action.color} group-hover:scale-110 transition-transform`}><Icon name={action.icon} size={24} /></div>
+                                        <span className="text-gray-600 font-medium text-sm text-center">{action.label}</span>
+                                    </a>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right Column: Feed */}
+                    <div className="space-y-6">
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 h-full">
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-lg font-bold text-gray-800">Avisos Recientes</h3>
+                                <a href="{% url 'ver_anuncios' %}" className="text-blue-600 text-sm font-medium hover:underline">Ver todo</a>
+                            </div>
+                            <div className="space-y-6">
+                                {data.notifications.map((notif, idx) => (
+                                    <div key={idx} className="flex gap-4 items-start group">
+                                        <div className="mt-1 w-2 h-2 rounded-full bg-blue-500 shrink-0 group-hover:scale-150 transition-transform"></div>
+                                        <div>
+                                            <p className="text-gray-800 font-medium text-sm leading-tight group-hover:text-blue-600 transition-colors cursor-pointer">{notif.titulo}</p>
+                                            <span className="text-gray-400 text-xs mt-1 block">{notif.fecha}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="mt-8 pt-6 border-t border-gray-50">
+                                <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl border border-gray-200 text-center">
+                                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-2">Estado del Sistema</p>
+                                    <div className="flex items-center justify-center gap-2"><span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span><span className="text-gray-700 text-sm font-bold">Operativo</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
             </div>
-        </div>
-    </div>
-    </div>
+        );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('react-dashboard-root'));
+    root.render(<Dashboard />);
+</script>
 {% endblock %}

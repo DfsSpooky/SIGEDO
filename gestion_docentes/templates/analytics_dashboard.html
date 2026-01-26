@@ -1,0 +1,171 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Dashboard de Analíticas" %}{% endblock %}
+{% block breadcrumb %}{% trans "Dashboard de Analíticas" %}{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
+<div class="mb-8">
+    <h1 class="text-3xl md:text-4xl font-bold text-base-content">{% trans "Dashboard de Analíticas" %}</h1>
+    <p class="text-base-content/70 mt-1">{% trans "Visualización de datos clave sobre la asistencia y rendimiento." %}</p>
+</div>
+
+<!-- Filters -->
+<div class="card bg-base-100 shadow-md mb-8">
+    <div class="card-body">
+        <h2 class="card-title">{% trans "Filtros" %}</h2>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+                <label class="label"><span class="label-text">{% trans "Desde" %}</span></label>
+                <input type="date" id="filter-fecha-inicio" class="input input-bordered w-full">
+            </div>
+            <div>
+                <label class="label"><span class="label-text">{% trans "Hasta" %}</span></label>
+                <input type="date" id="filter-fecha-fin" class="input input-bordered w-full">
+            </div>
+            <div>
+                <label class="label"><span class="label-text">{% trans "Especialidad" %}</span></label>
+                <select id="filter-especialidad" class="select select-bordered w-full">
+                    <option value="">{% trans "Todas" %}</option>
+                    {% for esp in especialidades %}
+                        <option value="{{ esp.id }}">{{ esp.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="self-end">
+                <button id="apply-filters-btn" class="btn btn-primary w-full">{% trans "Aplicar" %}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <!-- Bar Chart -->
+    <div class="card bg-base-100 shadow-md">
+        <div class="card-body">
+            <h2 class="card-title">{% trans "Asistencia a lo Largo del Tiempo" %}</h2>
+            <canvas id="attendance-over-time-chart"></canvas>
+        </div>
+    </div>
+    <!-- Pie Chart -->
+    <div class="card bg-base-100 shadow-md">
+        <div class="card-body">
+            <h2 class="card-title">{% trans "Resumen General de Asistencias" %}</h2>
+            <canvas id="overall-status-chart"></canvas>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const applyFiltersBtn = document.getElementById('apply-filters-btn');
+    const fechaInicioInput = document.getElementById('filter-fecha-inicio');
+    const fechaFinInput = document.getElementById('filter-fecha-fin');
+    const especialidadInput = document.getElementById('filter-especialidad');
+
+    let attendanceChart = null;
+    let overallChart = null;
+
+    async function fetchDataAndRenderCharts() {
+        const fechaInicio = fechaInicioInput.value;
+        const fechaFin = fechaFinInput.value;
+        const especialidadId = especialidadInput.value;
+
+        // Construir la URL con los parámetros de filtro
+        const url = new URL('{% url "api_get_report_chart_data" %}', window.location.origin);
+        if (fechaInicio) url.searchParams.append('fecha_inicio', fechaInicio);
+        if (fechaFin) url.searchParams.append('fecha_fin', fechaFin);
+        if (especialidadId) url.searchParams.append('especialidad', especialidadId);
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error('Error al cargar los datos del reporte.');
+            }
+            const chartData = await response.json();
+
+            renderAttendanceChart(chartData.data.bar_chart);
+            renderOverallChart(chartData.data.pie_chart);
+
+        } catch (error) {
+            console.error("Error fetching chart data:", error);
+            // Aquí podrías mostrar un mensaje de error en la UI
+        }
+    }
+
+    function renderAttendanceChart(data) {
+        const ctx = document.getElementById('attendance-over-time-chart').getContext('2d');
+        if (attendanceChart) {
+            attendanceChart.destroy();
+        }
+        attendanceChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.labels,
+                datasets: [
+                    {
+                        label: '{% trans "Presentes" %}',
+                        data: data.presentes,
+                        backgroundColor: 'rgba(34, 197, 94, 0.7)',
+                    },
+                    {
+                        label: '{% trans "Faltas" %}',
+                        data: data.faltas,
+                        backgroundColor: 'rgba(239, 68, 68, 0.7)',
+                    },
+                    {
+                        label: '{% trans "Tardanzas" %}',
+                        data: data.tardanzas,
+                        backgroundColor: 'rgba(245, 158, 11, 0.7)',
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: { beginAtZero: true, stacked: true },
+                    x: { stacked: true }
+                },
+                plugins: { legend: { position: 'top' } }
+            }
+        });
+    }
+
+    function renderOverallChart(data) {
+        const ctx = document.getElementById('overall-status-chart').getContext('2d');
+        if (overallChart) {
+            overallChart.destroy();
+        }
+        overallChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['{% trans "Presentes" %}', '{% trans "Faltas" %}', '{% trans "Tardanzas" %'],
+                datasets: [{
+                    data: [data.presentes, data.faltas, data.tardanzas],
+                    backgroundColor: [
+                        'rgba(34, 197, 94, 0.7)',
+                        'rgba(239, 68, 68, 0.7)',
+                        'rgba(245, 158, 11, 0.7)'
+                    ],
+                    borderColor: '#1f2937',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { position: 'top' } }
+            }
+        });
+    }
+
+    applyFiltersBtn.addEventListener('click', fetchDataAndRenderCharts);
+
+    // Carga inicial de datos
+    fetchDataAndRenderCharts();
+});
+</script>
+{% endblock %}

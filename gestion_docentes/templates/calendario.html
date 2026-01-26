@@ -1,0 +1,467 @@
+{% extends 'base.html' %}
+
+{% block title %}Mi Calendario de Horarios{% endblock %}
+
+{% block breadcrumb %}
+<a href="{% url 'dashboard' %}">Dashboard</a> / Mi Calendario
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6 fade-in-up">
+    <div
+        class="flex flex-col md:flex-row md:items-center justify-between gap-6 p-6 bg-white rounded-2xl border border-gray-200 shadow-sm">
+        <div>
+            <h2 class="text-3xl font-extrabold text-gray-800">
+                Mi Calendario Académico
+            </h2>
+            <p class="text-gray-500 mt-1 flex items-center gap-2">
+                {% if semestre_activo %}
+                <span class="badge badge-primary font-medium">{{ semestre_activo.nombre }}</span>
+                <span>•</span>
+                <span class="text-sm">Planificación Oficial</span>
+                {% else %}
+                <span class="text-warning font-medium flex items-center gap-1">
+                    <i class="fas fa-exclamation-triangle"></i> Sin Semestre Activo
+                </span>
+                {% endif %}
+            </p>
+        </div>
+
+        <div class="flex flex-wrap gap-4 text-sm font-medium">
+            <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700">
+                <span class="w-3 h-3 rounded bg-blue-500"></span>
+                <span>Clases</span>
+            </div>
+            <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700">
+                <span class="w-3 h-3 rounded bg-yellow-500"></span>
+                <span>Eventos</span>
+            </div>
+            <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700">
+                <span class="w-3 h-3 rounded bg-red-500"></span>
+                <span>Feriados</span>
+            </div>
+        </div>
+    </div>
+
+    {% if not semestre_activo %}
+    <div role="alert" class="alert alert-warning shadow-md rounded-xl">
+        <i class="fas fa-exclamation-circle text-2xl"></i>
+        <div>
+            <h3 class="font-bold text-lg">Atención: Semestre Inactivo</h3>
+            <div class="text-sm">No hay un semestre activo configurado. El calendario muestra datos históricos.</div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="card bg-white shadow-xl border border-gray-200 overflow-hidden rounded-2xl">
+        <div class="card-body p-0">
+            <div id="calendar" class="min-h-[750px] font-sans"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* --- FORZAR MODO CLARO Y ARREGLAR VISUALIZACIÓN --- */
+    :root {
+        /* Variables internas de FullCalendar forzadas a colores claros */
+        --fc-page-bg-color: #ffffff;
+        --fc-neutral-bg-color: #f9fafb;
+        --fc-border-color: #e5e7eb;
+        /* Gris suave para líneas */
+        --fc-list-event-hover-bg-color: #f3f4f6;
+        --fc-today-bg-color: rgba(59, 130, 246, 0.05);
+        /* Azul muy suave para hoy */
+    }
+
+    /* Animación de entrada */
+    .fade-in-up {
+        animation: fadeInUp 0.5s ease-out forwards;
+    }
+
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Contenedor Principal: Blanco Puro */
+    #calendar {
+        background-color: #ffffff;
+        color: #1f2937;
+        /* Texto gris oscuro (casi negro) */
+        font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    }
+
+    /* --- BARRA SUPERIOR (TOOLBAR) --- */
+    .fc .fc-toolbar {
+        background-color: #ffffff;
+        /* Fondo blanco */
+        margin-bottom: 0 !important;
+        padding: 1.5rem;
+        border-bottom: 1px solid #e5e7eb;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .fc .fc-toolbar-title {
+        color: #111827;
+        /* Título negro fuerte */
+        font-size: 1.5rem;
+        font-weight: 800;
+        text-transform: capitalize;
+    }
+
+    /* Botones de navegación (Hoy, <, >) */
+    .fc .fc-button-primary {
+        background-color: #ffffff !important;
+        border: 1px solid #d1d5db !important;
+        color: #374151 !important;
+        /* Iconos/Texto gris oscuro */
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+        font-weight: 600;
+        text-transform: capitalize;
+        transition: all 0.2s;
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+    }
+
+    .fc .fc-button-primary:hover {
+        background-color: #f3f4f6 !important;
+        /* Gris muy claro al pasar mouse */
+        border-color: #9ca3af !important;
+    }
+
+    .fc .fc-button-primary:not(:disabled).fc-button-active {
+        background-color: #eff6ff !important;
+        /* Azul muy pálido activo */
+        border-color: #3b82f6 !important;
+        color: #1d4ed8 !important;
+        /* Texto azul */
+    }
+
+    /* --- CABECERA DE LA GRILLA (Días de la semana) --- */
+    .fc-theme-standard th {
+        background-color: #f9fafb;
+        /* Gris muy claro, casi blanco */
+        border: none;
+        border-bottom: 1px solid #e5e7eb;
+        padding: 12px 0;
+    }
+
+    .fc .fc-col-header-cell-cushion {
+        color: #4b5563;
+        /* Gris medio */
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-decoration: none;
+    }
+
+    /* --- CUERPO DE LA GRILLA (Horas y Líneas) --- */
+    .fc-theme-standard td,
+    .fc-theme-standard .fc-scrollgrid {
+        border-color: #e5e7eb;
+        /* Líneas gris suave */
+    }
+
+    /* Texto de las horas (eje izquierdo) */
+    .fc-timegrid-slot-label-cushion {
+        color: #6b7280;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    /* Indicador de hora actual (Línea roja) */
+    .fc .fc-timegrid-now-indicator-line {
+        border-color: #ef4444;
+        /* Rojo vibrante */
+        border-width: 2px;
+        z-index: 20;
+    }
+
+    .fc .fc-timegrid-now-indicator-arrow {
+        border-color: #ef4444;
+        border-width: 6px;
+    }
+
+    /* --- ESTILOS DE LOS EVENTOS --- */
+    .fc-event {
+        border: none;
+        background: transparent;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        margin: 1px 2px;
+        border-radius: 6px;
+        transition: transform 0.2s;
+        cursor: pointer;
+    }
+
+    .fc-event:hover {
+        transform: translateY(-1px);
+        z-index: 50;
+    }
+
+    /* Contenedor interno del evento */
+    .evt-container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        width: 100%;
+        padding: 4px 6px;
+        border-radius: 4px;
+        overflow: hidden;
+        border-left: 3px solid rgba(0, 0, 0, 0.15);
+        color: #ffffff;
+        /* Texto blanco siempre para contraste */
+    }
+
+    /* Colores Fijos para los eventos (ignoran el tema oscuro) */
+    .evt-type-class {
+        background-color: #3b82f6;
+        /* Azul estándar sólido */
+    }
+
+    .evt-type-event {
+        background-color: #f59e0b;
+        /* Amarillo sólido */
+        color: #ffffff;
+    }
+
+    .evt-type-holiday {
+        background-color: #ef4444;
+        /* Rojo sólido */
+    }
+
+    .evt-time {
+        font-size: 0.75rem;
+        font-weight: 700;
+        opacity: 0.95;
+        margin-bottom: 2px;
+    }
+
+    .evt-title {
+        font-size: 0.85rem;
+        font-weight: 600;
+        line-height: 1.1;
+    }
+
+    .evt-loc {
+        margin-top: auto;
+        font-size: 0.75rem;
+        font-weight: 500;
+        opacity: 0.9;
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        padding-top: 4px;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.11/locales/es.global.min.js"></script>
+<script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const calendarEl = document.getElementById('calendar');
+
+        // Lógica de fechas
+        const activeSemesterStart = "{% if semestre_activo %}{{ semestre_activo.fecha_inicio|date:'Y-m-d' }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}";
+        const today = new Date().toISOString().split('T')[0];
+        let initialDate = today;
+        if (activeSemesterStart && today < activeSemesterStart) {
+            initialDate = activeSemesterStart;
+        }
+
+        const calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'timeGridWeek',
+            initialDate: initialDate,
+            locale: 'es',
+
+            // Toolbar limpia
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,listWeek'
+            },
+            buttonText: {
+                today: 'Hoy', month: 'Mes', week: 'Semana', list: 'Agenda'
+            },
+
+            // Configuración de la grilla horaria
+            navLinks: true,
+            nowIndicator: true,
+            slotMinTime: '07:00:00',
+            slotMaxTime: '22:30:00',
+            allDayText: 'Todo el día',
+            expandRows: true,
+            stickyHeaderDates: true,
+            height: 'auto',
+            dayMaxEventRows: true,
+            slotEventOverlap: false,
+
+            events: "{% url 'api:horario_docente' %}",
+
+            // --- RENDERIZADO PERSONALIZADO (SOLUCIÓN DE VISIBILIDAD) ---
+            eventContent: function (arg) {
+                // Determinar tipo y clase CSS
+                let cssClass = 'evt-type-class';
+
+                // Lógica para colores basados en tipo
+                if (arg.event.display === 'background' || arg.event.allDay) {
+                    if (arg.event.color === '#FF5733') {
+                        cssClass = 'evt-type-holiday';
+                    } else {
+                        cssClass = 'evt-type-event';
+                    }
+                }
+
+                // Construcción del HTML interno
+                let container = document.createElement('div');
+                container.className = `evt-container ${cssClass}`;
+
+                // Hora (solo si no es evento de día completo)
+                if (!arg.event.allDay) {
+                    let timeDiv = document.createElement('div');
+                    timeDiv.className = 'evt-time';
+                    timeDiv.innerText = arg.timeText;
+                    container.appendChild(timeDiv);
+                }
+
+                // Título
+                let titleDiv = document.createElement('div');
+                titleDiv.className = 'evt-title';
+                titleDiv.innerText = arg.event.title;
+                container.appendChild(titleDiv);
+
+                // Ubicación (Aula)
+                if (arg.event.extendedProps.classroom) {
+                    let locDiv = document.createElement('div');
+                    locDiv.className = 'evt-loc';
+                    locDiv.innerHTML = `<i class="fas fa-map-marker-alt text-xs"></i> <span>${arg.event.extendedProps.classroom}</span>`;
+                    container.appendChild(locDiv);
+                }
+
+                return { domNodes: [container] };
+            },
+
+            // Limpiar estilos por defecto del contenedor padre
+            eventDidMount: function (info) {
+                info.el.style.backgroundColor = 'transparent';
+                info.el.style.border = 'none';
+            },
+
+            // --- MODAL DE DETALLES (SweetAlert2) ---
+            eventClick: function (info) {
+                info.jsEvent.preventDefault();
+                const props = info.event.extendedProps;
+
+                // Configuración dinámica del modal
+                let titleColorClass = 'text-blue-600'; // Azul por defecto
+                let btnClass = 'btn-primary';
+                let htmlContent = '';
+
+                if (props.specialties) {
+                    // Es una clase
+                    htmlContent = `
+                        <div class="text-left mt-4 space-y-3">
+                            <div class="flex items-start gap-3">
+                                <i class="far fa-clock text-lg text-gray-400 mt-1"></i>
+                                <div>
+                                    <p class="font-bold text-sm text-gray-500">HORARIO</p>
+                                    <p class="text-base font-medium text-gray-800">${info.event.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${info.event.end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-map-marker-alt text-lg text-gray-400 mt-1"></i>
+                                <div>
+                                    <p class="font-bold text-sm text-gray-500">AULA</p>
+                                    <p class="text-base font-medium text-gray-800">${props.classroom || 'No asignada'}</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-users text-lg text-gray-400 mt-1"></i>
+                                <div>
+                                    <p class="font-bold text-sm text-gray-500">GRUPOS</p>
+                                    <p class="text-base font-medium text-gray-800">${props.specialties}</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // Es evento o feriado
+                    const isHoliday = info.event.color === '#FF5733';
+                    titleColorClass = isHoliday ? 'text-red-500' : 'text-yellow-500';
+                    btnClass = isHoliday ? 'btn-error' : 'btn-warning';
+
+                    htmlContent = `
+                        <div class="text-center mt-4">
+                             <p class="text-lg text-gray-700 font-medium">
+                                ${info.event.start.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                             </p>
+                             <p class="text-sm mt-2 text-gray-500">Evento académico programado</p>
+                        </div>
+                    `;
+                }
+
+                Swal.fire({
+                    title: `<span class="${titleColorClass} text-2xl">${info.event.title}</span>`,
+                    html: htmlContent,
+                    showCloseButton: true,
+                    showConfirmButton: true,
+                    confirmButtonText: 'Entendido',
+                    buttonsStyling: false,
+                    customClass: {
+                        popup: 'rounded-2xl',
+                        confirmButton: `btn ${btnClass} w-full mt-4 rounded-xl`
+                    }
+                });
+            }
+        });
+
+        calendar.render();
+
+        // Ajuste responsive simple
+        function adjustView() {
+            if (window.innerWidth < 768) {
+                if (calendar.view.type !== 'listWeek') calendar.changeView('listWeek');
+            } else {
+                if (calendar.view.type === 'listWeek') calendar.changeView('timeGridWeek');
+            }
+        }
+        adjustView();
+        window.addEventListener('resize', adjustView);
+
+        // --- WebSocket ---
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsPath = `${protocol}//${window.location.host}/ws/calendar/`;
+            const socket = new WebSocket(wsPath);
+
+            socket.onopen = () => console.log("WebSocket calendario conectado.");
+            socket.onmessage = (e) => {
+                const data = JSON.parse(e.data);
+                if (data.type === 'horario.update') {
+                    const Toast = Swal.mixin({
+                        toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, timerProgressBar: true
+                    });
+                    Toast.fire({ icon: 'info', title: 'El horario ha sido actualizado' });
+                    calendar.refetchEvents();
+                }
+            };
+            socket.onclose = () => setTimeout(connectWebSocket, 5000);
+        }
+        connectWebSocket();
+    });
+</script>
+{% endblock %}
