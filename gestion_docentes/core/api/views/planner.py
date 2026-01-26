@@ -961,8 +961,9 @@ def api_get_placement_suggestions(request):
         docente = curso.docente
         semestre_activo = Semestre.objects.filter(estado="ACTIVO").first()
 
-        if not docente:
-             return JsonResponse({"status": "error", "message": "El curso no tiene docente asignado (Sugerencias requieren docente)"}, status=400)
+        # No retornamos error si no hay docente, permitimos sugerencias basadas en otros factores
+        # if not docente:
+        #      return JsonResponse({"status": "error", "message": "El curso no tiene docente asignado (Sugerencias requieren docente)"}, status=400)
 
         # Configuraciones Básicas
         # Si estamos arrastrando desde "No Asignados", usamos el bloque estandar (ej. 2h o lo que quede).
@@ -978,28 +979,29 @@ def api_get_placement_suggestions(request):
 
         # --- PREPARAR DATOS DE OCUPACIÓN (Similar a auto_asignar) ---
         # 1. Ocupación Docente
-        bloques_docente = BloqueHorario.objects.filter(
-            curso__docente=docente, 
-            curso__semestre=semestre_activo
-        ).exclude(curso__id=curso_id) 
-        
         docente_ocupado = set()
         carga_docente_diaria = {dia: 0 for dia in dias_semana}
-        # Estructura: {docente_id: {dia: {indices}}}
-        docente_occupied_indices = {docente.id: {dia: set() for dia in dias_semana}}
+        docente_occupied_indices = {}
+        
+        if docente:
+            docente_occupied_indices = {docente.id: {dia: set() for dia in dias_semana}}
+            bloques_docente = BloqueHorario.objects.filter(
+                curso__docente=docente, 
+                curso__semestre=semestre_activo
+            ).exclude(curso__id=curso_id) 
 
-        for b in bloques_docente:
-            carga_docente_diaria[b.dia] += b.duracion_bloques
-            try:
-                start_idx = franja_map[b.franja_inicio.id]
-                for i in range(b.duracion_bloques):
-                    idx = start_idx + i
-                    if idx < len(franjas_horarias):
-                        f_id = franjas_horarias[idx].id
-                        docente_ocupado.add((b.dia, f_id))
-                        docente_occupied_indices[docente.id][b.dia].add(idx)
-            except (KeyError, IndexError):
-                pass
+            for b in bloques_docente:
+                carga_docente_diaria[b.dia] += b.duracion_bloques
+                try:
+                    start_idx = franja_map[b.franja_inicio.id]
+                    for i in range(b.duracion_bloques):
+                        idx = start_idx + i
+                        if idx < len(franjas_horarias):
+                            f_id = franjas_horarias[idx].id
+                            docente_ocupado.add((b.dia, f_id))
+                            docente_occupied_indices[docente.id][b.dia].add(idx)
+                except (KeyError, IndexError):
+                    pass
         
         # 2. Ocupación Grupo (si aplica)
         grupo_ocupado = set()
@@ -1044,7 +1046,7 @@ def api_get_placement_suggestions(request):
         # --- EVALUAR TODAS LAS POSICIONES ---
         for dia in dias_semana:
             # Check límite diario docente
-            if carga_docente_diaria[dia] + duracion > 8:
+            if docente and carga_docente_diaria[dia] + duracion > 8:
                  # Todo el día bloqueado
                  for f in franjas_horarias:
                      conflicts.append({
@@ -1064,8 +1066,8 @@ def api_get_placement_suggestions(request):
 
                 for f in franjas_del_bloque:
                     # 1. Disponibilidad Turno
-                    if (docente.disponibilidad == "MANANA" and f.turno != "MANANA") or \
-                       (docente.disponibilidad == "TARDE" and f.turno != "TARDE"):
+                    if docente and ((docente.disponibilidad == "MANANA" and f.turno != "MANANA") or \
+                       (docente.disponibilidad == "TARDE" and f.turno != "TARDE")):
                         bloque_valido = False
                         razon_invalidez = f"Docente solo {docente.disponibilidad}"
                         break
@@ -1085,7 +1087,7 @@ def api_get_placement_suggestions(request):
                 if bloque_valido:
                     # CALCULAR SCORE
                     score = calcular_puntaje(
-                        docente.id, 
+                        docente.id if docente else None, 
                         dia, 
                         i, 
                         duracion, 

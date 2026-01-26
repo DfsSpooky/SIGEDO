@@ -258,22 +258,23 @@ class BloqueHorario(models.Model):
 
         q_grupo = Q()
         if self.curso.pk:
-            # Obtenemos los grupos de las especialidades de este curso
-            grupos_ids = list(self.curso.especialidades.values_list('grupo__id', flat=True))
-            # Omitimos None si hubiera
-            grupos_ids = [gid for gid in grupos_ids if gid is not None]
+            # Nueva lógica: Conflicto solo si se comparte SEMESTRE y alguna ESPECIALIDAD
+            # No basta con compartir Grupo, pues un Grupo puede tener varias especialidades (Matemática, Biología)
+            # que pueden llevar clases simultáneas.
+            
+            # 1. Obtener especialidades de MI curso
+            mis_especialidades = list(self.curso.especialidades.values_list('id', flat=True))
+            
+            if mis_especialidades:
+                 # Conflicto si:
+                 # El otro curso tiene el mismo semestre cursado
+                 # Y el otro curso tiene AL MENOS UNA especialidad en común con las mías
+                 q_grupo = Q(
+                     curso__semestre_cursado=self.curso.semestre_cursado,
+                     curso__especialidades__id__in=mis_especialidades
+                 )
 
-            if grupos_ids:
-                # Conflicto si:
-                # 1. El curso conflicto tiene alguna especialidad en uno de MIS grupos
-                # 2. Y es del MISMO semestre (si asumimos que un grupo cursa todo junto el semestre)
-                q_grupo = Q(
-                    curso__especialidades__grupo__id__in=grupos_ids,
-                    curso__semestre_cursado=self.curso.semestre_cursado
-                )
-
-        # Consulta unificada: Buscar cualquier bloque que cumpla (Superposición) Y (MismoDocente O MismoAula O MismoGrupo)
-        # Excluimos el propio bloque si ya existe (edición)
+        # Consulta unificada: Buscar cualquier bloque que cumpla (Superposición) Y (MismoDocente O MismoAula O IntersecciónEspecialidad)
         conflicto = BloqueHorario.objects.filter(
             q_superposicion & (q_docente | q_aula | q_grupo)
         ).exclude(pk=self.pk).select_related('curso', 'curso__docente', 'aula').first()
@@ -324,25 +325,72 @@ class BloqueHorario(models.Model):
 
         # 6. Validar Carga Académica Diaria del Grupo (Max 6 horas)
         if self.curso.pk:
-            for especialidad in self.curso.especialidades.all():
-                if especialidad.grupo:
-                    horas_grupo = BloqueHorario.objects.filter(
-                        curso__especialidades__grupo=especialidad.grupo,
-                        curso__semestre_cursado=self.curso.semestre_cursado,
-                        dia=self.dia
-                    ).exclude(pk=self.pk).aggregate(total=models.Sum("duracion_bloques"))["total"] or 0
+            # Obtener los grupos únicos de las especialidades de este curso
+            grupos_unicos = set()
+            for esp in self.curso.especialidades.all():
+                if esp.grupo:
+                    grupos_unicos.add(esp.grupo)
+            
+            for grupo in grupos_unicos:
+                 # Buscamos todos los bloques de este grupo en este dia/semestre
+                 # Bloques cuyo curso tenga 'alguna' especialidad en 'este' grupo
+                 # Usamos distinct() para que si un bloque tiene varias especialidades del mismo grupo, no se cuente doble
+                 bloques_grupo_q = BloqueHorario.objects.filter(
+                    curso__especialidades__grupo=grupo,
+                    curso__semestre_cursado=self.curso.semestre_cursado,
+                    dia=self.dia
+                 ).exclude(pk=self.pk).distinct()
+                 
+                 horas_grupo = bloques_grupo_q.aggregate(total=models.Sum("duracion_bloques"))["total"] or 0
 
-                    if horas_grupo + self.duracion_bloques > 6:
-                        raise ValidationError(
-                            f"El grupo {especialidad.grupo} de {especialidad.nombre} excede el límite de 6 horas diarias."
+                 if horas_grupo + self.duracion_bloques > 6:
+                      raise ValidationError(
+                            f"El grupo {grupo} excede el límite de 6 horas diarias ({horas_grupo}h + {self.duracion_bloques}h > 6h)."
                         )
 
-        # 7. Validar Carga Continua del Docente (Max 4 horas seguidas)
-        # Nota: Esta validación es compleja porque requiere analizar la contigüidad.
-        # Por simplicidad y eficiencia, validamos si la suma total del día excede un umbral seguro
-        # o si el bloque actual es excesivamente largo.
-        if self.duracion_bloques > 4:
-             raise ValidationError("No se pueden asignar bloques de más de 4 horas continuas.")
+        # 7. Validar Carga Continua del Docente (Max 5 bloques seguidos ~ 4h 10m)
+        if self.curso.docente:
+            # Estrategia: Reconstruir la línea de tiempo del día
+            bloques_dia = list(BloqueHorario.objects.filter(
+                curso__docente=self.curso.docente,
+                dia=self.dia
+            ).exclude(pk=self.pk).order_by('franja_inicio__hora_inicio'))
+            
+            # Simulamos insertar el bloque actual
+            bloques_dia.append(self)
+            bloques_dia.sort(key=lambda b: b.franja_inicio.hora_inicio if b.franja_inicio else time.min)
+
+            # Convertir a lista de índices de franjas para verificar contigüidad
+            # Asumimos que las franjas están ordenadas por ID o Hora. Mejor usar Hora.
+            todas_franjas = list(FranjaHoraria.objects.order_by('hora_inicio'))
+            franja_map = {f.id: i for i, f in enumerate(todas_franjas)}
+            
+            slots_ocupados = set()
+            for b in bloques_dia:
+                if b.franja_inicio_id in franja_map:
+                    start_idx = franja_map[b.franja_inicio_id]
+                    for i in range(b.duracion_bloques):
+                        slots_ocupados.add(start_idx + i)
+            
+            # Contar racha máxima
+            sorted_slots = sorted(list(slots_ocupados))
+            max_consecutive = 0
+            current_consecutive = 0
+            last_slot = -1
+            
+            for slot in sorted_slots:
+                if slot == last_slot + 1:
+                    current_consecutive += 1
+                else:
+                    current_consecutive = 1
+                last_slot = slot
+                if current_consecutive > max_consecutive:
+                    max_consecutive = current_consecutive
+            
+            if max_consecutive > 5:
+                raise ValidationError(
+                    f"El docente {self.curso.docente} excedería el límite de 5 bloques consecutivos sin descanso ({max_consecutive} bloques)."
+                )
 
         # 8. Validar Reglas de Turno por Semestre
         # Semestres 1-4: Turno MAÑANA (salvo excepción)
