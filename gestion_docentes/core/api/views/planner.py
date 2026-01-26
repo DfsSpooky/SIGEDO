@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 from core.services.or_tools_solver import HorarioSolver
 
 from django.shortcuts import render
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
@@ -81,12 +81,23 @@ def calcular_puntaje(docente_id, dia, franja_idx, duracion, carga_docente_dia, d
 
 @staff_member_required
 @csrf_exempt
+@staff_member_required
+@csrf_exempt
 def api_asignar_horario(request):
+    # Soporte para HTMX (POST form data) o JSON (fetch)
     if request.method != "POST":
         return error_response("Método no permitido", status_code=405)
 
     try:
-        data = json.loads(request.body)
+        # Detectar si es JSON o Form Data (HTMX usa Form Data por defecto, pero htmx.ajax puede ser config)
+        # SortableJS htmx.ajax enviara x-www-form-urlencoded o json dependiendo de config.
+        # Asumiremos que leemos de request.POST si no es JSON body.
+        
+        if request.content_type == 'application/json':
+            data = json.loads(request.body)
+        else:
+            data = request.POST
+
         curso_id = data.get("curso_id")
         franja_id = data.get("franja_id")
         dia = data.get("dia")
@@ -94,7 +105,7 @@ def api_asignar_horario(request):
 
         # La duración del bloque ahora debe ser enviada desde el frontend.
         # Asumimos un valor por defecto si no se envía, para compatibilidad temporal.
-        duracion = data.get("duracion", 2)
+        duracion = int(data.get("duracion", 2))
 
         curso = Curso.objects.get(pk=curso_id)
         franja_inicio = FranjaHoraria.objects.get(pk=franja_id)
@@ -104,7 +115,7 @@ def api_asignar_horario(request):
             try:
                 aula = Aula.objects.get(pk=aula_id)
             except Aula.DoesNotExist:
-                return error_response(f"El aula con ID {aula_id} no existe.")
+                return error_htmx(request, f"El aula con ID {aula_id} no existe.")
 
         # Validar que no se excedan las horas semanales del curso
         horas_asignadas = (
@@ -114,7 +125,7 @@ def api_asignar_horario(request):
             or 0
         )
         if horas_asignadas + duracion > curso.horas_academicas_semanales:
-            return error_response(
+            return error_htmx(request, 
                 f"No se puede asignar: excede las horas semanales del curso ({curso.horas_academicas_semanales})."
             )
 
@@ -130,16 +141,49 @@ def api_asignar_horario(request):
         except ValidationError as e:
             # Extraer el mensaje de error de la excepción
             error_message = next(iter(e.message_dict.values()))[0] if hasattr(e, 'message_dict') else str(e)
-            return error_response(f"Conflicto de horario: {error_message}")
+            return error_htmx(request, f"Conflicto de horario: {error_message}")
+
+        if request.headers.get('HX-Request'):
+            # Prepara contexto para el partial
+            # Calcular hora fin
+            # Necesitamos todas las franjas para calcular la hora final visual
+            all_franjas = list(FranjaHoraria.objects.order_by('hora_inicio'))
+            try:
+                start_idx = next(i for i, f in enumerate(all_franjas) if f.id == franja_inicio.id)
+                end_idx = min(start_idx + duracion - 1, len(all_franjas) - 1)
+                hora_fin = all_franjas[end_idx].hora_fin
+            except StopIteration:
+                hora_fin = franja_inicio.hora_fin # Fallback
+
+            time_range = f"{franja_inicio.hora_inicio.strftime('%H:%M')} - {hora_fin.strftime('%H:%M')}"
+            
+            # Especialidades string
+            esp_names = [e.nombre for e in curso.especialidades.all()]
+            bloque.curso.especialidades_nombres_str = ", ".join(esp_names)
+
+            context = {
+                'bloque': bloque,
+                'time_range': time_range,
+                'es_ghost': False # TODO: Logic logic for ghost if needed
+            }
+            return render(request, 'partials/planner_cell.html', context)
 
         return success_response(message="Bloque asignado con éxito.")
 
     except Curso.DoesNotExist:
-        return not_found_response("Curso no encontrado.")
+        return error_htmx(request, "Curso no encontrado.")
     except FranjaHoraria.DoesNotExist:
-        return not_found_response("Franja horaria no encontrada.")
+        return error_htmx(request, "Franja horaria no encontrada.")
     except Exception as e:
-        return server_error_response(f"Error inesperado: {e}")
+        return error_htmx(request, f"Error inesperado: {e}")
+
+def error_htmx(request, message):
+    if request.headers.get('HX-Request'):
+        from django.http import HttpResponse
+        response = HttpResponse(status=200) # HTMX swaps even on 200, but we use triggers
+        response['HX-Trigger'] = json.dumps({"showError": message})
+        return response
+    return error_response(message)
 
 
 @staff_member_required
@@ -169,12 +213,18 @@ def api_desasignar_horario(request):
 
 @staff_member_required
 @csrf_exempt
+@staff_member_required
+@csrf_exempt
 def api_mover_bloque(request):
     if request.method != "POST":
         return error_response("Método no permitido", status_code=405)
 
     try:
-        data = json.loads(request.body)
+        if request.content_type == 'application/json':
+            data = json.loads(request.body)
+        else:
+            data = request.POST
+
         bloque_id = data.get("bloque_id")
         nuevo_dia = data.get("dia")
         nueva_franja_id = data.get("franja_id")
@@ -194,16 +244,38 @@ def api_mover_bloque(request):
                 bloque.save()
         except ValidationError as e:
             error_message = next(iter(e.message_dict.values()))[0] if hasattr(e, 'message_dict') else str(e)
-            return error_response(f"No se puede mover: {error_message}")
+            return error_htmx(request, f"No se puede mover: {error_message}")
+
+        if request.headers.get('HX-Request'):
+             # Prepara contexto para el partial
+            all_franjas = list(FranjaHoraria.objects.order_by('hora_inicio'))
+            try:
+                start_idx = next(i for i, f in enumerate(all_franjas) if f.id == nueva_franja_inicio.id)
+                end_idx = min(start_idx + bloque.duracion_bloques - 1, len(all_franjas) - 1)
+                hora_fin = all_franjas[end_idx].hora_fin
+            except StopIteration:
+                hora_fin = nueva_franja_inicio.hora_fin # Fallback
+
+            time_range = f"{nueva_franja_inicio.hora_inicio.strftime('%H:%M')} - {hora_fin.strftime('%H:%M')}"
+            
+            esp_names = [e.nombre for e in bloque.curso.especialidades.all()]
+            bloque.curso.especialidades_nombres_str = ", ".join(esp_names)
+
+            context = {
+                'bloque': bloque,
+                'time_range': time_range,
+                'es_ghost': False
+            }
+            return render(request, 'partials/planner_cell.html', context)
 
         return success_response(message="Bloque movido con éxito.")
 
     except BloqueHorario.DoesNotExist:
-        return not_found_response("El bloque a mover no existe.")
+        return error_htmx(request, "El bloque a mover no existe.")
     except FranjaHoraria.DoesNotExist:
-        return not_found_response("La nueva franja horaria no existe.")
+        return error_htmx(request, "La nueva franja horaria no existe.")
     except Exception as e:
-        return server_error_response(f"Error inesperado: {e}")
+        return error_htmx(request, f"Error inesperado: {e}")
 
 
 @staff_member_required
@@ -368,6 +440,131 @@ def api_get_teacher_conflicts(request):
         return server_error_response(f"Error inesperado: {e}")
 
 
+@staff_member_required
+@csrf_exempt
+def load_planner_content(request):
+    especialidad_id = request.GET.get('especialidad_id')
+    semestre_cursado = request.GET.get('semestre_cursado')
+
+    if not especialidad_id or not semestre_cursado:
+        return HttpResponse("") # Return empty if params missing
+
+    try:
+        data = _get_planner_data(especialidad_id, semestre_cursado)
+        
+        # Estructurar datos para el template (Grid)
+        # Necesitamos grid[turno][franja_id][dia] = bloque
+        
+        franjas_manana = list(FranjaHoraria.objects.filter(turno='MANANA').order_by('hora_inicio'))
+        franjas_tarde = list(FranjaHoraria.objects.filter(turno='TARDE').order_by('hora_inicio'))
+        dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
+        
+        # Mapear bloques por posicion
+        assigned_map = {} # Key: (dia, franja_id) -> bloquedict
+        for b in data['cursos_asignados']:
+             # Buscar franja idx para calcular duracion visual (rowspan logic)
+             # Pero en el template iteramos franjas.
+             # Solo necesitamos el objeto bloque en la celda de inicio.
+             assigned_map[(b['dia'], b['franja_id_inicio'])] = b
+             
+             # Tambien necesitamos marcar las celdas ocupadas por la duracion > 1 (para ocultarlas)
+             # Esto es complejo en template puro.
+             # Lo haremos pre-calculado:
+             # cell_state[dia][franja_id] = { 'bloque': b, 'span': duration, 'hidden': bool }
+
+        schedule_grid = { 'MANANA': {}, 'TARDE': {} }
+        
+        # Helper para construir el grid
+        def build_grid_data(franjas, turno_key):
+            grid_rows = []
+            for f in franjas:
+                row_data = {'franja': f, 'cells': {}}
+                for d in dias:
+                    cell_data = {'dia': d, 'franja_id': f.id}
+                    
+                    # Check assignments
+                    key = (d, f.id)
+                    if key in assigned_map:
+                        # Bloque de inicio
+                        b = assigned_map[key]
+                        # Hydrate objects for template tag usage manually or pass simple dict
+                        # El partial usa bloque.curso.nombre etc.
+                        # _get_planner_data devuelve dicts.
+                        # El partial espera OBJETO o dict con access similar.
+                        # _get_planner_data devuelve dict serializado.
+                        # Re-construir objeto dummy o usar un template tag personalizado?
+                        # Mejor: Pasar un objeto simple que funcione con el partial.
+                        # El partial usa {{ bloque.curso.nombre }}.
+                        # Nuestro dict tiene bloque['nombre'].
+                        # Modificaremos _get_planner_data o convertiremos aqui.
+                        
+                        # Hack rapido: Convertir dict a objeto con dot notation
+                        class Struct:
+                            def __init__(self, **entries): self.__dict__.update(entries)
+                        
+                        # Nested structs for curso, docente, etc
+                        # Esto es tedioso.
+                        # Mejor opcion: que _get_planner_data devuelva objetos ORM reales si se pide internamente?
+                        # O modificar el partial para aceptar dicts?
+                        # Modificare el partial para ser robusto (obj o dict).
+                        
+                        cell_data['bloque'] = b 
+                        cell_data['rowspan'] = b['duracion_bloques']
+                        
+                        # Marcar celdas siguientes como hidden
+                        # Necesitamos encontrar los siguientes IDs de franja
+                        f_idx = next((i for i, x in enumerate(franjas) if x.id == f.id), -1)
+                        if f_idx != -1:
+                            for i in range(1, b['duracion_bloques']):
+                                if f_idx + i < len(franjas):
+                                    next_f = franjas[f_idx + i]
+                                    # Marcar en un set global de hidden? 
+                                    # No podemos modificar el row futuro facilmente aqui porque estamos iterando.
+                                    pass
+                    cell_data['hidden'] = False # Default
+                    row_data['cells'][d] = cell_data
+                grid_rows.append(row_data)
+            
+            # Second pass for hidden
+            # Actually easier to use a set of hidden keys
+            hidden_keys = set()
+            for b in data['cursos_asignados']:
+                 f_start_id = b['franja_id_inicio']
+                 # Find index in franjas
+                 # This is O(N^2) but N is small (14 franjas)
+                 try:
+                     f_idx = next(i for i, x in enumerate(franjas) if x.id == f_start_id)
+                     for i in range(1, b['duracion_bloques']):
+                        if f_idx + i < len(franjas):
+                            hn_f = franjas[f_idx + i]
+                            hidden_keys.add((b['dia'], hn_f.id))
+                 except StopIteration:
+                     pass
+            
+            # Apply hidden
+            for r in grid_rows:
+                for d in dias:
+                    if (d, r['franja'].id) in hidden_keys:
+                        r['cells'][d]['hidden'] = True
+
+            return grid_rows
+
+        grid_manana = build_grid_data(franjas_manana, 'MANANA')
+        grid_tarde = build_grid_data(franjas_tarde, 'TARDE')
+
+        context = {
+            'grid_manana': grid_manana,
+            'grid_tarde': grid_tarde,
+            'dias_semana': dias,
+            'cursos_pendientes': data['cursos_pendientes'], # {generales: [], especialidad: []}
+        }
+        return render(request, 'partials/planner_body.html', context)
+    
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return HttpResponse(f"<div class='alert alert-error'>Error cargando horario: {e}</div>")
+
 def _get_planner_data(especialidad_id, semestre_cursado):
     try:
         semestre_activo = Semestre.objects.get(estado="ACTIVO")
@@ -402,6 +599,10 @@ def _get_planner_data(especialidad_id, semestre_cursado):
         )
 
         for curso in cursos_del_plan:
+            # We construct dicts compatible with the template logic
+            # Using simple dicts
+            esp_names = [e.nombre for e in curso.especialidades.all()]
+            
             curso_data = {
                 "id": curso.id,
                 "nombre": curso.nombre,
@@ -417,9 +618,9 @@ def _get_planner_data(especialidad_id, semestre_cursado):
                 "tipo_curso": curso.tipo_curso,
                 "semestre_cursado": curso.semestre_cursado,
                 "excepcion_horario": curso.excepcion_horario,
-                "especialidades_nombres": [
-                    e.nombre for e in curso.especialidades.all()
-                ],
+                "especialidades_nombres": esp_names,
+                "especialidades_nombres_str": ", ".join(esp_names),
+                "especialidades_count": len(esp_names)
             }
 
             # Lógica para cursos pendientes
@@ -429,27 +630,18 @@ def _get_planner_data(especialidad_id, semestre_cursado):
                 else:
                     cursos_pendientes_especialidad.append(curso_data)
 
-            # Lógica para bloques ya asignados (que se mostrarán en el horario)
+            # Lógica para bloques ya asignados
             for bloque in curso.bloques_horario.all():
+                # Necesitamos un objeto "bloque" que tenga .curso.nombre etc
+                # Simularemos la estructura anidada usando dicts
+                
                 cursos_asignados_json.append(
                     {
-                        "bloque_id": bloque.id,
-                        "curso_id": curso.id,
-                        "nombre": curso.nombre,
-                        "docente_nombre": (
-                            f"{curso.docente.first_name} {curso.docente.last_name}"
-                            if curso.docente
-                            else "N/A"
-                        ),
+                        "id": bloque.id, # for data-bloque-id
                         "dia": bloque.dia,
                         "franja_id_inicio": bloque.franja_inicio.id,
                         "duracion_bloques": bloque.duracion_bloques,
-                        "tipo_curso": curso.tipo_curso,
-                        "semestre_cursado": curso.semestre_cursado,
-                        "excepcion_horario": curso.excepcion_horario,
-                        "especialidades_nombres": [
-                            e.nombre for e in curso.especialidades.all()
-                        ],
+                        "curso": curso_data # Nested curso data
                     }
                 )
 

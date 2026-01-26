@@ -44,6 +44,7 @@ urlpatterns = [
         views.api_get_cursos_no_asignados,
         name="get_cursos_no_asignados",
     ),
+    path("load-planner/", views.load_planner_content, name="load_planner_content"),
     # --- URLs para la API de Reportes ---
     path(
         "reporte/chart-data/", views.api_get_report_chart_data, name="report_chart_data"

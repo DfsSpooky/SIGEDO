@@ -155,12 +155,16 @@ def planificador_horarios(request):
     context = {
         "semestre_activo": semestre_activo,
         "especialidades": Especialidad.objects.all(),
+        # JSON para JS (legacy/config)
         "franjas_manana_json": franjas_manana_json,
         "franjas_tarde_json": franjas_tarde_json,
         "dias_semana_json": dias_semana_json,
-        "dias_semana": dias_semana,  # <-- Añadido para el template
+        # Objetos para Template Django (Iteración server-side)
+        "franjas_manana": franjas.filter(turno="MANANA"),
+        "franjas_tarde": franjas.filter(turno="TARDE"),
+        "dias_semana": dias_semana,
         "semestres_validos": semestres_validos,
-        # Pasamos los filtros seleccionados para que la plantilla los recuerde
+        # Filtros seleccionados
         "especialidad_seleccionada_id": request.GET.get("especialidad"),
         "semestre_seleccionado": request.GET.get("semestre_cursado"),
     }
