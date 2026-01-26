@@ -30,7 +30,9 @@ document.addEventListener('DOMContentLoaded', function () {
         searchInput: document.querySelector('#course-search-input'),
         autoAssignBtn: document.querySelector('#auto-assign-btn'),
         autoAssignLog: document.querySelector('#auto-assign-log'),
+        groupAutoAssignBtn: document.querySelector('#group-auto-assign-btn'),
         globalAutoAssignBtn: document.querySelector('#global-auto-assign-btn'),
+        clearScheduleBtn: document.querySelector('#clear-schedule-btn'),
         scheduleTabsContainer: document.querySelector('#schedule-tabs-container'),
         toggleGeneralEdit: document.querySelector('#toggle-general-edit')
     };
@@ -596,6 +598,54 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    async function handleGroupAutoAssign() {
+        if (!currentPlannerData || !currentPlannerData.grupo_id) {
+            return Toast.fire({ icon: 'warning', title: 'Primero selecciona una especialidad.' });
+        }
+
+        const groupName = currentPlannerData.grupo_nombre || 'N/A';
+        const specialties = currentPlannerData.especialidades_en_grupo || [];
+        const specialtiesHtml = specialties.map(s => `<li>${s}</li>`).join('');
+
+        Swal.fire({
+            title: `Generar Horario: ${groupName}`,
+            html: `
+                <div class="text-left mt-4">
+                    <p class="mb-2">Se regenerarán los horarios para las siguientes especialidades:</p>
+                    <ul class="list-disc ml-6 mb-4 font-semibold text-primary">
+                        ${specialtiesHtml}
+                    </ul>
+                    <p class="text-xs text-base-content/60 bg-base-200 p-2 rounded">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Los cursos ya asignados en otros grupos se mantendrán fijos para evitar conflictos.
+                    </p>
+                </div>
+            `,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, generar horario',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#7c3aed', // Purple/Secondary
+            width: '32rem'
+        }).then(async (result) => {
+            if (result.isConfirmed) {
+                const btn = DOMElements.groupAutoAssignBtn;
+                btn.classList.add('loading', 'btn-disabled');
+                Swal.fire({ title: 'Procesando...', text: 'Optimizando horario del grupo...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+                try {
+                    const data = await callApi('/api/generar-horario-automatico/', 'POST', { grupo_id: currentPlannerData.grupo_id });
+                    Swal.close();
+                    Swal.fire({ title: '¡Grupo Completado!', text: data.message, icon: 'success' });
+                    loadPlannerData();
+                } catch (error) {
+                    Swal.fire({ title: 'Error', text: `Ocurrió un error: ${error.message}`, icon: 'error' });
+                } finally {
+                    btn.classList.remove('loading', 'btn-disabled');
+                }
+            }
+        });
+    }
+
     if (DOMElements.toggleGeneralEdit) {
         DOMElements.toggleGeneralEdit.addEventListener('change', () => {
             if (currentPlannerData) {
@@ -610,7 +660,53 @@ document.addEventListener('DOMContentLoaded', function () {
     if (DOMElements.especialidad) DOMElements.especialidad.addEventListener('change', loadPlannerData);
     if (DOMElements.semestre) DOMElements.semestre.addEventListener('change', loadPlannerData);
     if (DOMElements.autoAssignBtn) DOMElements.autoAssignBtn.addEventListener('click', handleAutoAssign);
+    if (DOMElements.groupAutoAssignBtn) DOMElements.groupAutoAssignBtn.addEventListener('click', handleGroupAutoAssign);
     if (DOMElements.globalAutoAssignBtn) DOMElements.globalAutoAssignBtn.addEventListener('click', handleGlobalAutoAssign);
+    if (DOMElements.clearScheduleBtn) DOMElements.clearScheduleBtn.addEventListener('click', handleClearSchedule);
+
+    async function handleClearSchedule() {
+        if (!currentPlannerData || !currentPlannerData.grupo_id) {
+            return Toast.fire({ icon: 'warning', title: 'Primero selecciona una especialidad.' });
+        }
+
+        const { value: clearType } = await Swal.fire({
+            title: '¿Qué deseas limpiar?',
+            icon: 'warning',
+            input: 'select',
+            inputOptions: {
+                'especialidad': 'Solo la vista actual (Especialidad/Semestre)',
+                'grupo': `Todo el Grupo (${currentPlannerData.grupo_nombre})`,
+                'global': 'TODO el Semestre (Global)'
+            },
+            inputPlaceholder: 'Selecciona una opción',
+            showCancelButton: true,
+            confirmButtonText: 'Confirmar Limpieza',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#d33',
+            inputValidator: (value) => {
+                if (!value) return 'Debes seleccionar una opción';
+            }
+        });
+
+        if (clearType) {
+            const body = { tipo: clearType };
+            if (clearType === 'grupo') body.grupo_id = currentPlannerData.grupo_id;
+            if (clearType === 'especialidad') {
+                body.especialidad_id = DOMElements.especialidad.value;
+                body.semestre_cursado = DOMElements.semestre.value;
+            }
+
+            Swal.fire({ title: 'Limpiando...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+            try {
+                const data = await callApi('/api/clear-horario/', 'POST', body);
+                Swal.fire({ title: '¡Limpieza Exitosa!', text: data.message, icon: 'success' });
+                loadPlannerData();
+            } catch (error) {
+                Swal.fire({ title: 'Error', text: error.message, icon: 'error' });
+            }
+        }
+    }
 
     if (DOMElements.searchInput) {
         DOMElements.searchInput.addEventListener('input', (e) => {
