@@ -113,6 +113,18 @@ class Curso(models.Model):
             ("view_planificador", "Puede ver el planificador de horarios"),
         ]
 
+    def get_horas_asignadas(self):
+        """Bloques de 50 minutos ya asignados en el horario"""
+        from .scheduling import BloqueHorario
+        return sum(
+            bh.duracion_bloques 
+            for bh in BloqueHorario.objects.filter(curso=self)
+        )
+
+    def get_horas_pendientes(self):
+        """Bloques de 50 minutos que faltan por asignar"""
+        return max(0, self.horas_academicas_semanales - self.get_horas_asignadas())
+
     def __str__(self):
         esp_nombres = ", ".join([e.nombre for e in self.especialidades.all()])
         return f"{self.nombre} ({esp_nombres if esp_nombres else 'N/A'})"

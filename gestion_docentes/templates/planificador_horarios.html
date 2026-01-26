@@ -591,5 +591,69 @@
     });
 </script>
 <script src="{% static 'js/planner.js' %}?v={% now 'U' %}"></script>
+<script src="{% static 'js/planner_ai.js' %}?v={% now 'U' %}"></script>
+
+<!-- AI Chat Assistant Widget -->
+<div id="ai-chat-widget" class="fixed bottom-6 right-6 z-[100] flex flex-col items-end pointer-events-none">
+    <!-- Chat Window (initially hidden) -->
+    <div id="ai-chat-window"
+        class="card bg-base-100 shadow-2xl border border-base-300 w-80 sm:w-96 mb-4 hidden pointer-events-auto transform transition-all duration-300 scale-90 opacity-0 origin-bottom-right">
+        <div class="card-header bg-primary text-primary-content p-3 rounded-t-xl flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <div class="avatar placeholder">
+                    <div class="bg-primary-focus text-primary-content rounded-full w-8">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                </div>
+                <div>
+                    <h3 class="font-bold text-sm">Asistente SIGEDO</h3>
+                    <div class="flex items-center gap-1">
+                        <span class="badge badge-success badge-xs"></span>
+                        <span class="text-[10px] opacity-70">En línea</span>
+                    </div>
+                </div>
+            </div>
+            <button id="close-chat" class="btn btn-ghost btn-xs btn-circle"><i class="fas fa-times"></i></button>
+        </div>
+
+        <div id="ai-chat-messages" class="p-4 h-80 overflow-y-auto space-y-4 bg-base-200/30">
+            <div class="chat chat-start">
+                <div class="chat-bubble chat-bubble-primary text-sm">
+                    ¡Hola! Soy tu asistente de horarios. ¿En qué puedo ayudarte hoy?
+                    <br><span class="text-[10px] opacity-50">Prueba preguntando: "¿Qué cursos faltan asignar?"</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-3 border-t border-base-300 bg-base-100 rounded-b-xl">
+            <div class="join w-full">
+                <input id="ai-chat-input" type="text" placeholder="Escribe tu consulta..."
+                    class="input input-sm input-bordered join-item w-full focus:outline-none" />
+                <button id="send-ai-message" class="btn btn-sm btn-primary join-item">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toggle Button -->
+    <button id="toggle-ai-chat"
+        class="btn btn-circle btn-primary btn-lg shadow-lg pointer-events-auto hover:scale-110 transition-transform duration-200">
+        <i class="fas fa-comment-dots text-2xl"></i>
+    </button>
+</div>
+
+<style>
+    #ai-chat-window.show {
+        display: flex !important;
+        transform: scale(1) !important;
+        opacity: 1 !important;
+    }
+
+    .chat-bubble {
+        border-radius: 12px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+</style>
 
 {% endblock %}

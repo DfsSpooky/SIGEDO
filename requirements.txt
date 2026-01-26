@@ -54,3 +54,4 @@ drf-spectacular
 django-simple-history
 django-redis
 ortools
+google-generativeai

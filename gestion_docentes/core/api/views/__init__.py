@@ -30,6 +30,7 @@ from .planner import (
     generar_horario_automatico,
     clear_horario,
 )
+from .planner_ai import api_planner_chat
 from .schedules import export_schedule_ics
 from .reports import api_get_report_chart_data, detalle_asistencia_docente_ajax
 from .justifications import JustificationListView, TipoJustificacionListView

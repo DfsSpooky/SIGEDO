@@ -32,6 +32,7 @@ SECRET_KEY = os.environ.get("SECRET_KEY")
 
 # Key for encrypting IDs
 ID_ENCRYPTION_KEY = os.environ.get("ID_ENCRYPTION_KEY", "").encode()
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DEBUG", "False").lower() in ("true", "1", "t")

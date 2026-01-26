@@ -39,6 +39,7 @@ urlpatterns = [
         name="generar_horario_automatico",
     ),
     path("clear-horario/", views.clear_horario, name="clear_horario"),
+    path("planner-chat/", views.api_planner_chat, name="planner_chat"),
     path(
         "get-cursos-no-asignados/",
         views.api_get_cursos_no_asignados,
