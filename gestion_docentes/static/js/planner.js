@@ -1,8 +1,5 @@
 document.addEventListener('DOMContentLoaded', function () {
     const DOMElements = {
-        gridManana: document.querySelector('#schedule-grid-manana'),
-        gridTarde: document.querySelector('#schedule-grid-tarde'),
-        unassignedContainer: document.querySelector('#unassigned-courses-container'),
         trash: document.querySelector('#trash-zone'),
         especialidad: document.querySelector('#especialidad'),
         semestre: document.querySelector('#semestre_cursado'),
@@ -18,6 +15,7 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementById('unassigned-especialidad')
         ].filter(el => el); // Filter nulls
 
+        // Destroy existing instances to prevent duplicates or memory leaks
         sortableInstances.forEach(s => s.destroy());
         sortableInstances = [];
 
@@ -40,8 +38,14 @@ document.addEventListener('DOMContentLoaded', function () {
             }));
         });
 
-        // Trash Zone
+        // Trash Zone (Static, likely already initialized but good to re-check if we destroy all)
+        // Since trash zone is outside the HTMX swapped area (usually), we might not need to destroy/re-init it constantly.
+        // However, if we clear `sortableInstances` global array, we lose the reference.
+        // DOMElements.trash is static.
         if (DOMElements.trash) {
+             // Check if already initialized?
+             // Sortable doesn't expose a simple "isInitialized" on the element easily without keeping track.
+             // But since we destroyed ALL instances in `sortableInstances`, we should re-init.
             sortableInstances.push(new Sortable(DOMElements.trash, {
                 ...sharedConfig,
                 onAdd: (evt) => {
@@ -63,12 +67,9 @@ document.addEventListener('DOMContentLoaded', function () {
         // If dropped in trash, handled by onAdd of trash
         if (to.id === 'trash-zone') return;
 
-        // If dropped back to unassigned list (implied by not being a drop-zone)
-        // TODO: Handle returning to unassigned if needed, usually simple remove from grid api
-
         // Target must be a valid drop zone
         if (!to.classList.contains('drop-zone')) {
-            return; // Reverted by animation typically
+            return;
         }
 
         const cursoId = item.dataset.cursoId;
@@ -98,35 +99,9 @@ document.addEventListener('DOMContentLoaded', function () {
             swap: 'innerHTML',
             values: vals
         }).then(() => {
-            // Success callback if needed
-            // If error occurred (HTMX trigger), the cell likely didn't update or was swapped empty?
-            // Actually our backend returns 200 with HX-Trigger on error.
-            // If error, the swap might clear the cell if we returned empty body?
-            // FIX: On error we should probably NOT swap.
-            // But htmx handled headers separately.
-
-            // If the cell is updated, we might need to remove the item from the previous location explicity?
-            // Sortable moved DOM element 'item' to 'to'.
-            // HTMX response will replace 'to' content (which currently contains 'item').
-            // Correct result: 'item' is overwritten by the new partial. Perfect.
-
-            // Clean up 'from' if it was a grid Move
-            // If we moved FROM another cell, that cell is now empty in DOM (Sortable removed item).
-            // But visually it is empty. Correct.
-
-            // WAIT - Rowspan logic?
-            // Our HTMX partial impl doesn't handle rowspan visual logic automatically in JS anymore.
-            // Detailed rowspan logic (hiding cells below) was done in JS buildGrid.
-            // If we move to HTMX, we either lose rowspans visual or need to re-calc them.
-            // For now, we assume simple grid without rowspans or 1-height blocks? 
-            // The prompt asked to refactor to HTMX. Without full page reload, rowspans are tricky in HTMX partals.
-            // For this iteration, we accept 1-height blocks or CSS tricks. 
-            // The partial returns ONE `div`. If dur > 1, it overflows?
-            // CSS: .assigned-course-item { height: 100%; z-index: 10; ... }
+            // Success handling if needed
         }).catch(err => {
             console.error("HTMX Error", err);
-            // Revert Sortable move on fatal error?
-            // Since we use HX-Trigger for logic errors, allow standard htmx fail handling.
         });
     }
 
@@ -157,22 +132,21 @@ document.addEventListener('DOMContentLoaded', function () {
                     values: { bloque_id: bloqueId },
                     swap: 'none'
                 }).then(() => {
-                    // Start full reload or remove element?
-                    // Element is inside the cell.
-                    // We can find it by data attribute
                     const el = document.querySelector(`[data-bloque-id="${bloqueId}"]`);
                     if (el) el.remove();
-                    // Or reload unassigned list
                 });
             }
         });
     };
 
-    // Re-init on HTMX swaps (if we do full table swaps later)
+    // Re-init on HTMX swaps
     document.body.addEventListener('htmx:afterSwap', function (evt) {
-        // initializePlanner(); // If we were swapping the whole grid
+        // Only re-init if the swap happened in the planner main container or relevant sub-parts
+        if (evt.target.id === 'planner-main-container' || evt.target.classList.contains('tab-pane') || evt.target.closest('#planner-main-container')) {
+             initializePlanner();
+        }
     });
 
-    // Initial load
+    // Initial load (in case content is already there, though unlikely with current setup)
     initializePlanner();
 });
