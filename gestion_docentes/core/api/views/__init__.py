@@ -29,6 +29,7 @@ from .planner import (
     api_mover_bloque,
     generar_horario_automatico,
     load_planner_content,
+    load_planner_sidebar,
 )
 from .schedules import export_schedule_ics
 from .reports import api_get_report_chart_data, detalle_asistencia_docente_ajax

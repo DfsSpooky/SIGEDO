@@ -25,8 +25,7 @@
                             </td>
                             {% for dia in dias_semana %}
                             {% with cell=row.cells|get_item:dia %}
-                            {% include "partials/planner_cell.html" with bloque=cell.bloque dia=dia
-                            franja_id=row.franja.id rowspan=cell.rowspan hidden=cell.hidden es_ghost=False %}
+                            {% include "partials/planner_cell.html" with bloque=cell.bloque dia=dia franja_id=row.franja.id rowspan=cell.rowspan hidden=cell.hidden es_ghost=False %}
                             {% endwith %}
                             {% endfor %}
                         </tr>
@@ -54,8 +53,7 @@
                             </td>
                             {% for dia in dias_semana %}
                             {% with cell=row.cells|get_item:dia %}
-                            {% include "partials/planner_cell.html" with bloque=cell.bloque dia=dia
-                            franja_id=row.franja.id rowspan=cell.rowspan hidden=cell.hidden es_ghost=False %}
+                            {% include "partials/planner_cell.html" with bloque=cell.bloque dia=dia franja_id=row.franja.id rowspan=cell.rowspan hidden=cell.hidden es_ghost=False %}
                             {% endwith %}
                             {% endfor %}
                         </tr>
@@ -67,60 +65,7 @@
     </main>
 
     <aside class="lg:col-span-1">
-        <div class="planner-sidebar h-full space-y-4 sticky top-24">
-            <div role="tablist" class="tabs tabs-boxed">
-                <a role="tab" class="tab tab-active" onclick="switchSidebarTab(event, 'manual')">Manual</a>
-                <a role="tab" class="tab" onclick="switchSidebarTab(event, 'auto')">Automático</a>
-            </div>
-
-            <div id="tab-manual" class="tab-content active space-y-4">
-                <h3 class="font-bold text-lg">Cursos por Asignar</h3>
-
-                <div class="collapse collapse-arrow bg-base-200/50">
-                    <input type="checkbox" checked />
-                    <div class="collapse-title text-md font-medium">
-                        Generales ({{ cursos_pendientes.generales|length }})
-                    </div>
-                    <div class="collapse-content">
-                        <div id="unassigned-generales" class="space-y-2 pt-2">
-                            {% for curso in cursos_pendientes.generales %}
-                            {% include "partials/unassigned_item.html" with curso=curso %}
-                            {% empty %}
-                            <p class="text-xs text-base-content/50 p-2">No hay cursos pendientes.</p>
-                            {% endfor %}
-                        </div>
-                    </div>
-                </div>
-
-                <div class="collapse collapse-arrow bg-base-200/50">
-                    <input type="checkbox" checked />
-                    <div class="collapse-title text-md font-medium">
-                        Especialidad ({{ cursos_pendientes.especialidad|length }})
-                    </div>
-                    <div class="collapse-content">
-                        <div id="unassigned-especialidad" class="space-y-2 pt-2">
-                            {% for curso in cursos_pendientes.especialidad %}
-                            {% include "partials/unassigned_item.html" with curso=curso %}
-                            {% empty %}
-                            <p class="text-xs text-base-content/50 p-2">No hay cursos pendientes.</p>
-                            {% endfor %}
-                        </div>
-                    </div>
-                </div>
-
-                <div class="divider"></div>
-                <div id="trash-zone"
-                    class="p-4 text-center border-2 border-dashed border-base-300 rounded-box bg-base-200 text-base-content/70 min-h-[80px] flex flex-col justify-center items-center">
-                    <i class="fas fa-trash-alt text-2xl mb-2"></i>
-                    <p class="font-semibold text-sm">Arrastra aquí para desasignar</p>
-                </div>
-            </div>
-
-            <div id="tab-auto" class="tab-content space-y-4">
-                <h3 class="font-bold text-lg">Generador Automático</h3>
-                <p class="text-xs text-base-content/60">Funcionalidad en reestructuración.</p>
-            </div>
-        </div>
+        {% include "partials/planner_sidebar.html" %}
     </aside>
 </div>
 

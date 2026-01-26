@@ -31,6 +31,10 @@ from core.utils.responses import (
     success_response,
 )
 
+def success_htmx_trigger(message, trigger):
+    response = success_response(message=message)
+    response['HX-Trigger'] = trigger
+    return response
 
 def calcular_puntaje(docente_id, dia, franja_idx, duracion, carga_docente_dia, docente_occupied_indices):
     """
@@ -168,7 +172,7 @@ def api_asignar_horario(request):
             }
             return render(request, 'partials/planner_cell.html', context)
 
-        return success_response(message="Bloque asignado con éxito.")
+        return success_htmx_trigger("Bloque asignado con éxito.", "reload-unassigned")
 
     except Curso.DoesNotExist:
         return error_htmx(request, "Curso no encontrado.")
@@ -204,7 +208,7 @@ def api_desasignar_horario(request):
             bloque = BloqueHorario.objects.select_for_update().get(pk=bloque_id)
             bloque.delete()
             
-        return success_response(message="Bloque de horario eliminado.")
+        return success_htmx_trigger("Bloque de horario eliminado.", "reload-unassigned")
     except BloqueHorario.DoesNotExist:
         return not_found_response("El bloque de horario especificado no existe.")
     except Exception as e:
@@ -266,7 +270,8 @@ def api_mover_bloque(request):
                 'time_range': time_range,
                 'es_ghost': False
             }
-            return render(request, 'partials/planner_cell.html', context)
+            response = render(request, 'partials/planner_cell.html', context)
+            return response
 
         return success_response(message="Bloque movido con éxito.")
 
@@ -564,6 +569,25 @@ def load_planner_content(request):
         import traceback
         traceback.print_exc()
         return HttpResponse(f"<div class='alert alert-error'>Error cargando horario: {e}</div>")
+
+@staff_member_required
+@csrf_exempt
+def load_planner_sidebar(request):
+    especialidad_id = request.GET.get('especialidad_id')
+    semestre_cursado = request.GET.get('semestre_cursado')
+
+    # Si faltan datos, devolvemos sidebar vacío o error
+    if not especialidad_id or not semestre_cursado:
+         return HttpResponse("")
+
+    try:
+        data = _get_planner_data(especialidad_id, semestre_cursado)
+        context = {
+            'cursos_pendientes': data['cursos_pendientes'],
+        }
+        return render(request, 'partials/planner_sidebar.html', context)
+    except Exception as e:
+        return HttpResponse(f"<div class='alert alert-error'>Error sidebar: {e}</div>")
 
 def _get_planner_data(especialidad_id, semestre_cursado):
     try:

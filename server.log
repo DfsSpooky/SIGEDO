@@ -1,0 +1,419 @@
+Watching for file changes with StatReloader
+/app/gestion_docentes/core/api/views/planner.py:3: FutureWarning:
+
+All support for the `google.generativeai` package has ended. It will no longer be receiving
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  import google.generativeai as genai
+Listen failure: Couldn't listen on 0.0.0.0:8000: [Errno 98] Address already in use.
+HTTP GET /accounts/login/ 200 [0.02, 127.0.0.1:33344]
+HTTP POST /accounts/login/ 302 [1.74, 127.0.0.1:33344]
+HTTP GET / 200 [0.04, 127.0.0.1:33344]
+HTTP GET /media/fotos_docentes/placeholder.png 200 [0.01, 127.0.0.1:33344]
+WebSocket HANDSHAKING /ws/notifications/ [127.0.0.1:33352]
+Internal Server Error: /api/notificaciones/json/
+Traceback (most recent call last):
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/django_redis/cache.py", line 29, in _decorator
+    return method(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/django_redis/cache.py", line 99, in _get
+    return self.client.get(key, default=default, version=version, client=client)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/django_redis/client/default.py", line 300, in get
+    raise ConnectionInterrupted(connection=client) from e
+django_redis.exceptions.ConnectionInterrupted: Redis ConnectionError: Error -2 connecting to redis:6379. Name or service not known.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/asgiref/sync.py", line 489, in thread_handler
+    raise exc_info[1]
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/django/core/handlers/exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/asgiref/sync.py", line 489, in thread_handler
+    raise exc_info[1]
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/django/core/handlers/base.py", line 253, in _get_response_async
+    response = await wrapped_callback(
+               ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/asgiref/sync.py", line 439, in __call__
+    ret = await asyncio.shield(exec_coro)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/concurrent/futures/thread.py", line 59, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/asgiref/sync.py", line 493, in thread_handler
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/django/views/decorators/csrf.py", line 65, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/django/views/generic/base.py", line 105, in view
+    return self.dispatch(request, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/rest_framework/views.py", line 515, in dispatch
+    response = self.handle_exception(exc)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/rest_framework/views.py", line 475, in handle_exception
+    self.raise_uncaught_exception(exc)
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/rest_framework/views.py", line 486, in raise_uncaught_exception
+    raise exc
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/rest_framework/views.py", line 503, in dispatch
+    self.initial(request, *args, **kwargs)
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/rest_framework/views.py", line 422, in initial
+    self.check_throttles(request)
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/rest_framework/views.py", line 365, in check_throttles
+    if not throttle.allow_request(request, self):
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/rest_framework/throttling.py", line 123, in allow_request
+    self.history = self.cache.get(self.key, [])
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/django_redis/cache.py", line 92, in get
+    value = self._get(key, default, version, client)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/django_redis/cache.py", line 36, in _decorator
+    raise e.__cause__  # noqa: B904
+    ^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/django_redis/client/default.py", line 298, in get
+    value = client.get(key)
+            ^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/commands/core.py", line 1923, in get
+    return self.execute_command("GET", name, keys=[name])
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/client.py", line 657, in execute_command
+    return self._execute_command(*args, **options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/client.py", line 663, in _execute_command
+    conn = self.connection or pool.get_connection()
+                              ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/utils.py", line 196, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/connection.py", line 2603, in get_connection
+    connection.connect()
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/connection.py", line 846, in connect
+    self.connect_check_health(check_health=True)
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/connection.py", line 863, in connect_check_health
+    raise ConnectionError(self._error_message(e))
+redis.exceptions.ConnectionError: Error -2 connecting to redis:6379. Name or service not known.
+HTTP GET /api/notificaciones/json/ 500 [0.10, 127.0.0.1:33344]
+Exception inside application: Error -2 connecting to redis:6379. Name or service not known.
+Traceback (most recent call last):
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/asyncio/connection.py", line 307, in connect_check_health
+    await self.retry.call_with_retry(
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/asyncio/retry.py", line 50, in call_with_retry
+    return await do()
+           ^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/asyncio/connection.py", line 768, in _connect
+    reader, writer = await asyncio.open_connection(
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/asyncio/streams.py", line 48, in open_connection
+    transport, _ = await loop.create_connection(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/asyncio/base_events.py", line 1083, in create_connection
+    infos = await self._ensure_resolved(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/asyncio/base_events.py", line 1466, in _ensure_resolved
+    return await loop.getaddrinfo(host, port, family=family, type=type,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/asyncio/base_events.py", line 905, in getaddrinfo
+    return await self.run_in_executor(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/concurrent/futures/thread.py", line 59, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/socket.py", line 978, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno -2] Name or service not known
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels/utils.py", line 50, in await_many_dispatch
+    await dispatch(result)
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels/consumer.py", line 74, in dispatch
+    await handler(message)
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels/generic/websocket.py", line 180, in websocket_connect
+    await self.connect()
+  File "/app/gestion_docentes/core/consumers.py", line 38, in connect
+    await self.channel_layer.group_add(self.room_group_name, self.channel_name)
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels_redis/core.py", line 493, in group_add
+    await connection.zadd(group_key, {channel: time.time()})
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/asyncio/client.py", line 720, in execute_command
+    conn = self.connection or await pool.get_connection()
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/asyncio/connection.py", line 1198, in get_connection
+    await self.ensure_connection(connection)
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/asyncio/connection.py", line 1231, in ensure_connection
+    await connection.connect()
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/asyncio/connection.py", line 298, in connect
+    await self.connect_check_health(check_health=True)
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/asyncio/connection.py", line 317, in connect_check_health
+    raise ConnectionError(self._error_message(e))
+redis.exceptions.ConnectionError: Error -2 connecting to redis:6379. Name or service not known.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/django/contrib/staticfiles/handlers.py", line 101, in __call__
+    return await self.application(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels/routing.py", line 48, in __call__
+    return await application(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels/sessions.py", line 44, in __call__
+    return await self.inner(dict(scope, cookies=cookies), receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels/sessions.py", line 261, in __call__
+    return await self.inner(wrapper.scope, receive, wrapper.send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels/auth.py", line 185, in __call__
+    return await super().__call__(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels/middleware.py", line 24, in __call__
+    return await self.inner(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels/routing.py", line 118, in __call__
+    return await application(
+           ^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels/consumer.py", line 95, in app
+    return await consumer(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels/consumer.py", line 58, in __call__
+    await await_many_dispatch(
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels/utils.py", line 57, in await_many_dispatch
+    await task
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels_redis/core.py", line 340, in receive
+    message_channel, message = await self.receive_single(
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels_redis/core.py", line 397, in receive_single
+    content = await self._brpop_with_clean(
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels_redis/core.py", line 231, in _brpop_with_clean
+    await connection.eval(cleanup_script, 0, channel, backup_queue)
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/asyncio/client.py", line 720, in execute_command
+    conn = self.connection or await pool.get_connection()
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/asyncio/connection.py", line 1198, in get_connection
+    await self.ensure_connection(connection)
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/asyncio/connection.py", line 1231, in ensure_connection
+    await connection.connect()
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/asyncio/connection.py", line 298, in connect
+    await self.connect_check_health(check_health=True)
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/asyncio/connection.py", line 317, in connect_check_health
+    raise ConnectionError(self._error_message(e))
+redis.exceptions.ConnectionError: Error -2 connecting to redis:6379. Name or service not known.
+WebSocket DISCONNECT /ws/notifications/ [127.0.0.1:33352]
+HTTP GET /planificador/ 200 [0.02, 127.0.0.1:33344]
+HTTP GET /static/js/planner.js?v=1769397061 200 [0.00, 127.0.0.1:33344]
+HTTP GET /api/load-planner/?especialidad_id=1&semestre_cursado= 200 [0.02, 127.0.0.1:33344]
+HTTP GET /api/load-planner/?semestre_cursado=1&especialidad_id=1 200 [0.05, 127.0.0.1:33344]
+HTTP GET /accounts/login/ 200 [0.01, 127.0.0.1:50890]
+HTTP POST /accounts/login/ 302 [1.73, 127.0.0.1:50890]
+HTTP GET / 200 [0.05, 127.0.0.1:50890]
+HTTP GET /media/fotos_docentes/placeholder.png 200 [0.01, 127.0.0.1:50890]
+WebSocket HANDSHAKING /ws/notifications/ [127.0.0.1:36600]
+Internal Server Error: /api/notificaciones/json/
+Traceback (most recent call last):
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/django_redis/cache.py", line 29, in _decorator
+    return method(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/django_redis/cache.py", line 99, in _get
+    return self.client.get(key, default=default, version=version, client=client)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/django_redis/client/default.py", line 300, in get
+    raise ConnectionInterrupted(connection=client) from e
+django_redis.exceptions.ConnectionInterrupted: Redis ConnectionError: Error -2 connecting to redis:6379. Name or service not known.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/asgiref/sync.py", line 489, in thread_handler
+    raise exc_info[1]
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/django/core/handlers/exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/asgiref/sync.py", line 489, in thread_handler
+    raise exc_info[1]
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/django/core/handlers/base.py", line 253, in _get_response_async
+    response = await wrapped_callback(
+               ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/asgiref/sync.py", line 439, in __call__
+    ret = await asyncio.shield(exec_coro)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/concurrent/futures/thread.py", line 59, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/asgiref/sync.py", line 493, in thread_handler
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/django/views/decorators/csrf.py", line 65, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/django/views/generic/base.py", line 105, in view
+    return self.dispatch(request, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/rest_framework/views.py", line 515, in dispatch
+    response = self.handle_exception(exc)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/rest_framework/views.py", line 475, in handle_exception
+    self.raise_uncaught_exception(exc)
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/rest_framework/views.py", line 486, in raise_uncaught_exception
+    raise exc
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/rest_framework/views.py", line 503, in dispatch
+    self.initial(request, *args, **kwargs)
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/rest_framework/views.py", line 422, in initial
+    self.check_throttles(request)
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/rest_framework/views.py", line 365, in check_throttles
+    if not throttle.allow_request(request, self):
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/rest_framework/throttling.py", line 123, in allow_request
+    self.history = self.cache.get(self.key, [])
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/django_redis/cache.py", line 92, in get
+    value = self._get(key, default, version, client)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/django_redis/cache.py", line 36, in _decorator
+    raise e.__cause__  # noqa: B904
+    ^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/django_redis/client/default.py", line 298, in get
+    value = client.get(key)
+            ^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/commands/core.py", line 1923, in get
+    return self.execute_command("GET", name, keys=[name])
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/client.py", line 657, in execute_command
+    return self._execute_command(*args, **options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/client.py", line 663, in _execute_command
+    conn = self.connection or pool.get_connection()
+                              ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/utils.py", line 196, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/connection.py", line 2603, in get_connection
+    connection.connect()
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/connection.py", line 846, in connect
+    self.connect_check_health(check_health=True)
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/connection.py", line 863, in connect_check_health
+    raise ConnectionError(self._error_message(e))
+redis.exceptions.ConnectionError: Error -2 connecting to redis:6379. Name or service not known.
+HTTP GET /api/notificaciones/json/ 500 [0.11, 127.0.0.1:50890]
+HTTP GET /planificador/ 200 [0.03, 127.0.0.1:50890]
+Exception inside application: Error -2 connecting to redis:6379. Name or service not known.
+Traceback (most recent call last):
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/asyncio/connection.py", line 307, in connect_check_health
+    await self.retry.call_with_retry(
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/asyncio/retry.py", line 50, in call_with_retry
+    return await do()
+           ^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/asyncio/connection.py", line 768, in _connect
+    reader, writer = await asyncio.open_connection(
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/asyncio/streams.py", line 48, in open_connection
+    transport, _ = await loop.create_connection(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/asyncio/base_events.py", line 1083, in create_connection
+    infos = await self._ensure_resolved(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/asyncio/base_events.py", line 1466, in _ensure_resolved
+    return await loop.getaddrinfo(host, port, family=family, type=type,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/asyncio/base_events.py", line 905, in getaddrinfo
+    return await self.run_in_executor(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/concurrent/futures/thread.py", line 59, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/socket.py", line 978, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno -2] Name or service not known
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels/utils.py", line 50, in await_many_dispatch
+    await dispatch(result)
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels/consumer.py", line 74, in dispatch
+    await handler(message)
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels/generic/websocket.py", line 180, in websocket_connect
+    await self.connect()
+  File "/app/gestion_docentes/core/consumers.py", line 38, in connect
+    await self.channel_layer.group_add(self.room_group_name, self.channel_name)
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels_redis/core.py", line 493, in group_add
+    await connection.zadd(group_key, {channel: time.time()})
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/asyncio/client.py", line 720, in execute_command
+    conn = self.connection or await pool.get_connection()
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/asyncio/connection.py", line 1198, in get_connection
+    await self.ensure_connection(connection)
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/asyncio/connection.py", line 1231, in ensure_connection
+    await connection.connect()
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/asyncio/connection.py", line 298, in connect
+    await self.connect_check_health(check_health=True)
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/asyncio/connection.py", line 317, in connect_check_health
+    raise ConnectionError(self._error_message(e))
+redis.exceptions.ConnectionError: Error -2 connecting to redis:6379. Name or service not known.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/django/contrib/staticfiles/handlers.py", line 101, in __call__
+    return await self.application(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels/routing.py", line 48, in __call__
+    return await application(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels/sessions.py", line 44, in __call__
+    return await self.inner(dict(scope, cookies=cookies), receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels/sessions.py", line 261, in __call__
+    return await self.inner(wrapper.scope, receive, wrapper.send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels/auth.py", line 185, in __call__
+    return await super().__call__(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels/middleware.py", line 24, in __call__
+    return await self.inner(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels/routing.py", line 118, in __call__
+    return await application(
+           ^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels/consumer.py", line 95, in app
+    return await consumer(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels/consumer.py", line 58, in __call__
+    await await_many_dispatch(
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels/utils.py", line 57, in await_many_dispatch
+    await task
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels_redis/core.py", line 340, in receive
+    message_channel, message = await self.receive_single(
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels_redis/core.py", line 397, in receive_single
+    content = await self._brpop_with_clean(
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/channels_redis/core.py", line 231, in _brpop_with_clean
+    await connection.eval(cleanup_script, 0, channel, backup_queue)
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/asyncio/client.py", line 720, in execute_command
+    conn = self.connection or await pool.get_connection()
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/asyncio/connection.py", line 1198, in get_connection
+    await self.ensure_connection(connection)
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/asyncio/connection.py", line 1231, in ensure_connection
+    await connection.connect()
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/asyncio/connection.py", line 298, in connect
+    await self.connect_check_health(check_health=True)
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages/redis/asyncio/connection.py", line 317, in connect_check_health
+    raise ConnectionError(self._error_message(e))
+redis.exceptions.ConnectionError: Error -2 connecting to redis:6379. Name or service not known.
+WebSocket DISCONNECT /ws/notifications/ [127.0.0.1:36600]
+HTTP GET /static/js/planner.js?v=1769397182 200 [0.00, 127.0.0.1:50890]
+HTTP GET /api/load-planner/?especialidad_id=1&semestre_cursado= 200 [0.02, 127.0.0.1:50890]
+HTTP GET /api/load-planner/?semestre_cursado=1&especialidad_id=1 200 [0.05, 127.0.0.1:50890]
+Internal Server Error: /api/desasignar-horario/
+HTTP POST /api/desasignar-horario/ 500 [0.01, 127.0.0.1:50890]
