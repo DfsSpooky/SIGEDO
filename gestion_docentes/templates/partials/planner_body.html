@@ -25,8 +25,7 @@
                             </td>
                             {% for dia in dias_semana %}
                             {% with cell=row.cells|get_item:dia %}
-                            {% include "partials/planner_cell.html" with bloque=cell.bloque dia=dia
-                            franja_id=row.franja.id rowspan=cell.rowspan hidden=cell.hidden es_ghost=False %}
+                            {% include "partials/planner_cell.html" with bloque=cell.bloque dia=dia franja_id=row.franja.id rowspan=cell.rowspan hidden=cell.hidden es_ghost=False %}
                             {% endwith %}
                             {% endfor %}
                         </tr>
@@ -54,8 +53,7 @@
                             </td>
                             {% for dia in dias_semana %}
                             {% with cell=row.cells|get_item:dia %}
-                            {% include "partials/planner_cell.html" with bloque=cell.bloque dia=dia
-                            franja_id=row.franja.id rowspan=cell.rowspan hidden=cell.hidden es_ghost=False %}
+                            {% include "partials/planner_cell.html" with bloque=cell.bloque dia=dia franja_id=row.franja.id rowspan=cell.rowspan hidden=cell.hidden es_ghost=False %}
                             {% endwith %}
                             {% endfor %}
                         </tr>
