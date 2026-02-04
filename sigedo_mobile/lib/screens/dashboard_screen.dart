@@ -74,8 +74,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       final File originalFile = File(photo.path);
       // Optimizar Imagen
-      final compressedPhoto = await ImageUtils.compressImage(originalFile);
-      photoFile = compressedPhoto ?? originalFile;
+      File? compressedPhoto;
+      try {
+        compressedPhoto = await ImageUtils.compressImage(originalFile);
+      } catch (e) {
+        debugPrint("Error compressing image: $e");
+      }
+
+      // Fallback: Si falla la compresión, usar original
+      if (compressedPhoto == null) {
+        debugPrint("Compression failed, using original file");
+        photoFile = originalFile;
+      } else {
+        photoFile = compressedPhoto;
+      }
     }
     // 2. Flujo de SALIDA (Sin Foto, con Observación opcional)
     else {
@@ -202,6 +214,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       );
 
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      final courses = auth.teacherData?.courses ?? [];
+
       try {
         final locationService = LocationService();
         final position = await locationService.getCurrentLocation();
@@ -209,7 +224,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (!mounted) return;
 
         // Usar AuthProvider con parámetros nombrados
-        await Provider.of<AuthProvider>(context, listen: false).markAttendance(
+        await auth.markAttendance(
           actionType,
           courseId,
           photo: photoFile, // Use the potentially compressed photoFile
@@ -259,16 +274,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
       } catch (e) {
         if (mounted) {
           Navigator.pop(context);
-          scaffoldMessenger.showSnackBar(
-            SnackBar(
-              content: Text('Error: $e'),
-              backgroundColor: Colors.redAccent,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+
+          final errorStr = e.toString();
+          if (errorStr.contains("TOO_EARLY")) {
+            // Specialized handling for "Too Early"
+            final courseToAdelantar = courses.firstWhere(
+              (c) => c.id == courseId,
+            );
+            _showAdelantoDialog(courseToAdelantar);
+          } else {
+            scaffoldMessenger.showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Error: ${errorStr.replaceAll("Exception: ", "")}',
+                ),
+                backgroundColor: Colors.redAccent,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
-            ),
-          );
+            );
+          }
         }
       }
     }
@@ -1390,17 +1417,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           if (!course.entryMarked)
                             Builder(
                               builder: (context) {
-                                bool canMark = true;
-                                final start = DateUtilsLima.parseTimeString(
-                                  course.startTime,
-                                );
-                                final now = DateUtilsLima.now;
-
-                                if (start != null) {
-                                  // 10 minute rule
-                                  final diff = start.difference(now).inMinutes;
-                                  if (diff > 10) canMark = false;
-                                }
+                                // Backend now provides canMarkEntry based on 10-min tolerance/logic
+                                bool canMark = course.canMarkEntry;
 
                                 if (canMark) {
                                   return Expanded(

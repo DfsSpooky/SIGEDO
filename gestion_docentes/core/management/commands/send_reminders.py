@@ -11,20 +11,11 @@ class Command(BaseCommand):
     help = 'Envía recordatorios Push a los docentes 10-15 minutos antes de su clase.'
 
     def handle(self, *args, **options):
-        # 1. Inicializar Firebase (Solo si no está inicializado)
-        try:
-            if not firebase_admin._apps:
-                # Busca el archivo en la raíz del proyecto Django
-                cred_path = os.path.join(settings.BASE_DIR, 'serviceAccountKey.json')
-                if os.path.exists(cred_path):
-                    cred = credentials.Certificate(cred_path)
-                    firebase_admin.initialize_app(cred)
-                else:
-                    self.stdout.write(self.style.WARNING(f"No se encontró serviceAccountKey.json en {cred_path}. No se enviarán notificaciones."))
-                    return
-        except Exception as e:
-            self.stdout.write(self.style.ERROR(f"Error inicializando Firebase: {e}"))
-            return
+        # 1. Inicializar Firebase
+        from core.utils.firebase import initialize_firebase
+        if not initialize_firebase():
+             self.stdout.write(self.style.WARNING("No se pudo inicializar Firebase. No se enviarán notificaciones."))
+             return
 
         # 2. Calcular Rango de Tiempo (Próximos 15 mins)
         now = timezone.localtime(timezone.now())

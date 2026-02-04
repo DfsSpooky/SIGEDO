@@ -62,5 +62,27 @@ class ConfiguracionInstitucion(models.Model):
     def load(cls):
         obj = cls.objects.first()
         if obj is None:
-            obj = cls.objects.create()
+            obj = cls.objects.create(nombre_institucion="Mi Institución")
         return obj
+
+    def validar_ubicacion(self, lat, lng):
+        """
+        Valida si una ubicación dada está dentro del rango permitido del campus.
+        Retorna (es_valido, distancia_o_error).
+        """
+        from django.conf import settings
+        from core.utils.geo import calculate_haversine_distance
+        
+        if not self.validar_geolocalizacion:
+            return True, 0
+            
+        if lat is None or lng is None:
+            return False, "Ubicación requerida por política institucional."
+            
+        campus_lat, campus_lng = settings.CAMPUS_LOCATION
+        distance = calculate_haversine_distance(campus_lat, campus_lng, lat, lng)
+        
+        if distance > settings.ALLOWED_RADIUS_METERS:
+            return False, f"Fuera de rango. Distancia: {int(distance)}m (Máx: {settings.ALLOWED_RADIUS_METERS}m)."
+            
+        return True, distance

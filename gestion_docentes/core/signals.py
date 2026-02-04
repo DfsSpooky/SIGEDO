@@ -28,15 +28,8 @@ from firebase_admin import credentials, messaging
 
 logger = logging.getLogger(__name__)
 
-# --- Inicialización Lazy de Firebase ---
-if not firebase_admin._apps:
-    try:
-        cred_path = os.path.join(settings.BASE_DIR, 'serviceAccountKey.json')
-        if os.path.exists(cred_path):
-            cred = credentials.Certificate(cred_path)
-            firebase_admin.initialize_app(cred)
-    except Exception as e:
-        logger.error(f"Error loading Firebase credentials in signals: {e}")
+from .utils.firebase import initialize_firebase
+initialize_firebase()
 
 from django.utils.html import strip_tags
 
@@ -66,21 +59,26 @@ def send_fcm_notification(user, title, body, data=None):
         logger.error(f"Error sending FCM to {user.username}: {e}")
 
 
-def do_broadcast(user_id, payload):
-    """Helper function to broadcast a message to a user's notification channel."""
+def do_broadcast(user_id, type_str, message_data):
+    """
+    Helper function to broadcast a message to a user's notification channel.
+    type_str: The event type (e.g., 'send.notification', 'attendance.update')
+    message_data: The actual data payload.
+    """
     try:
         channel_layer = get_channel_layer()
         if channel_layer:
-            logger.info(f"Broadcasting notification to user {user_id}.")
-            async_to_sync(channel_layer.group_send)(f"notifications_{user_id}", payload)
+            group_name = f"notifications_{user_id}"
+            payload = {
+                "type": type_str,
+                "message": message_data,
+            }
+            logger.info(f"Broadcasting {type_str} to user {user_id}.")
+            async_to_sync(channel_layer.group_send)(group_name, payload)
         else:
-            logger.warning(
-                "Channel layer is not available. Real-time notifications may not work."
-            )
+            logger.warning("Channel layer is not available.")
     except Exception as e:
-        logger.error(
-            f"Failed to broadcast notification for user {user_id}: {e}", exc_info=True
-        )
+        logger.error(f"Failed to broadcast to user {user_id}: {e}")
 
 
 @receiver(pre_save, sender=Documento)
@@ -101,18 +99,15 @@ def crear_notificacion_estado_documento(sender, instance, **kwargs):
                         mensaje=message,
                         url=reverse("lista_documentos"),
                     )
-                    payload = {
-                        "type": "send.notification",
-                        "message": {
-                            "id": notificacion.id,
-                            "mensaje": notificacion.mensaje,
-                            "url": notificacion.url,
-                            "leido": notificacion.leido,
-                            "fecha_creacion": notificacion.fecha_creacion.isoformat(),
-                        },
+                    message_payload = {
+                        "id": notificacion.id,
+                        "mensaje": notificacion.mensaje,
+                        "url": notificacion.url,
+                        "leido": notificacion.leido,
+                        "fecha_creacion": notificacion.fecha_creacion.isoformat(),
                     }
                     transaction.on_commit(
-                        partial(do_broadcast, instance.docente.id, payload)
+                        partial(do_broadcast, instance.docente.id, "send.notification", message_payload)
                     )
         except Documento.DoesNotExist:
             pass
@@ -138,18 +133,15 @@ def crear_notificacion_estado_solicitud(sender, instance, **kwargs):
                         mensaje=message,
                         url=reverse("ver_solicitudes"),
                     )
-                    payload = {
-                        "type": "send.notification",
-                        "message": {
-                            "id": notificacion.id,
-                            "mensaje": notificacion.mensaje,
-                            "url": notificacion.url,
-                            "leido": notificacion.leido,
-                            "fecha_creacion": notificacion.fecha_creacion.isoformat(),
-                        },
+                    message_payload = {
+                        "id": notificacion.id,
+                        "mensaje": notificacion.mensaje,
+                        "url": notificacion.url,
+                        "leido": notificacion.leido,
+                        "fecha_creacion": notificacion.fecha_creacion.isoformat(),
                     }
                     transaction.on_commit(
-                        partial(do_broadcast, destinatario.id, payload)
+                        partial(do_broadcast, destinatario.id, "send.notification", message_payload)
                     )
         except SolicitudIntercambio.DoesNotExist:
             pass
@@ -171,18 +163,15 @@ def crear_notificacion_asignacion_curso(sender, instance, **kwargs):
                     mensaje=message,
                     url=reverse("ver_horarios", args=[instance.carrera.id]),
                 )
-                payload = {
-                    "type": "send.notification",
-                    "message": {
-                        "id": notificacion.id,
-                        "mensaje": notificacion.mensaje,
-                        "url": notificacion.url,
-                        "leido": notificacion.leido,
-                        "fecha_creacion": notificacion.fecha_creacion.isoformat(),
-                    },
+                message_payload = {
+                    "id": notificacion.id,
+                    "mensaje": notificacion.mensaje,
+                    "url": notificacion.url,
+                    "leido": notificacion.leido,
+                    "fecha_creacion": notificacion.fecha_creacion.isoformat(),
                 }
                 transaction.on_commit(
-                    partial(do_broadcast, instance.docente.id, payload)
+                    partial(do_broadcast, instance.docente.id, "send.notification", message_payload)
                 )
         except Curso.DoesNotExist:
             pass
@@ -196,17 +185,14 @@ def crear_notificacion_asignacion_curso(sender, instance, **kwargs):
         notificacion = Notificacion.objects.create(
             destinatario=instance.docente, mensaje=message, url=url
         )
-        payload = {
-            "type": "send.notification",
-            "message": {
-                "id": notificacion.id,
-                "mensaje": notificacion.mensaje,
-                "url": notificacion.url,
-                "leido": notificacion.leido,
-                "fecha_creacion": notificacion.fecha_creacion.isoformat(),
-            },
+        message_payload = {
+            "id": notificacion.id,
+            "mensaje": notificacion.mensaje,
+            "url": notificacion.url,
+            "leido": notificacion.leido,
+            "fecha_creacion": notificacion.fecha_creacion.isoformat(),
         }
-        transaction.on_commit(partial(do_broadcast, instance.docente.id, payload))
+        transaction.on_commit(partial(do_broadcast, instance.docente.id, "send.notification", message_payload))
 
 
 @receiver(post_save, sender=Anuncio)
@@ -218,19 +204,16 @@ def crear_notificacion_anuncio(sender, instance, created, **kwargs):
             notificacion = Notificacion.objects.create(
                 destinatario=docente, mensaje=message, url=reverse("ver_anuncios")
             )
-            payload = {
-                "type": "send.notification",
-                "message": {
-                    "id": notificacion.id,
-                    "mensaje": notificacion.mensaje,
-                    "url": notificacion.url,
-                    "leido": notificacion.leido,
-                    "fecha_creacion": notificacion.fecha_creacion.isoformat(),
-                },
+            message_payload = {
+                "id": notificacion.id,
+                "mensaje": notificacion.mensaje,
+                "url": notificacion.url,
+                "leido": notificacion.leido,
+                "fecha_creacion": notificacion.fecha_creacion.isoformat(),
             }
             # Prepare data payload for deep link
             fcm_data = {"screen": "announcements", "id": str(instance.id)}
-            transaction.on_commit(partial(do_broadcast, docente.id, payload))
+            transaction.on_commit(partial(do_broadcast, docente.id, "send.notification", message_payload))
             transaction.on_commit(partial(send_fcm_notification, docente, "SIGEDO", message, fcm_data))
 
 
@@ -247,17 +230,15 @@ def notificar_admin_nuevo_documento(sender, instance, created, **kwargs):
             notificacion = Notificacion.objects.create(
                 destinatario=admin, mensaje=message, url=url
             )
-            payload = {
-                "type": "send.notification",
-                "message": {
-                    "id": notificacion.id,
-                    "mensaje": notificacion.mensaje,
-                    "url": notificacion.url,
-                    "leido": notificacion.leido,
-                    "fecha_creacion": notificacion.fecha_creacion.isoformat(),
-                },
+            message_payload = {
+                "id": notificacion.id,
+                "mensaje": notificacion.mensaje,
+                "url": notificacion.url,
+                "leido": notificacion.leido,
+                "fecha_creacion": notificacion.fecha_creacion.isoformat(),
             }
-            transaction.on_commit(partial(do_broadcast, admin.id, payload))
+            transaction.on_commit(partial(do_broadcast, admin.id, "send.notification", message_payload))
+
 
 
 @receiver(post_save, sender=Justificacion)
@@ -271,17 +252,15 @@ def notificar_admin_nueva_justificacion(sender, instance, created, **kwargs):
             notificacion = Notificacion.objects.create(
                 destinatario=admin, mensaje=message, url=url
             )
-            payload = {
-                "type": "send.notification",
-                "message": {
-                    "id": notificacion.id,
-                    "mensaje": notificacion.mensaje,
-                    "url": notificacion.url,
-                    "leido": notificacion.leido,
-                    "fecha_creacion": notificacion.fecha_creacion.isoformat(),
-                },
+            message_payload = {
+                "id": notificacion.id,
+                "mensaje": notificacion.mensaje,
+                "url": notificacion.url,
+                "leido": notificacion.leido,
+                "fecha_creacion": notificacion.fecha_creacion.isoformat(),
             }
-            transaction.on_commit(partial(do_broadcast, admin.id, payload))
+            transaction.on_commit(partial(do_broadcast, admin.id, "send.notification", message_payload))
+
 
 
 @receiver(post_save, sender=SolicitudIntercambio)
@@ -294,17 +273,14 @@ def notificar_nueva_solicitud_intercambio(sender, instance, created, **kwargs):
         notificacion = Notificacion.objects.create(
             destinatario=destinatario, mensaje=message, url=url
         )
-        payload = {
-            "type": "send.notification",
-            "message": {
-                "id": notificacion.id,
-                "mensaje": notificacion.mensaje,
-                "url": notificacion.url,
-                "leido": notificacion.leido,
-                "fecha_creacion": notificacion.fecha_creacion.isoformat(),
-            },
+        message_payload = {
+            "id": notificacion.id,
+            "mensaje": notificacion.mensaje,
+            "url": notificacion.url,
+            "leido": notificacion.leido,
+            "fecha_creacion": notificacion.fecha_creacion.isoformat(),
         }
-        transaction.on_commit(partial(do_broadcast, destinatario.id, payload))
+        transaction.on_commit(partial(do_broadcast, destinatario.id, "send.notification", message_payload))
 
 
 # --- Señales para el Calendario en Tiempo Real ---

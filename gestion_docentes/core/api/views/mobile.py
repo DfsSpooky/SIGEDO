@@ -71,48 +71,15 @@ class MobileMarkAttendanceView(APIView):
         photo_file_multipart = request.FILES.get('photo') 
 
         # --- VALIDACIÓN GEOLOCALIZACIÓN ---
-        from django.conf import settings
         from core.models.settings import ConfiguracionInstitucion
-        import math
-
         config = ConfiguracionInstitucion.load()
         
-        # Solo validar si está activo en la configuración
-        if config.validar_geolocalizacion and latitude is not None and longitude is not None:
-             # Coordenadas Campus
-             campus_lat, campus_lng = settings.CAMPUS_LOCATION
-             
-             # Fórmula Haversine
-             R = 6371000 # Radio Tierra en metros
-             phi1 = math.radians(campus_lat)
-             phi2 = math.radians(latitude)
-             delta_phi = math.radians(latitude - campus_lat)
-             delta_lambda = math.radians(longitude - campus_lng)
-
-             a = math.sin(delta_phi / 2.0)**2 + \
-                 math.cos(phi1) * math.cos(phi2) * \
-                 math.sin(delta_lambda / 2.0)**2
-             c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-             
-             distance = R * c
-
-             if distance > settings.ALLOWED_RADIUS_METERS:
-                 return Response(
-                     {
-                         "status": "error",
-                         "message": f"Fuera de rango. Distancia: {int(distance)}m (Máx: {settings.ALLOWED_RADIUS_METERS}m).",
-                     },
-                     status=status.HTTP_400_BAD_REQUEST,
-                 )
-        elif config.validar_geolocalizacion and (latitude is None or longitude is None):
-            # Si es obligatorio y no mandan coordenadas
-             return Response(
-                 {"status": "error", "message": "Ubicación requerida por política institucional."},
-                 status=status.HTTP_400_BAD_REQUEST
-             )
-        else:
-             # Validación apagada o datos incompletos pero permitidos (si fuera opcional)
-             pass 
+        es_valido, resultado = config.validar_ubicacion(latitude, longitude)
+        if not es_valido:
+            return Response(
+                {"status": "error", "message": resultado},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         # ----------------------------------
 
         docente = request.user
@@ -240,60 +207,21 @@ class MobileMarkAttendanceView(APIView):
             response_data = {}
 
             if action_type == "course_entry":
-                if asistencia.hora_entrada:
+                from core.services.attendance_service import can_mark_entry, calculate_allowed_exit_time
+                
+                can_mark, error_msg, bloque_del_dia = can_mark_entry(docente, curso, now)
+                if not can_mark:
+                    code = "TOO_EARLY" if "inicio" in error_msg else "ERROR"
                     return Response(
-                        {
-                            "status": "warning",
-                            "message": "La entrada para este curso ya fue marcada.",
-                        }
+                        {"status": "error", "message": error_msg, "code": code},
+                        status=status.HTTP_400_BAD_REQUEST
                     )
 
                 asistencia.hora_entrada = now
                 asistencia.foto_entrada = photo_file
+                asistencia.hora_salida_permitida = calculate_allowed_exit_time(bloque_del_dia, now)
+                
                 response_data["es_tardanza"] = asistencia.es_tardanza()
-
-                # --- VALIDACIÓN 10 MINUTOS ANTES ---
-                bloque_del_dia = BloqueHorario.objects.filter(
-                    curso=curso, dia_semana=today.weekday()
-                ).first()
-
-                if bloque_del_dia and bloque_del_dia.horario_inicio:
-                    # Crear datetime aware para la hora de inicio de hoy
-                    inicio_clase_dt = timezone.make_aware(
-                        timezone.datetime.combine(today, bloque_del_dia.horario_inicio)
-                    )
-                    
-                    # Calcular diferencia
-                    diff = inicio_clase_dt - now
-                    # Si faltan más de 10 minutos (diff > 10 min)
-                    if diff.total_seconds() > 600: 
-                        # Verificar si existe AdelantoClase
-                        has_adelanto = AdelantoClase.objects.filter(
-                            docente=docente, curso=curso, fecha=today
-                        ).exists()
-
-                        if not has_adelanto:
-                             return Response(
-                                {
-                                    "status": "error",
-                                    "message": "Falta mucho para el inicio de clase (Mínimo 10 min antes). Use la opción 'Adelantar Clase' si es necesario.",
-                                    "code": "TOO_EARLY" 
-                                },
-                                status=status.HTTP_400_BAD_REQUEST,
-                            )
-
-                # --- Cálculo de Hora Salida Permitida ---
-                # FIX: Usar Hora Fin Programada - 15 minutos en lugar de Duracion + Hora Entrada
-                if bloque_del_dia and bloque_del_dia.horario_fin:
-                    fin_clase_dt = timezone.make_aware(
-                        timezone.datetime.combine(today, bloque_del_dia.horario_fin)
-                    )
-                    # Permitir salir 15 minutos antes de que acabe la clase
-                    asistencia.hora_salida_permitida = fin_clase_dt - timedelta(minutes=15)
-                else:
-                    # Fallback si no hay bloque (raro): 75 min duración por defecto
-                    asistencia.hora_salida_permitida = now + timedelta(minutes=75)
-
                 asistencia.save()
 
             elif action_type == "course_exit":
@@ -387,6 +315,7 @@ class UpdateFCMTokenView(APIView):
         user = request.user
         user.fcm_token = token
         user.save()
+        return Response({'status': 'success', 'message': 'Token updated successfully'})
 
 class MobileDocumentsView(APIView):
     """
@@ -730,9 +659,10 @@ class MobileAttendanceHistoryView(APIView):
 
         # Definir rango de fechas
         import calendar
+        from datetime import date
         _, last_day = calendar.monthrange(year, month)
-        start_date = timezone.datetime(year, month, 1).date()
-        end_date = timezone.datetime(year, month, last_day).date()
+        start_date = date(year, month, 1)
+        end_date = date(year, month, last_day)
 
         # 1. Obtener Asistencias Generales (Campus)
         asistencias_general = AsistenciaDiaria.objects.filter(
@@ -786,6 +716,7 @@ class MobileAttendanceHistoryView(APIView):
 
         # Convertir a lista y ordenar
         response_list = sorted(history_by_day.values(), key=lambda x: x['date'], reverse=True)
+        return Response(response_list)
 
 
 class MobileRecuperacionClaseView(APIView):

@@ -20,15 +20,19 @@ class ImageUtils {
         '${dir.absolute.path}/temp_${DateTime.now().millisecondsSinceEpoch}.jpg';
 
     // Compress
-    final result = await FlutterImageCompress.compressAndGetFile(
-      file.absolute.path,
-      targetPath,
-      minWidth: minWidth,
-      minHeight: minHeight,
-      quality: quality,
-      format: CompressFormat.jpeg,
-    );
-
-    return result != null ? File(result.path) : null;
+    try {
+      final result = await FlutterImageCompress.compressAndGetFile(
+        file.absolute.path,
+        targetPath,
+        minWidth: minWidth,
+        minHeight: minHeight,
+        quality: quality,
+        format: CompressFormat.jpeg,
+      );
+      return result != null ? File(result.path) : null;
+    } catch (e) {
+      // Log error internally or rely on caller to handle null
+      return null;
+    }
   }
 }

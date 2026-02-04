@@ -7,6 +7,7 @@ import 'notifications_screen.dart';
 import 'profile_screen.dart';
 import 'schedule_screen.dart';
 import 'director_attendance_screen.dart';
+import 'credential_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -71,6 +72,7 @@ class _MainScreenState extends State<MainScreen> {
     List<Widget> screens = [
       const DashboardScreen(),
       const ScheduleScreen(),
+      const CredentialScreen(),
       if (_isStaff) const DirectorAttendanceScreen(),
       const NotificationsScreen(),
       const ProfileScreen(),
@@ -86,6 +88,11 @@ class _MainScreenState extends State<MainScreen> {
         icon: Icon(Icons.calendar_month_outlined),
         activeIcon: Icon(Icons.calendar_month_rounded),
         label: 'Horario',
+      ),
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.qr_code_outlined),
+        activeIcon: Icon(Icons.qr_code_rounded),
+        label: 'Carnet',
       ),
       if (_isStaff)
         const BottomNavigationBarItem(

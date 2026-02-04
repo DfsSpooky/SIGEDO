@@ -151,6 +151,7 @@ class CourseAttendance {
   final String name;
   final bool entryMarked;
   final bool exitMarked;
+  final bool canMarkEntry; // NEW
   final bool canMarkExit;
   final String? exitTimeStr;
   final String? startTime;
@@ -163,6 +164,7 @@ class CourseAttendance {
     required this.name,
     required this.entryMarked,
     required this.exitMarked,
+    required this.canMarkEntry,
     required this.canMarkExit,
     this.exitTimeStr,
     this.startTime,
@@ -176,6 +178,7 @@ class CourseAttendance {
     String? name,
     bool? entryMarked,
     bool? exitMarked,
+    bool? canMarkEntry,
     bool? canMarkExit,
     String? exitTimeStr,
     String? startTime,
@@ -187,6 +190,7 @@ class CourseAttendance {
       name: name ?? this.name,
       entryMarked: entryMarked ?? this.entryMarked,
       exitMarked: exitMarked ?? this.exitMarked,
+      canMarkEntry: canMarkEntry ?? this.canMarkEntry,
       canMarkExit: canMarkExit ?? this.canMarkExit,
       exitTimeStr: exitTimeStr ?? this.exitTimeStr,
       startTime: startTime ?? this.startTime,
@@ -201,6 +205,7 @@ class CourseAttendance {
       name: json['name'],
       entryMarked: json['entryMarked'] ?? false,
       exitMarked: json['exitMarked'] ?? false,
+      canMarkEntry: json['canMarkEntry'] ?? false,
       canMarkExit: json['canMarkExit'] ?? false,
       exitTimeStr: json['hora_salida_permitida_str'],
       startTime: json['startTime'],

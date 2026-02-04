@@ -43,10 +43,20 @@ class TeacherInfoView(APIView):
             )
 
         try:
+            # Validar que sea un formato UUID válido antes de consultar
+            import uuid
+            try:
+                uuid.UUID(str(qr_id))
+            except (ValueError, TypeError):
+                 return Response(
+                    {"status": "error", "message": "Formato de código QR inválido. Por favor, use su carnet actualizado."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
             docente = Docente.objects.get(id_qr=qr_id)
         except Docente.DoesNotExist:
             return Response(
-                {"status": "error", "message": "QR no válido o docente no encontrado."},
+                {"status": "error", "message": "Código QR no reconocido. Verifique su carnet digital."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -81,10 +91,20 @@ class MarkAttendanceView(APIView):
         photo_base64 = validated_data["photoBase64"]
 
         try:
+            # Validar formato UUID
+            import uuid
+            try:
+                uuid.UUID(str(qr_id))
+            except:
+                 return Response(
+                    {"status": "error", "message": "Identificador de seguridad inválido."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+                
             docente = Docente.objects.get(id_qr=qr_id)
         except Docente.DoesNotExist:
             return Response(
-                {"status": "error", "message": "QR no válido o docente no encontrado."},
+                {"status": "error", "message": "Docente no identificado correctamente."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 

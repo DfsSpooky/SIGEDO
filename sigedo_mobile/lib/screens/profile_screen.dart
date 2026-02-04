@@ -6,6 +6,7 @@ import '../providers/auth_provider.dart';
 import 'login_screen.dart';
 import 'recovery_screen.dart';
 import 'justification_screen.dart';
+import 'credential_screen.dart';
 import 'package:image_picker/image_picker.dart'; // Import ImagePicker
 import 'dart:io'; // Import File
 import '../utils/image_utils.dart'; // Import ImageUtils
@@ -351,6 +352,19 @@ class ProfileScreen extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                         builder: (_) => const JustificationScreen(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildSettingsTile(
+                    icon: Icons.qr_code_2_rounded,
+                    iconColor: Colors.indigo,
+                    title: "Mi Carnet Digital",
+                    subtitle: "Ver código QR de asistencia",
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const CredentialScreen(),
                       ),
                     ),
                   ),

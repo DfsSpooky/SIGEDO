@@ -1,254 +1,408 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../providers/auth_provider.dart';
 
-class CredentialScreen extends StatelessWidget {
+class CredentialScreen extends StatefulWidget {
   const CredentialScreen({super.key});
+
+  @override
+  State<CredentialScreen> createState() => _CredentialScreenState();
+}
+
+class _CredentialScreenState extends State<CredentialScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
+    _scaleAnimation = Tween<double>(
+      begin: 0.9,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _showFullQR(BuildContext context, String qrData) {
+    showDialog(
+      context: context,
+      builder: (context) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Dialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  "Código QR de Asistencia",
+                  style: GoogleFonts.outfit(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF1A1A2E),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.1),
+                        blurRadius: 20,
+                      ),
+                    ],
+                  ),
+                  child: QrImageView(
+                    data: qrData,
+                    version: QrVersions.auto,
+                    size: 240.0,
+                    padding: EdgeInsets.zero,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1A1A2E),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 16,
+                    ),
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Cerrar"),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
     final user = auth.teacherData?.teacher;
-    // Use QR ID if available, otherwise fallback to DNI
-    final qrData = user?.idQr ?? user?.dni ?? 'no-data';
+    final qrData = user?.idQr ?? 'no-data';
 
-    // Gradient Colors for Card
-    final List<Color> cardGradient = [
-      const Color(0xFF1A1A2E),
-      const Color(0xFF16213E),
-    ];
-    final Color accentColor = const Color(0xFFE94560);
+    const List<Color> cardGradient = [Color(0xFF0F172A), Color(0xFF1E293B)];
+    const Color accentColor = Color(0xFF38BDF8); // Sky blue premium
 
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text(
-          "Carnet Digital",
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          "Mi Carnet Digital",
+          style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        foregroundColor: const Color(0xFF0F172A),
         elevation: 0,
+        centerTitle: true,
       ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              // --- CARD CONTAINER ---
-              Container(
-                width: 340,
-                height: 580,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: cardGradient,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 30,
-                      offset: const Offset(0, 15),
-                    ),
-                  ],
-                ),
-                child: Stack(
-                  children: [
-                    // --- Decorative Circles ---
-                    Positioned(
-                      top: -60,
-                      right: -60,
-                      child: Container(
-                        width: 200,
-                        height: 200,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: accentColor.withValues(alpha: 0.1),
+      body: FadeTransition(
+        opacity: _fadeAnimation,
+        child: ScaleTransition(
+          scale: _scaleAnimation,
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Column(
+                children: [
+                  // --- CARNET CARD ---
+                  Container(
+                    width: 340,
+                    height: 560,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: cardGradient,
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF0F172A).withValues(alpha: 0.3),
+                          blurRadius: 40,
+                          offset: const Offset(0, 20),
                         ),
-                      ),
+                      ],
                     ),
-                    Positioned(
-                      bottom: 100,
-                      left: -50,
-                      child: Container(
-                        width: 150,
-                        height: 150,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.blue.withValues(alpha: 0.1),
-                        ),
-                      ),
-                    ),
-
-                    // --- CONTENT ---
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 32,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(30),
+                      child: Stack(
                         children: [
-                          // 1. HEADER (Logo + Name)
-                          Row(
-                            children: [
-                              auth.publicConfig?.logoUrl != null
-                                  ? Image.network(
-                                      auth.publicConfig!.logoUrl!,
-                                      width: 40,
-                                      height: 40,
-                                    )
-                                  : Image.asset(
-                                      'assets/images/logo.png',
-                                      width: 40,
-                                      height: 40,
-                                      errorBuilder: (c, o, s) => const Icon(
-                                        Icons.school,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                          // Decorative shapes
+                          Positioned(
+                            top: -40,
+                            right: -40,
+                            child: CircleAvatar(
+                              radius: 100,
+                              backgroundColor: accentColor.withValues(
+                                alpha: 0.05,
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: -50,
+                            left: -50,
+                            child: CircleAvatar(
+                              radius: 120,
+                              backgroundColor: Colors.white.withValues(
+                                alpha: 0.03,
+                              ),
+                            ),
+                          ),
+
+                          // Content
+                          Padding(
+                            padding: const EdgeInsets.all(28),
+                            child: Column(
+                              children: [
+                                // Header
+                                Row(
                                   children: [
-                                    Text(
-                                      (auth.publicConfig?.institutionName ??
-                                              "UNIVERSIDAD NACIONAL")
-                                          .toUpperCase(),
-                                      style: const TextStyle(
+                                    if (auth.publicConfig?.logoUrl != null)
+                                      Image.network(
+                                        auth.publicConfig!.logoUrl!,
+                                        width: 44,
+                                        height: 44,
+                                        errorBuilder: (_, _, _) => const Icon(
+                                          Icons.school_rounded,
+                                          color: accentColor,
+                                          size: 32,
+                                        ),
+                                      )
+                                    else
+                                      const Icon(
+                                        Icons.school_rounded,
                                         color: Colors.white,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 0.5,
+                                        size: 40,
                                       ),
-                                      maxLines: 2,
-                                    ),
-                                    const Text(
-                                      "CARNET DIGITAL",
-                                      style: TextStyle(
-                                        color: Colors.white54,
-                                        fontSize: 10,
-                                        letterSpacing: 1,
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            (auth
+                                                        .publicConfig
+                                                        ?.institutionName ??
+                                                    "UNIVERSIDAD NACIONAL")
+                                                .toUpperCase(),
+                                            style: GoogleFonts.outfit(
+                                              color: Colors.white,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: 0.5,
+                                            ),
+                                            maxLines: 2,
+                                          ),
+                                          Text(
+                                            "CREDENCIAL OFICIAL",
+                                            style: GoogleFonts.outfit(
+                                              color: Colors.white.withValues(
+                                                alpha: 0.5,
+                                              ),
+                                              fontSize: 10,
+                                              letterSpacing: 2,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ],
                                 ),
-                              ),
-                            ],
-                          ),
 
-                          const SizedBox(height: 32),
+                                const SizedBox(height: 40),
 
-                          // 2. PHOTO
-                          Container(
-                            padding: const EdgeInsets.all(4),
-                            width: 130,
-                            height: 130,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: accentColor, width: 3),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: accentColor.withValues(alpha: 0.4),
-                                  blurRadius: 20,
+                                // Photo with Glow
+                                Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: accentColor.withValues(alpha: 0.5),
+                                      width: 2,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: accentColor.withValues(
+                                          alpha: 0.2,
+                                        ),
+                                        blurRadius: 30,
+                                        spreadRadius: 5,
+                                      ),
+                                    ],
+                                  ),
+                                  child: CircleAvatar(
+                                    radius: 65,
+                                    backgroundColor: Colors.white.withValues(
+                                      alpha: 0.1,
+                                    ),
+                                    backgroundImage:
+                                        (user?.foto != null &&
+                                            user!.foto!.isNotEmpty)
+                                        ? NetworkImage(user.foto!)
+                                        : null,
+                                    child:
+                                        (user?.foto == null ||
+                                            user!.foto!.isEmpty)
+                                        ? const Icon(
+                                            Icons.person,
+                                            size: 70,
+                                            color: Colors.white24,
+                                          )
+                                        : null,
+                                  ),
                                 ),
-                              ],
-                            ),
-                            child: ClipOval(
-                              child:
-                                  (user?.foto != null && user!.foto!.isNotEmpty)
-                                  ? Image.network(user.foto!, fit: BoxFit.cover)
-                                  : Container(
-                                      color: Colors.grey[800],
-                                      child: const Icon(
-                                        Icons.person,
-                                        size: 80,
-                                        color: Colors.white,
+
+                                const SizedBox(height: 24),
+
+                                // User Details
+                                Text(
+                                  user?.name ?? "NOMBRE DOCENTE",
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.outfit(
+                                    color: Colors.white,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: accentColor.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: accentColor.withValues(alpha: 0.3),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    "Catedrático".toUpperCase(),
+                                    style: GoogleFonts.outfit(
+                                      color: accentColor,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 1.5,
+                                    ),
+                                  ),
+                                ),
+
+                                const Spacer(),
+
+                                // QR Section with Glass Effect
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.05),
+                                    borderRadius: BorderRadius.circular(24),
+                                    border: Border.all(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.1,
                                       ),
                                     ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 24),
-
-                          // 3. USER INFO
-                          Text(
-                            user?.name ?? "DOCENTE",
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: accentColor,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Text(
-                              "DOCENTE",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.5,
-                              ),
-                            ),
-                          ),
-
-                          const Spacer(),
-
-                          // 4. QR CODE AREA
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Row(
-                              children: [
-                                QrImageView(
-                                  data: qrData,
-                                  version: QrVersions.auto,
-                                  size: 80.0,
-                                  padding: EdgeInsets.zero,
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                  ),
+                                  child: Row(
                                     children: [
-                                      const Text(
-                                        "IDENTIFICACIÓN",
-                                        style: TextStyle(
-                                          color: Colors.grey,
-                                          fontSize: 10,
+                                      GestureDetector(
+                                        onTap: () =>
+                                            _showFullQR(context, qrData),
+                                        child: Hero(
+                                          tag: 'qr_code',
+                                          child: Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                            ),
+                                            child: QrImageView(
+                                              data: qrData,
+                                              version: QrVersions.auto,
+                                              size: 80.0,
+                                              padding: EdgeInsets.zero,
+                                            ),
+                                          ),
                                         ),
                                       ),
-                                      Text(
-                                        user?.dni ?? "---",
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 18,
-                                        ),
-                                      ),
-                                      const Divider(height: 12),
-                                      Text(
-                                        "Escanea este código para registrar asistencia.",
-                                        style: TextStyle(
-                                          color: Colors.grey[600],
-                                          fontSize: 10,
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              "DNI NÚMERO",
+                                              style: GoogleFonts.outfit(
+                                                color: Colors.white.withValues(
+                                                  alpha: 0.4,
+                                                ),
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            Text(
+                                              user?.dni ?? "---",
+                                              style: GoogleFonts.outfit(
+                                                color: Colors.white,
+                                                fontSize: 20,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Row(
+                                              children: [
+                                                const Icon(
+                                                  Icons.touch_app_outlined,
+                                                  size: 14,
+                                                  color: accentColor,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  "Toca para ampliar",
+                                                  style: GoogleFonts.outfit(
+                                                    color: accentColor,
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ],
@@ -260,28 +414,26 @@ class CredentialScreen extends StatelessWidget {
                         ],
                       ),
                     ),
-                  ],
-                ),
-              ),
+                  ),
 
-              const SizedBox(height: 30),
+                  const SizedBox(height: 40),
 
-              // Shadow/Reflection effect below card
-              Container(
-                width: 280,
-                height: 20,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(100),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 20,
-                      spreadRadius: 5,
+                  // Tips
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Text(
+                      "Este carnet es personal e intransferible. Úselo para marcar su ingreso y salida en los lectores autorizados.",
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.outfit(
+                        color: Colors.blueGrey[400],
+                        fontSize: 13,
+                        fontStyle: FontStyle.italic,
+                      ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

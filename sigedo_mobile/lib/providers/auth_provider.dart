@@ -33,6 +33,7 @@ class AuthProvider with ChangeNotifier {
   Future<void> checkAuthStatus() async {
     _isAuthenticated = await _authService.hasToken(); // Use AuthService
     if (_isAuthenticated) {
+      await loadConfig(); // Cargar config institucional
       await loadDashboard();
       _initWebSocket(); // Connect WS
     }
@@ -52,6 +53,7 @@ class AuthProvider with ChangeNotifier {
 
       if (success) {
         _isAuthenticated = true;
+        await loadConfig(); // Cargar config institucional
         await loadDashboard();
         _initWebSocket(); // Connect WS
       }

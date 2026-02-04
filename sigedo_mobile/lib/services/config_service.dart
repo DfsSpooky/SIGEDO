@@ -5,7 +5,9 @@ import '../utils/constants.dart';
 
 class ConfigService {
   static Future<Map<String, dynamic>?> getInstitutionConfig() async {
-    final url = Uri.parse('${AppConstants.baseUrl}/mobile/public-config/');
+    final url = Uri.parse(
+      '${AppConstants.baseUrl}${AppConstants.publicConfigEndpoint}',
+    );
     try {
       final response = await http.get(url);
 

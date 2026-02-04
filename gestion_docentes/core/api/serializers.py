@@ -46,7 +46,7 @@ class DocenteInfoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Docente
-        fields = ["name", "dni", "photoUrl", "email", "is_staff", "celular"]
+        fields = ["name", "dni", "photoUrl", "email", "is_staff", "celular", "id_qr"]
 
 
 class CursoAsistenciaSerializer(serializers.ModelSerializer):
@@ -63,6 +63,7 @@ class CursoAsistenciaSerializer(serializers.ModelSerializer):
     entryMarked = serializers.SerializerMethodField()
     exitMarked = serializers.SerializerMethodField()
     canMarkExit = serializers.BooleanField(source="puede_marcar_salida")
+    canMarkEntry = serializers.SerializerMethodField()
     hora_salida_permitida_str = serializers.SerializerMethodField()
 
     startTime = serializers.SerializerMethodField()
@@ -83,6 +84,7 @@ class CursoAsistenciaSerializer(serializers.ModelSerializer):
             "name",
             "entryMarked",
             "exitMarked",
+            "canMarkEntry",
             "canMarkExit",
             "hora_salida_permitida_str",
             "startTime",
@@ -142,6 +144,11 @@ class CursoAsistenciaSerializer(serializers.ModelSerializer):
 
     def get_exitMarked(self, obj):
         return obj.hora_salida is not None
+
+    def get_canMarkEntry(self, obj):
+        from core.services.attendance_service import can_mark_entry
+        can_mark, unused_msg, unused_bloque = can_mark_entry(obj.docente, obj.curso)
+        return can_mark
 
     def get_hora_salida_permitida_str(self, obj):
         if obj.hora_salida_permitida:

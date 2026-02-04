@@ -60,29 +60,14 @@ def registrar_asistencia(request):
             error_message = "No se encontró un bloque horario activo en este momento."
         
         elif accion == "entrada":
-            if asistencia_obj:
-                error_message = "Ya existe un registro de entrada para este curso hoy."
+            from ..services.attendance_service import can_mark_entry, calculate_allowed_exit_time
+            
+            can_mark, error_msg, bloque_actual = can_mark_entry(docente, bloque_actual.curso if bloque_actual else None, now)
+            
+            if not can_mark:
+                error_message = error_msg
             else:
                 try:
-                    # --- VALIDACIÓN 10 MINUTOS / ADELANTO ---
-                    # Calculate start datetime
-                    inicio_clase_dt = timezone.make_aware(
-                        timezone.datetime.combine(now.date(), bloque_actual.horario_inicio)
-                    )
-                    diff = inicio_clase_dt - now
-                    
-                    if diff.total_seconds() > 600: # More than 10 mins early
-                        has_adelanto = AdelantoClase.objects.filter(
-                            docente=docente, 
-                            curso=bloque_actual.curso, 
-                            fecha=now.date()
-                        ).exists()
-                        
-                        if not has_adelanto:
-                            minutos_restantes = int(diff.total_seconds() / 60)
-                            error_message = f"Falta mucho para el inicio ({minutos_restantes} min). Use la opción 'Adelantar Clase' en la App Móvil si es necesario."
-                            raise ValidationError(error_message)
-
                     nueva_asistencia = Asistencia(
                         docente=docente,
                         curso=bloque_actual.curso,
@@ -90,28 +75,15 @@ def registrar_asistencia(request):
                         hora_entrada=now
                     )
                     
-                    # --- MEJORA: Cálculo dinámico de la duración ---
-                    # Obtenemos la duración real basada en las franjas horarias
-                    duracion_real_minutos = bloque_actual.get_duracion_real_minutos()
-                    
-                    # Definimos que se puede salir 15 minutos antes de que acabe la hora real
-                    tiempo_minimo_clase = duracion_real_minutos - 15
-                    
-                    # Salvaguarda: Si la clase es muy corta (ej. < 30 min), forzamos al menos 15 min
-                    if tiempo_minimo_clase < 15:
-                        tiempo_minimo_clase = 15
-                    
-                    nueva_asistencia.hora_salida_permitida = now + timedelta(minutes=tiempo_minimo_clase)
-                    # -----------------------------------------------
+                    nueva_asistencia.hora_salida_permitida = calculate_allowed_exit_time(bloque_actual, now)
 
-                    nueva_asistencia.full_clean()  # Valida reglas del modelo (ej. anti-passback)
+                    nueva_asistencia.full_clean()
                     nueva_asistencia.save()
                     
                     messages.success(request, f"Entrada marcada correctamente a las {now.strftime('%H:%M')}")
                     return redirect("asistencia")
                     
                 except ValidationError as e:
-                    # Extraemos el primer error disponible para mostrarlo limpio
                     error_message = e.message_dict.get('__all__', [str(e)])[0] if hasattr(e, 'message_dict') else str(e)
 
         elif accion == "salida":
