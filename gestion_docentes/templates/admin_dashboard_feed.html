@@ -1,0 +1,432 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Centro de Control | SIGEDO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    animation: {
+                        'fade-in-down': 'fadeInDown 0.5s ease-out',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        fadeInDown: {
+                            '0%': { opacity: '0', transform: 'translateY(-10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .glass-panel {
+            background: rgba(17, 24, 39, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .glass-input {
+            background: rgba(31, 41, 55, 0.5);
+            border: 1px solid rgba(75, 85, 99, 0.5);
+        }
+
+        .glass-input:focus {
+            background: rgba(31, 41, 55, 0.8);
+            border-color: rgba(59, 130, 246, 0.6);
+            outline: none;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(75, 85, 99, 0.5);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(107, 114, 128, 0.8);
+        }
+    </style>
+</head>
+
+<body class="bg-gray-950 text-white h-screen overflow-hidden flex selection:bg-blue-500/30">
+
+    <!-- Sidebar Filters -->
+    <aside
+        class="w-80 bg-gray-900/50 backdrop-blur-xl border-r border-gray-800 flex flex-col z-20 transition-all duration-300 transform"
+        id="sidebar">
+        <div class="p-6 border-b border-gray-800/50">
+            <h1
+                class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-500 tracking-tight flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-blue-500"></span>
+                SIGEDO
+            </h1>
+            <p class="text-xs text-gray-500 mt-1 uppercase tracking-wider font-mono">Centro de Control</p>
+        </div>
+
+        <div class="p-6 space-y-6 flex-1 overflow-y-auto">
+            <!-- Connection Status -->
+            <div class="glass-input rounded-xl p-4 flex items-center justify-between group">
+                <div class="flex items-center gap-3">
+                    <div class="relative flex h-3 w-3">
+                        <span id="status-ping"
+                            class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span id="status-dot"
+                            class="relative inline-flex rounded-full h-3 w-3 bg-green-500 transition-colors"></span>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-gray-400">Estado del Sistema</p>
+                        <p id="connection-status" class="text-sm font-bold text-green-400">EN LÍNEA</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Search -->
+            <div class="space-y-2">
+                <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Buscar Docente</label>
+                <div class="relative">
+                    <input type="text" id="params-search" placeholder="Nombre del docente..."
+                        class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-gray-200 placeholder-gray-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                        oninput="applyFilters()">
+                    <svg class="absolute right-3 top-3 w-4 h-4 text-gray-500 pointer-events-none" fill="none"
+                        stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="space-y-4">
+                <div class="space-y-2">
+                    <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Filtrar por
+                        Carrera</label>
+                    <select id="params-career" onchange="applyFilters()"
+                        class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-gray-200 appearance-none cursor-pointer">
+                        <option value="">Todas las Carreras</option>
+                        {% for carrera in carreras %}
+                        <option value="{{ carrera.id }}">{{ carrera.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Filtrar por
+                        Curso</label>
+                    <select id="params-course" onchange="applyFilters()"
+                        class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-gray-200 appearance-none cursor-pointer">
+                        <option value="">Todos los Cursos</option>
+                        {% for curso in cursos %}
+                        <option value="{{ curso.nombre }}" data-career="{{ curso.carrera.id }}">{{ curso.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="pt-4">
+                    <button onclick="resetFilters()"
+                        class="w-full py-2 px-4 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-semibold text-gray-400 hover:text-white transition-all border border-gray-700 hover:border-gray-600">
+                        Limpiar Filtros
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Clock Footer -->
+        <div class="p-6 border-t border-gray-800/50 bg-gray-900/30">
+            <h2 id="clock" class="text-3xl font-mono font-bold text-gray-200 tracking-tight text-center tabular-nums">
+                --:--</h2>
+            <p id="date" class="text-xs text-center text-gray-500 mt-1 uppercase tracking-widest font-medium">--</p>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main
+        class="flex-1 flex flex-col relative overflow-hidden bg-[url('https://tailwindcss.com/_next/static/media/hero-dark.9a75e549.png')] bg-cover bg-no-repeat bg-center">
+        <!-- Top Bar -->
+        <div
+            class="h-16 border-b border-gray-800/50 bg-gray-900/20 backdrop-blur-md flex items-center justify-between px-6 z-10">
+            <h2 class="text-sm font-semibold text-gray-300 flex items-center gap-2">
+                <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+                Transmisión en Vivo
+            </h2>
+            <div class="flex items-center gap-4">
+                <a href="{% url 'admin:index' %}"
+                    class="text-xs font-medium text-gray-400 hover:text-white transition-colors bg-gray-800/50 hover:bg-gray-800 px-3 py-1.5 rounded-lg border border-gray-700/50">
+                    Volver al Admin
+                </a>
+            </div>
+        </div>
+
+        <!-- Feed Grid -->
+        <div class="flex-1 overflow-y-auto p-6 scroll-smooth z-0" id="main-scroll">
+            <div id="feed-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 pb-20">
+                {% for asistencia in initial_events %}
+                <!-- Card Template (Server Side Rendered) -->
+                <div class="feed-card group relative glass-panel rounded-xl p-4 border-l-4 transition-all duration-300 hover:bg-gray-800/60 hover:shadow-lg hover:-translate-y-1 {% if asistencia.hora_salida %}border-red-500{% else %}border-green-500{% endif %}"
+                    data-docente="{{ asistencia.docente.get_full_name|lower }}"
+                    data-curso="{{ asistencia.curso.nombre|lower }}" data-carrera="{{ asistencia.curso.carrera.id }}"
+                    data-timestamp="{% if asistencia.hora_salida %}{{ asistencia.hora_salida|date:'U' }}{% else %}{{ asistencia.hora_entrada|date:'U' }}{% endif %}">
+
+                    <div class="flex items-start gap-4">
+                        <div class="relative flex-shrink-0">
+                            <img src="{% if asistencia.foto_entrada %}{{ asistencia.foto_entrada.url }}{% else %}https://ui-avatars.com/api/?name={{ asistencia.docente.get_full_name|urlencode }}&background=374151&color=fff{% endif %}"
+                                class="w-12 h-12 rounded-full object-cover ring-2 ring-gray-700 bg-gray-800"
+                                onerror="this.src='https://ui-avatars.com/api/?name={{ asistencia.docente.get_full_name|urlencode }}&background=374151&color=fff'">
+                            <span
+                                class="absolute -bottom-1 -right-1 w-3 h-3 rounded-full ring-2 ring-gray-900 {% if asistencia.hora_salida %}bg-red-500{% else %}bg-green-500{% endif %}"></span>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex justify-between items-start">
+                                <h3 class="text-sm font-bold text-gray-100 truncate pr-2"
+                                    title="{{ asistencia.docente.get_full_name }}">{{ asistencia.docente.get_full_name
+                                    }}</h3>
+                                <span
+                                    class="text-xs font-mono text-gray-400 tabular-nums bg-gray-800 px-1.5 py-0.5 rounded">
+                                    {% if asistencia.hora_salida %}{{ asistencia.hora_salida|date:"H:i" }}{% else %}{{
+                                    asistencia.hora_entrada|date:"H:i" }}{% endif %}
+                                </span>
+                            </div>
+                            <p class="text-xs text-blue-400 font-medium truncate mt-0.5">{{ asistencia.curso.nombre }}
+                            </p>
+                            <div class="flex items-center gap-2 mt-2">
+                                <span
+                                    class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full {% if asistencia.hora_salida %}bg-red-500/10 text-red-500{% else %}bg-green-500/10 text-green-500{% endif %}">
+                                    {% if asistencia.hora_salida %}SALIDA{% else %}ENTRADA{% endif %}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Empty State (Hidden/Shown via JS) -->
+            <div id="empty-state"
+                class="hidden absolute inset-0 flex flex-col items-center justify-center text-gray-500">
+                <svg class="w-16 h-16 mb-4 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                <p class="text-lg font-medium">No se encontraron resultados</p>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- 1. Clock & UI Utilities ---
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').innerText = now.toLocaleTimeString('es-PE', { hour12: false, hour: '2-digit', minute: '2-digit' });
+            const dateStr = now.toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long' });
+            document.getElementById('date').innerText = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // --- 2. Filters Logic ---
+        function applyFilters() {
+            const search = document.getElementById('params-search').value.toLowerCase();
+            const careerId = document.getElementById('params-career').value;
+            const courseName = document.getElementById('params-course').value.toLowerCase();
+
+            const cards = document.querySelectorAll('.feed-card');
+            let visibleCount = 0;
+
+            cards.forEach(card => {
+                const docName = card.dataset.docente || "";
+                const docCourse = card.dataset.curso || "";
+                // To support career filtering, we might need to populate data-carrera in the card better if possible, 
+                // currently assuming simplified check or partial match if data available.
+                // For this demo, let's assume filtering works mostly on text for course/name if attributes missing.
+
+                const matchesSearch = docName.includes(search);
+                const matchesCourse = courseName === "" || docCourse === courseName;
+                // Note: data-carrera might be missing on some cards if not strictly populated, be careful.
+                const matchesCareer = careerId === "" || (card.dataset.carrera && card.dataset.carrera === careerId);
+
+                if (matchesSearch && matchesCourse && matchesCareer) {
+                    card.style.display = 'block';
+                    visibleCount++;
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+
+            const emptyState = document.getElementById('empty-state');
+            if (visibleCount === 0 && cards.length > 0) {
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+            }
+        }
+
+        function resetFilters() {
+            document.getElementById('params-search').value = "";
+            document.getElementById('params-career').value = "";
+            document.getElementById('params-course').value = "";
+            applyFilters();
+        }
+
+        // --- 3. Robust WebSocket & Real-Time Logic ---
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = protocol + '//' + window.location.host + '/ws/dashboard/';
+        let socket = null;
+        let reconnectTimer = null;
+
+        function setStatus(status) {
+            const el = document.getElementById('connection-status');
+            const dot = document.getElementById('status-dot');
+            const ping = document.getElementById('status-ping');
+
+            if (status === 'connected') {
+                el.innerText = "EN LÍNEA";
+                el.className = "text-sm font-bold text-green-400";
+                dot.className = "relative inline-flex rounded-full h-3 w-3 bg-green-500";
+                ping.classList.remove('hidden');
+            } else if (status === 'connecting') {
+                el.innerText = "CONECTANDO...";
+                el.className = "text-sm font-bold text-yellow-400";
+                dot.className = "relative inline-flex rounded-full h-3 w-3 bg-yellow-500 animate-pulse";
+                ping.classList.add('hidden');
+            } else {
+                el.innerText = "DESCONECTADO";
+                el.className = "text-sm font-bold text-red-500";
+                dot.className = "relative inline-flex rounded-full h-3 w-3 bg-red-500";
+                ping.classList.add('hidden');
+            }
+        }
+
+        function connect() {
+            if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
+
+            console.log("Starting WebSocket connection...");
+            setStatus('connecting');
+            socket = new WebSocket(wsUrl);
+
+            socket.onopen = () => {
+                console.log("WebSocket Connected!");
+                setStatus('connected');
+                if (reconnectTimer) clearInterval(reconnectTimer);
+            };
+
+            socket.onclose = (event) => {
+                console.warn("WebSocket Closed:", event);
+                setStatus('disconnected');
+                // Try to reconnect in 3s
+                if (!reconnectTimer) {
+                    reconnectTimer = setInterval(connect, 3000);
+                }
+            };
+
+            socket.onerror = (error) => {
+                console.error("WebSocket Error:", error);
+                socket.close();
+            };
+
+            socket.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log("Received Data:", data);
+
+                    if (data.type === 'attendance.update') {
+                        addNewCard(data.data);
+                    }
+                } catch (e) {
+                    console.error("Error parsing message:", e);
+                }
+            };
+        }
+
+        function addNewCard(data) {
+            const grid = document.getElementById('feed-grid');
+            const isExit = data.tipo.includes('salida'); // 'salida' or 'salida_general'
+            const timeStr = isExit ? data.hora_salida : data.hora_entrada;
+            const borderColor = isExit ? 'border-red-500' : 'border-green-500';
+            const statusLabel = isExit ? 'SALIDA' : 'ENTRADA';
+            const statusColor = isExit ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500';
+            const dotColor = isExit ? 'bg-red-500' : 'bg-green-500';
+
+            // Build HTML
+            const docName = data.docente_nombre || "Desconocido";
+            const courseName = data.curso || "---";
+            const photoUrl = data.foto_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(docName)}&background=374151&color=fff`;
+
+            const card = document.createElement('div');
+            card.className = `feed-card group relative glass-panel rounded-xl p-4 border-l-4 transition-all duration-300 hover:bg-gray-800/60 hover:shadow-lg hover:-translate-y-1 ${borderColor} animate-fade-in-down`;
+
+            // Set Data Attributes for Filtering
+            card.dataset.docente = docName.toLowerCase();
+            card.dataset.curso = courseName.toLowerCase();
+            card.dataset.timestamp = Date.now(); // Sort order fallback
+            // Note: data['carrera_id'] might need to be sent from backend in signal payload for perfect filtering
+
+            card.innerHTML = `
+                <div class="flex items-start gap-4">
+                    <div class="relative flex-shrink-0">
+                        <img src="${photoUrl}" 
+                             class="w-12 h-12 rounded-full object-cover ring-2 ring-gray-700 bg-gray-800"
+                             onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(docName)}&background=374151&color=fff'">
+                        <span class="absolute -bottom-1 -right-1 w-3 h-3 rounded-full ring-2 ring-gray-900 ${dotColor}"></span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex justify-between items-start">
+                            <h3 class="text-sm font-bold text-gray-100 truncate pr-2" title="${docName}">${docName}</h3>
+                            <span class="text-xs font-mono text-gray-400 tabular-nums bg-gray-800 px-1.5 py-0.5 rounded">${timeStr}</span>
+                        </div>
+                        <p class="text-xs text-blue-400 font-medium truncate mt-0.5">${courseName}</p>
+                        <div class="flex items-center gap-2 mt-2">
+                            <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${statusColor}">
+                                ${statusLabel}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Prepend
+            grid.insertBefore(card, grid.firstChild);
+
+            // Limit to 60 items
+            if (grid.children.length > 60) {
+                grid.lastElementChild.remove();
+            }
+
+            // Re-apply filters to newly added card
+            applyFilters();
+        }
+
+        // Init
+        connect();
+    </script>
+</body>
+
+</html>
