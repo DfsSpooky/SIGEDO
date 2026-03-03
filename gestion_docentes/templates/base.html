@@ -4,8 +4,10 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="SIGEDO - Sistema de Gestión de Docentes para la gestión eficiente de horarios, asistencia y recursos.">
+        <meta name="keywords" content="gestión docente, horarios, asistencia, SIGEDO, educación">
         <title>
-            {% block title %}Dashboard{% endblock %}
+            {% block title %}Dashboard{% endblock title %}
         | {{ configuracion.nombre_institucion|default:"Sistema de Gestión" }}</title>
         <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.2/dist/full.min.css"
               rel="stylesheet"
@@ -89,15 +91,14 @@
                                 </li>
                                 <li>
                                     <a>
-                                        {% block breadcrumb %}{% endblock %}
+                                        {% block breadcrumb %}{% endblock breadcrumb %}
                                     </a>
                                 </li>
                             </ul>
                         </div>
                     </div>
                     <div class="navbar-center lg:hidden">
-                        <a href="{% url 'dashboard' %}" class="btn btn-ghost text-lg">{{
-                        configuracion.nombre_dashboard|default:"Gestión Docente" }}</a>
+                        <a href="{% url 'dashboard' %}" class="btn btn-ghost text-lg">{{ configuracion.nombre_dashboard|default:"Gestión Docente" }}</a>
                     </div>
                     <div class="navbar-end gap-2">
                         <div class="dropdown dropdown-end">
@@ -105,8 +106,7 @@
                                 <div class="indicator">
                                     <i class="fas fa-bell text-xl"></i>
                                     <span id="notification-badge"
-                                          class="badge badge-sm badge-primary indicator-item"
-                                          style="display: none">0</span>
+                                          class="badge badge-sm badge-primary indicator-item hidden">0</span>
                                 </div>
                             </label>
                             <div tabindex="0"
@@ -132,7 +132,7 @@
                         <div class="dropdown dropdown-end">
                             <label tabindex="0" class="btn btn-ghost btn-circle avatar">
                                 <div class="w-10 rounded-full ring-2 ring-offset-2 ring-offset-base-100 ring-transparent hover:ring-primary transition-shadow duration-300">
-                                    <img src="{% if user.foto %}{{ user.foto.url }}{% else %}{% static 'placeholder.png' %}{% endif %}" />
+                                    <img src="{% if user.foto %}{{ user.foto.url }}{% else %}{% static 'placeholder.png' %}{% endif %}" alt="Avatar de {{ user.first_name }}" width="40" height="40" />
                                 </div>
                             </label>
                             <ul tabindex="0"
@@ -205,7 +205,7 @@
                         </script>
                     {% endif %}
                     {% block content %}
-                    {% endblock %}
+                    {% endblock content %}
                 </main>
             </div>
             <div class="drawer-side">
@@ -217,7 +217,7 @@
                             {% if configuracion.logo %}
                                 <img src="{{ configuracion.logo.url }}"
                                      alt="Logo"
-                                     class="h-8 w-8 mr-2 object-contain">
+                                     class="h-8 w-8 mr-2 object-contain" width="32" height="32">
                             {% else %}
                                 <i class="fas fa-university text-primary"></i>
                             {% endif %}
@@ -297,7 +297,7 @@ Gestionar Justificaciones</a>
 </li>
 {% endif %}
 <li>
-<a href="/admin"
+<a href="{% url 'admin:index' %}"
    target="_blank"
    class="group transition-all duration-300"><i class="fas fa-cogs fa-fw mr-2 group-hover:text-primary transition-colors duration-300"></i>
 Panel de Admin</a>
@@ -320,7 +320,7 @@ Horarios Públicos</a>
 </ul>
 </div>
 </div>
-{% block extra_js %}{% endblock %}
+{% block extra_js %}{% endblock extra_js %}
 {% if user.is_authenticated %}
     <script src="{% static 'js/notifications.js' %}"></script>
 {% endif %}

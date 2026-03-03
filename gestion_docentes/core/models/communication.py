@@ -1,6 +1,5 @@
 from django.db import models
 
-
 class Notificacion(models.Model):
     # String reference
     destinatario = models.ForeignKey(
@@ -22,7 +21,6 @@ class Notificacion(models.Model):
 
     def __str__(self):
         return f"Notificación para {self.destinatario.username}: {self.mensaje[:30]}..."
-
 
 class Anuncio(models.Model):
     titulo = models.CharField(max_length=200)

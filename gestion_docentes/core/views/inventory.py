@@ -11,7 +11,6 @@ from django.views.generic import (
 
 from ..models import Activo
 
-
 class ActivoListView(LoginRequiredMixin, ListView):
     model = Activo
     template_name = "inventario/lista_activos.html"
@@ -30,12 +29,17 @@ class ActivoListView(LoginRequiredMixin, ListView):
             )
         return queryset
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["activos_disponibles_count"] = Activo.objects.filter(estado="DISPONIBLE").count()
+        context["activos_asignados_count"] = Activo.objects.filter(estado="ASIGNADO").count()
+        context["activos_mantenimiento_count"] = Activo.objects.filter(estado="EN_MANTENIMIENTO").count()
+        return context
 
 class ActivoDetailView(LoginRequiredMixin, DetailView):
     model = Activo
     template_name = "inventario/detalle_activo.html"
     context_object_name = "activo"
-
 
 class ActivoCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
     model = Activo
@@ -58,7 +62,6 @@ class ActivoCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
         context["titulo"] = "Crear Nuevo Activo"
         return context
 
-
 class ActivoUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
     model = Activo
     template_name = "inventario/form_activo.html"
@@ -79,7 +82,6 @@ class ActivoUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
         context = super().get_context_data(**kwargs)
         context["titulo"] = "Editar Activo"
         return context
-
 
 class ActivoDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
     model = Activo

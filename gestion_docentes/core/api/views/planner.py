@@ -387,17 +387,15 @@ def _get_planner_data(especialidad_id, semestre_cursado):
 
         cursos_del_plan = (
             Curso.objects.filter(q_cursos_del_plan)
-            .annotate(
-                horas_asignadas=models.Sum(
-                    "bloques_horario__duracion_bloques", default=0
-                )
-            )
             .select_related("docente")
             .prefetch_related("bloques_horario", "especialidades")
             .distinct()
         )
 
         for curso in cursos_del_plan:
+            # Calcular horas_asignadas en Python para evitar SQL fanout (multiplicación por JOINs de M2M)
+            horas_asignadas = sum(b.duracion_bloques for b in curso.bloques_horario.all())
+            
             curso_data = {
                 "id": curso.id,
                 "nombre": curso.nombre,
@@ -406,10 +404,9 @@ def _get_planner_data(especialidad_id, semestre_cursado):
                     if curso.docente
                     else "N/A"
                 ),
-                "horas_pendientes": curso.horas_academicas_semanales
-                - curso.horas_asignadas,
+                "horas_pendientes": curso.horas_academicas_semanales - horas_asignadas,
                 "horas_totales": curso.horas_academicas_semanales,
-                "horas_asignadas": curso.horas_asignadas,
+                "horas_asignadas": horas_asignadas,
                 "tipo_curso": curso.tipo_curso,
                 "semestre_cursado": curso.semestre_cursado,
                 "excepcion_horario": curso.excepcion_horario,
@@ -419,7 +416,7 @@ def _get_planner_data(especialidad_id, semestre_cursado):
             }
 
             # Lógica para cursos pendientes
-            if curso.horas_asignadas < curso.horas_academicas_semanales:
+            if horas_asignadas < curso.horas_academicas_semanales:
                 if curso.tipo_curso == "GENERAL":
                     cursos_pendientes_generales.append(curso_data)
                 else:
@@ -496,21 +493,16 @@ def api_auto_asignar(request):
 
             cursos_a_planificar = (
                 Curso.objects.filter(q_cursos_del_plan)
-                .annotate(
-                    horas_asignadas=models.Sum(
-                        "bloques_horario__duracion_bloques", default=0
-                    )
-                )
                 .select_related("docente")
-                .prefetch_related("especialidades__grupo")
+                .prefetch_related("especialidades__grupo", "bloques_horario")
                 .distinct()
             )
 
-            cursos_con_pendientes = [
-                c
-                for c in cursos_a_planificar
-                if c.horas_asignadas < c.horas_academicas_semanales
-            ]
+            cursos_con_pendientes = []
+            for c in cursos_a_planificar:
+                c.horas_asignadas = sum(b.duracion_bloques for b in c.bloques_horario.all())
+                if c.horas_asignadas < c.horas_academicas_semanales:
+                    cursos_con_pendientes.append(c)
 
             if not cursos_con_pendientes:
                 planner_data = _get_planner_data(especialidad_id, semestre_cursado_num)
@@ -525,14 +517,14 @@ def api_auto_asignar(request):
 
             # Estructuras para tracking de carga horaria
             carga_docente = defaultdict(lambda: defaultdict(int)) # {docente_id: {dia: horas}}
-            carga_grupo = defaultdict(lambda: defaultdict(int))   # {(grupo_id, semestre): {dia: horas}}
+            carga_especialidad = defaultdict(lambda: defaultdict(int))   # {(especialidad_id, semestre): {dia: horas}}
             
             # Estructura para tracking de indices ocupados por docente (para compactacion)
             docente_occupied_indices = defaultdict(lambda: defaultdict(set)) # {docente_id: {dia: {indices}}}
 
             todos_los_bloques = BloqueHorario.objects.filter(
                 curso__semestre=semestre_activo
-            ).select_related("curso__docente").prefetch_related("curso__especialidades__grupo")
+            ).select_related("curso__docente").prefetch_related("curso__especialidades")
 
             for bloque in todos_los_bloques:
                 try:
@@ -543,11 +535,10 @@ def api_auto_asignar(request):
                          for i in range(bloque.duracion_bloques):
                              docente_occupied_indices[bloque.curso.docente.id][bloque.dia].add(franja_idx + i)
 
-                    # Iterar sobre especialidades para tracking de grupo
+                    # Iterar sobre especialidades para tracking
                     for especialidad in bloque.curso.especialidades.all():
-                        if especialidad.grupo:
-                            key_grupo = (especialidad.grupo.id, bloque.curso.semestre_cursado)
-                            carga_grupo[key_grupo][bloque.dia] += bloque.duracion_bloques
+                        key_esp = (especialidad.id, bloque.curso.semestre_cursado)
+                        carga_especialidad[key_esp][bloque.dia] += bloque.duracion_bloques
 
                     for i in range(bloque.duracion_bloques):
                         franja_ocupada = franjas_horarias[franja_idx + i]
@@ -555,17 +546,16 @@ def api_auto_asignar(request):
                             horarios_ocupados["docente"].add(
                                 (bloque.curso.docente.id, bloque.dia, franja_ocupada.id)
                             )
-                        # Iterar sobre especialidades para ocupar horarios de grupo
+                        # Iterar sobre especialidades para ocupar horarios
                         for especialidad in bloque.curso.especialidades.all():
-                            if especialidad.grupo:
-                                horarios_ocupados["grupo"].add(
-                                    (
-                                        especialidad.grupo.id,
-                                        bloque.curso.semestre_cursado,
-                                        bloque.dia,
-                                        franja_ocupada.id,
-                                    )
+                            horarios_ocupados["especialidad"].add(
+                                (
+                                    especialidad.id,
+                                    bloque.curso.semestre_cursado,
+                                    bloque.dia,
+                                    franja_ocupada.id,
                                 )
+                            )
                 except ValueError:
                     continue
 
@@ -592,10 +582,7 @@ def api_auto_asignar(request):
             for curso in cursos_con_pendientes:
                 horas_pendientes = curso.horas_academicas_semanales - curso.horas_asignadas
                 docente = curso.docente
-                grupos = []
-                for especialidad in curso.especialidades.all():
-                    if especialidad.grupo:
-                        grupos.append(especialidad.grupo)
+                especialidades = list(curso.especialidades.all())
 
                 semestre_cursado = curso.semestre_cursado
                 # Sort days based on teacher load (ascending) to balance workload
@@ -617,18 +604,18 @@ def api_auto_asignar(request):
 
                     for dia in dias_semana_ordenados:
                         # Validar límites diarios antes de intentar buscar hueco
-                        if docente and carga_docente[docente.id][dia] + duracion_a_intentar > 8:
+                        if docente and carga_docente[docente.id][dia] + duracion_a_intentar > 10:
                             continue
 
-                        # Validar límite de grupo para CADA grupo asociado
-                        grupo_excede_limite = False
+                        # Validar límite de especialidad para CADA especialidad asociada
+                        especialidad_excede_limite = False
                         if semestre_cursado:
-                            for grupo in grupos:
-                                key_grupo = (grupo.id, semestre_cursado)
-                                if carga_grupo[key_grupo][dia] + duracion_a_intentar > 6:
-                                    grupo_excede_limite = True
+                            for esp in especialidades:
+                                key_esp = (esp.id, semestre_cursado)
+                                if carga_especialidad[key_esp][dia] + duracion_a_intentar > 8:
+                                    especialidad_excede_limite = True
                                     break
-                        if grupo_excede_limite:
+                        if especialidad_excede_limite:
                             continue
                             
                         # Compactación: Ordenar indices
@@ -656,29 +643,29 @@ def api_auto_asignar(request):
                             bloque_valido = True
                             for franja in franjas_del_bloque:
                                 if (
-                                    docente.disponibilidad == "MANANA"
+                                    docente and docente.disponibilidad == "MANANA"
                                     and franja.turno != "MANANA"
                                 ) or (
-                                    docente.disponibilidad == "TARDE"
+                                    docente and docente.disponibilidad == "TARDE"
                                     and franja.turno != "TARDE"
                                 ):
                                     bloque_valido = False
                                     break
-                                if (docente.id, dia, franja.id) in horarios_ocupados[
+                                if docente and (docente.id, dia, franja.id) in horarios_ocupados[
                                     "docente"
                                 ]:
                                     bloque_valido = False
                                     break
 
-                                # Verificar conflicto para CADA grupo asociado
+                                # Verificar conflicto para CADA especialidad asociada
                                 if semestre_cursado:
-                                    for grupo in grupos:
+                                    for esp in especialidades:
                                         if (
-                                            grupo.id,
+                                            esp.id,
                                             semestre_cursado,
                                             dia,
                                             franja.id,
-                                        ) in horarios_ocupados["grupo"]:
+                                        ) in horarios_ocupados["especialidad"]:
                                             bloque_valido = False
                                             break
                                     if not bloque_valido:
@@ -701,18 +688,19 @@ def api_auto_asignar(request):
                                      docente_occupied_indices[docente.id][dia].add(i + idx_offset)
 
                             if semestre_cursado:
-                                for grupo in grupos:
-                                    key_grupo = (grupo.id, semestre_cursado)
-                                    carga_grupo[key_grupo][dia] += duracion_a_intentar
+                                for esp in especialidades:
+                                    key_esp = (esp.id, semestre_cursado)
+                                    carga_especialidad[key_esp][dia] += duracion_a_intentar
 
                             for franja in franjas_del_bloque:
-                                horarios_ocupados["docente"].add(
-                                    (docente.id, dia, franja.id)
-                                )
+                                if docente:
+                                    horarios_ocupados["docente"].add(
+                                        (docente.id, dia, franja.id)
+                                    )
                                 if semestre_cursado:
-                                    for grupo in grupos:
-                                        horarios_ocupados["grupo"].add(
-                                            (grupo.id, semestre_cursado, dia, franja.id)
+                                    for esp in especialidades:
+                                        horarios_ocupados["especialidad"].add(
+                                            (esp.id, semestre_cursado, dia, franja.id)
                                         )
                             horas_pendientes -= duracion_a_intentar
                             bloque_asignado_en_iteracion = True
@@ -879,29 +867,35 @@ def api_get_placement_suggestions(request):
                 except (KeyError, IndexError):
                     pass
         
-        # 2. Ocupación Grupo (si aplica)
-        grupo_ocupado = set()
-        grupo_ocupado_detalle = {} # (dia, f_id) -> Razón
-        grupos = []
-        # Iterar sobre todas las especialidades asociadas al curso
-        for especialidad in curso.especialidades.all():
-            if especialidad.grupo:
-                grupos.append(especialidad.grupo)
-
+        # 2. Ocupación Especialidad
+        especialidad_ocupado = set()
+        especialidad_ocupado_detalle = {} # (dia, f_id) -> Razón
+        carga_especialidad_diaria = defaultdict(lambda: {dia: 0 for dia in dias_semana})
+        
+        especialidades_curso = list(curso.especialidades.all())
         semestre_cursado = curso.semestre_cursado
         
-        if semestre_cursado and grupos:
-            q_grupos = Q()
-            for g in grupos:
-                q_grupos |= Q(especialidad__grupo=g) | Q(tipo_curso='GENERAL', especialidades__grupo=g)
+        if semestre_cursado and especialidades_curso:
+            q_esp = Q()
+            for esp in especialidades_curso:
+                q_cond = Q(curso__especialidades=esp)
+                if esp.grupo:
+                    q_cond |= Q(curso__tipo_curso='GENERAL', curso__especialidades__grupo=esp.grupo)
+                q_esp |= q_cond
             
-            bloques_grupo = BloqueHorario.objects.filter(
-                q_grupos,
+            bloques_esp = BloqueHorario.objects.filter(
+                q_esp,
                 curso__semestre_cursado=semestre_cursado, # Mismo semestre
                 curso__semestre=semestre_activo
-            ).exclude(curso__id=curso_id)
+            ).exclude(curso__id=curso_id).distinct()
 
-            for b in bloques_grupo:
+            for b in bloques_esp:
+                 # Check if this block belongs to which of my specialties
+                 b_especialidades = list(b.curso.especialidades.all())
+                 for esp in especialidades_curso:
+                     if esp in b_especialidades or (b.curso.tipo_curso == 'GENERAL' and esp.grupo and b.curso.especialidades.filter(grupo=esp.grupo).exists()):
+                         carga_especialidad_diaria[esp.id][b.dia] += b.duracion_bloques
+                      
                  try:
                     start_idx = franja_map[b.franja_inicio.id]
                     for i in range(b.duracion_bloques):
@@ -909,9 +903,9 @@ def api_get_placement_suggestions(request):
                         if idx < len(franjas_horarias):
                             f_id = franjas_horarias[idx].id
                             key = (b.dia, f_id)
-                            grupo_ocupado.add(key)
+                            especialidad_ocupado.add(key)
                             # Guardar detalle del conflicto
-                            grupo_ocupado_detalle[key] = f"Conflicto con Grupo: {b.curso.nombre}"
+                            especialidad_ocupado_detalle[key] = f"Conflicto con Especialidad: {b.curso.nombre}"
                  except (KeyError, IndexError):
                     pass
 
@@ -922,13 +916,31 @@ def api_get_placement_suggestions(request):
         # --- EVALUAR TODAS LAS POSICIONES ---
         for dia in dias_semana:
             # Check límite diario docente
-            if docente and carga_docente_diaria[dia] + duracion > 8:
+            if docente and carga_docente_diaria[dia] + duracion > 10:
                  # Todo el día bloqueado
                  for f in franjas_horarias:
                      conflicts.append({
                          'dia': dia,
                          'franja_id': f.id,
-                         'razon': 'Carga diaria máxima (8h) excedida'
+                         'razon': 'Carga diaria máxima (10h) excedida para el docente'
+                     })
+                 continue
+                 
+            # Check límite de horas diarias por especialidad
+            excede_esp = False
+            razon_limite_esp = ""
+            for esp in especialidades_curso:
+                if carga_especialidad_diaria.get(esp.id, {}).get(dia, 0) + duracion > 8:
+                    excede_esp = True
+                    razon_limite_esp = f"La especialidad {esp.nombre} excede su límite de 8h diarias"
+                    break
+                    
+            if excede_esp:
+                 for f in franjas_horarias:
+                     conflicts.append({
+                         'dia': dia,
+                         'franja_id': f.id,
+                         'razon': razon_limite_esp
                      })
                  continue
 
@@ -954,10 +966,10 @@ def api_get_placement_suggestions(request):
                         razon_invalidez = "Docente ocupado"
                         break
                     
-                    # 3. Ocupación Grupo
-                    if (dia, f.id) in grupo_ocupado:
+                    # 3. Ocupación Especialidad
+                    if (dia, f.id) in especialidad_ocupado:
                          bloque_valido = False
-                         razon_invalidez = grupo_ocupado_detalle.get((dia, f.id), "Grupo ocupado")
+                         razon_invalidez = especialidad_ocupado_detalle.get((dia, f.id), "Especialidad en clase")
                          break
                 
                 if bloque_valido:

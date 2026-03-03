@@ -280,6 +280,40 @@ document.addEventListener('DOMContentLoaded', function () {
 
             try {
                 const isExistingBlock = item.dataset.bloqueId;
+
+                let durationToAssign = parseInt(item.dataset.duracion, 10);
+                let finalCursoData = null;
+
+                if (!isExistingBlock) {
+                    try {
+                        finalCursoData = JSON.parse(item.dataset.fullData);
+                    } catch (e) { console.error(e); }
+
+                    if (finalCursoData && finalCursoData.horas_pendientes > 1) {
+                        const { value: selectedDur } = await Swal.fire({
+                            title: 'Asignar Horas',
+                            text: `¿Cuántas horas seguidas quieres asignar para "${finalCursoData.nombre}"? (Máx. ${finalCursoData.horas_pendientes})`,
+                            input: 'number',
+                            inputValue: Math.min(2, finalCursoData.horas_pendientes),
+                            showCancelButton: true,
+                            inputValidator: (value) => {
+                                if (!value || value < 1) return 'Debes asignar al menos 1 hora.';
+                                if (value > finalCursoData.horas_pendientes) return `No puedes asignar más de ${finalCursoData.horas_pendientes} horas pendientes.`;
+                            }
+                        });
+
+                        if (!selectedDur) { // User cancelled
+                            revertVisualSpan(from); // Just reload state
+                            await loadPlannerData();
+                            return;
+                        }
+
+                        durationToAssign = parseInt(selectedDur, 10);
+                    } else if (finalCursoData && finalCursoData.horas_pendientes === 1) {
+                        durationToAssign = 1;
+                    }
+                }
+
                 const payload = isExistingBlock ? {
                     bloque_id: item.dataset.bloqueId,
                     dia: to.dataset.dia,
@@ -288,7 +322,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     curso_id: item.dataset.cursoId,
                     dia: to.dataset.dia,
                     franja_id: to.dataset.franjaId,
-                    duracion: parseInt(item.dataset.duracion, 10)
+                    duracion: durationToAssign
                 };
                 const url = isExistingBlock ? '/api/mover-bloque/' : '/api/asignar-horario/';
                 const data = await callApi(url, 'POST', payload);

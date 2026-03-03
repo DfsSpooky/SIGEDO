@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Inventario de Activos{% endblock title %}
+{% block breadcrumb %}Inventario{% endblock breadcrumb %}
+
+{% block extra_css %}
+<style>
+    .activo-card {
+        transition: all 0.3s ease;
+    }
+    .activo-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    }
+    .status-badge {
+        transition: all 0.2s ease;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- Header -->
+    <div class="bg-white rounded-2xl shadow-md p-6 mb-8">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-800">
+                    <i class="fas fa-laptop mr-3 text-indigo-600"></i>Inventario de Equipos
+                </h1>
+                <p class="mt-1 text-gray-500">Gestione los activos y equipos de la institución.</p>
+            </div>
+            <div class="flex items-center gap-3 flex-wrap">
+                <a href="{% url 'reservas:disponibilidad' %}" class="px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors">
+                    <i class="fas fa-bookmark mr-2"></i>Reservar Equipos
+                </a>
+                {% if perms.core.add_activo %}
+                <a href="{% url 'inventario:crear' %}" class="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors">
+                    <i class="fas fa-plus mr-2"></i>Nuevo Activo
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Search bar -->
+        <form method="get" class="mt-4 flex gap-3">
+            <input type="text" name="q" value="{{ request.GET.q }}"
+                   placeholder="Buscar por nombre, código o docente..."
+                   class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+            <button type="submit" class="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                <i class="fas fa-search mr-2"></i>Buscar
+            </button>
+            {% if request.GET.q %}
+            <a href="{% url 'inventario:lista' %}" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                Limpiar
+            </a>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Stats cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div class="bg-white rounded-xl shadow-sm p-4 text-center">
+            <div class="text-3xl font-bold text-indigo-600">{{ activos.paginator.count }}</div>
+            <div class="text-sm text-gray-500 mt-1">Total Activos</div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-4 text-center">
+            <div class="text-3xl font-bold text-green-600">{{ activos_disponibles_count }}</div>
+            <div class="text-sm text-gray-500 mt-1">Disponibles</div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-4 text-center">
+            <div class="text-3xl font-bold text-blue-600">{{ activos_asignados_count }}</div>
+            <div class="text-sm text-gray-500 mt-1">Asignados</div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-4 text-center">
+            <div class="text-3xl font-bold text-yellow-600">{{ activos_mantenimiento_count }}</div>
+            <div class="text-sm text-gray-500 mt-1">En Mantenimiento</div>
+        </div>
+    </div>
+
+    <!-- Activos table -->
+    <div class="bg-white rounded-2xl shadow-md overflow-hidden">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Equipo</th>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Tipo</th>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Código Patrimonial</th>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Estado</th>
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Asignado a</th>
+                    {% if perms.core.change_activo or perms.core.delete_activo %}
+                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Acciones</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for activo in activos %}
+                <tr class="activo-card hover:bg-gray-50 transition-colors">
+                    <td class="px-6 py-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                                <i class="fas
+                                    {% if activo.tipo.nombre|lower == 'laptop' or activo.tipo.nombre|lower == 'computadora' %}fa-laptop
+                                    {% elif activo.tipo.nombre|lower == 'proyector' %}fa-projector
+                                    {% elif activo.tipo.nombre|lower == 'monitor' %}fa-desktop
+                                    {% elif activo.tipo.nombre|lower == 'tablet' %}fa-tablet-alt
+                                    {% else %}fa-box
+                                    {% endif %}
+                                    text-indigo-600"></i>
+                            </div>
+                            <div>
+                                <div class="font-semibold text-gray-900">{{ activo.nombre }}</div>
+                                {% if activo.descripcion %}
+                                <div class="text-xs text-gray-500 truncate max-w-xs">{{ activo.descripcion }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-600 hidden md:table-cell">{{ activo.tipo.nombre }}</td>
+                    <td class="px-6 py-4 text-sm font-mono text-gray-600 hidden lg:table-cell">{{ activo.codigo_patrimonial }}</td>
+                    <td class="px-6 py-4">
+                        {% if activo.estado == 'DISPONIBLE' %}
+                            <span class="status-badge px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                <i class="fas fa-check-circle mr-1"></i>Disponible
+                            </span>
+                        {% elif activo.estado == 'ASIGNADO' %}
+                            <span class="status-badge px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                                <i class="fas fa-user mr-1"></i>Asignado
+                            </span>
+                        {% elif activo.estado == 'EN_MANTENIMIENTO' %}
+                            <span class="status-badge px-3 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                <i class="fas fa-tools mr-1"></i>Mantenimiento
+                            </span>
+                        {% elif activo.estado == 'DE_BAJA' %}
+                            <span class="status-badge px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                                <i class="fas fa-times-circle mr-1"></i>De Baja
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-600 hidden lg:table-cell">
+                        {% if activo.asignado_a %}
+                            <div class="font-medium">{{ activo.asignado_a.get_full_name }}</div>
+                            <div class="text-xs text-gray-400">Desde {{ activo.fecha_asignacion|date:"d/m/Y" }}</div>
+                        {% else %}
+                            <span class="text-gray-400">—</span>
+                        {% endif %}
+                    </td>
+                    {% if perms.core.change_activo or perms.core.delete_activo %}
+                    <td class="px-6 py-4">
+                        <div class="flex items-center gap-2">
+                            <a href="{% url 'inventario:detalle' activo.pk %}"
+                               class="text-gray-500 hover:text-indigo-600 transition-colors" title="Ver detalle">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            {% if perms.core.change_activo %}
+                            <a href="{% url 'inventario:editar' activo.pk %}"
+                               class="text-gray-500 hover:text-yellow-600 transition-colors" title="Editar">
+                                <i class="fas fa-pencil-alt"></i>
+                            </a>
+                            {% endif %}
+                            {% if perms.core.delete_activo %}
+                            <a href="{% url 'inventario:eliminar' activo.pk %}"
+                               class="text-gray-500 hover:text-red-600 transition-colors" title="Eliminar">
+                                <i class="fas fa-trash-alt"></i>
+                            </a>
+                            {% endif %}
+                        </div>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="px-6 py-16 text-center">
+                        <div class="flex flex-col items-center text-gray-400">
+                            <i class="fas fa-box-open text-5xl mb-4"></i>
+                            <p class="text-lg font-medium">No hay activos registrados</p>
+                            {% if request.GET.q %}
+                            <p class="text-sm mt-1">No se encontraron resultados para "{{ request.GET.q }}"</p>
+                            {% else %}
+                            <p class="text-sm mt-1">Comience agregando un nuevo activo.</p>
+                            {% endif %}
+                            {% if perms.core.add_activo %}
+                            <a href="{% url 'inventario:crear' %}" class="mt-4 px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                                <i class="fas fa-plus mr-2"></i>Agregar Activo
+                            </a>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Pagination -->
+        {% if is_paginated %}
+        <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+            <div class="text-sm text-gray-500">
+                Mostrando {{ page_obj.start_index }} - {{ page_obj.end_index }} de {{ paginator.count }} activos
+            </div>
+            <div class="flex gap-2">
+                {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}"
+                   class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors">
+                    Anterior
+                </a>
+                {% endif %}
+                <span class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm">
+                    {{ page_obj.number }} / {{ paginator.num_pages }}
+                </span>
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}"
+                   class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors">
+                    Siguiente
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock content %}

@@ -2,7 +2,6 @@ from datetime import datetime, date
 from django.core.exceptions import ValidationError
 from django.db import models
 
-
 class FranjaHoraria(models.Model):
     TURNO_CHOICES = [("MANANA", "Mañana"), ("TARDE", "Tarde"), ("NOCHE", "Noche")]
     turno = models.CharField(max_length=10, choices=TURNO_CHOICES)
@@ -16,7 +15,6 @@ class FranjaHoraria(models.Model):
 
     def __str__(self):
         return f"{self.get_turno_display()}: {self.hora_inicio.strftime('%I:%M %p')} - {self.hora_fin.strftime('%I:%M %p')}"
-
 
 class DiaEspecial(models.Model):
     TIPO_CHOICES = [
@@ -35,7 +33,6 @@ class DiaEspecial(models.Model):
     def __str__(self):
         return f"{self.fecha}: {self.motivo} ({self.get_tipo_display()})"
 
-
 class Aula(models.Model):
     nombre = models.CharField(max_length=100, unique=True)
     ubicacion = models.CharField(max_length=200, blank=True, null=True)
@@ -43,7 +40,6 @@ class Aula(models.Model):
 
     def __str__(self):
         return self.nombre
-
 
 class BloqueNoLectivo(models.Model):
     DIAS_SEMANA_CHOICES = [
@@ -130,7 +126,6 @@ class BloqueNoLectivo(models.Model):
 
     def __str__(self):
         return f"{self.docente} - {self.motivo} ({self.dia})"
-
 
 class BloqueHorario(models.Model):
     DIAS_SEMANA_CHOICES = [
@@ -311,41 +306,43 @@ class BloqueHorario(models.Model):
                     f"El docente {self.curso.docente} tiene un bloque no lectivo ({conflicto_no_lectivo.motivo}) en este horario."
                 )
 
-        # 5. Validar Carga Académica Diaria del Docente (Max 8 horas)
+        # 5. Validar Carga Académica Diaria del Docente (Max 10 horas)
         if self.curso.docente:
             horas_existentes = BloqueHorario.objects.filter(
                 curso__docente=self.curso.docente,
                 dia=self.dia
             ).exclude(pk=self.pk).aggregate(total=models.Sum("duracion_bloques"))["total"] or 0
 
-            if horas_existentes + self.duracion_bloques > 8:
+            if horas_existentes + self.duracion_bloques > 10:
                 raise ValidationError(
-                    f"El docente {self.curso.docente} excede el límite de 8 horas diarias."
+                    f"El docente {self.curso.docente} excede el límite de 10 horas diarias."
                 )
 
-        # 6. Validar Carga Académica Diaria del Grupo (Max 6 horas)
+        # 6. Validar Carga Académica Diaria de la Especialidad (Max 8 horas)
         if self.curso.pk:
-            # Obtener los grupos únicos de las especialidades de este curso
-            grupos_unicos = set()
-            for esp in self.curso.especialidades.all():
-                if esp.grupo:
-                    grupos_unicos.add(esp.grupo)
+            # Obtener las especialidades de este curso
+            especialidades = self.curso.especialidades.all()
             
-            for grupo in grupos_unicos:
-                 # Buscamos todos los bloques de este grupo en este dia/semestre
-                 # Bloques cuyo curso tenga 'alguna' especialidad en 'este' grupo
-                 # Usamos distinct() para que si un bloque tiene varias especialidades del mismo grupo, no se cuente doble
-                 bloques_grupo_q = BloqueHorario.objects.filter(
-                    curso__especialidades__grupo=grupo,
+            for esp in especialidades:
+                 # Buscamos todos los bloques de esta especialidad en este dia/semestre
+                 # Bloques cuyo curso tenga 'esta' especialidad o sea un curso 'GENERAL' dictado para el grupo de esta especialidad
+                 from django.db.models import Q
+                 
+                 q_esp = Q(curso__especialidades=esp)
+                 if esp.grupo:
+                     q_esp |= Q(curso__tipo_curso='GENERAL', curso__especialidades__grupo=esp.grupo)
+                     
+                 bloques_esp_q = BloqueHorario.objects.filter(
+                    q_esp,
                     curso__semestre_cursado=self.curso.semestre_cursado,
                     dia=self.dia
                  ).exclude(pk=self.pk).distinct()
                  
-                 horas_grupo = bloques_grupo_q.aggregate(total=models.Sum("duracion_bloques"))["total"] or 0
+                 horas_esp = bloques_esp_q.aggregate(total=models.Sum("duracion_bloques"))["total"] or 0
 
-                 if horas_grupo + self.duracion_bloques > 6:
+                 if horas_esp + self.duracion_bloques > 8:
                       raise ValidationError(
-                            f"El grupo {grupo} excede el límite de 6 horas diarias ({horas_grupo}h + {self.duracion_bloques}h > 6h)."
+                            f"La especialidad {esp.nombre} excede el límite de 8 horas diarias ({horas_esp}h + {self.duracion_bloques}h > 8h)."
                         )
 
         # 7. Validar Carga Continua del Docente (Max 5 bloques seguidos ~ 4h 10m)
@@ -430,7 +427,6 @@ class BloqueHorario(models.Model):
             self.horario_fin = self.franja_inicio.hora_fin
 
         super().save(*args, **kwargs)
-
 
 class SolicitudIntercambio(models.Model):
     # Using string references
