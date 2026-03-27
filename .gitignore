@@ -22,7 +22,8 @@ public_html/static/
 public_html/media/
 gestion_docentes/server.log
 gestion_docentes/debug_output.txt
-gestion_docentes/data_temp/
+gestion_docentes/data_temp/*
+!gestion_docentes/data_temp/HORARIO DE CLASES 2026-A.xlsx
 *.log
 
 # Archivos de sistema

@@ -46,6 +46,28 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 
 
+# --- Configurar Apache proxy (Hestia usa Apache como backend) ---
+APACHE_CONF_DIR="/home/sigedo/conf/web/sigedo.ddnsgeek.com"
+if [ ! -f "$APACHE_CONF_DIR/apache2.conf_docker" ]; then
+    echo "[i] Configurando Apache proxy hacia Docker..."
+    sudo a2enmod proxy proxy_http headers rewrite > /dev/null 2>&1 || true
+    sudo tee "$APACHE_CONF_DIR/apache2.conf_docker" > /dev/null << 'EOF'
+ProxyPreserveHost On
+ProxyPass / http://127.0.0.1:8010/
+ProxyPassReverse / http://127.0.0.1:8010/
+EOF
+    sudo tee "$APACHE_CONF_DIR/apache2.ssl.conf_docker" > /dev/null << 'EOF'
+ProxyPreserveHost On
+RequestHeader set X-Forwarded-Proto "https"
+ProxyPass / http://127.0.0.1:8010/
+ProxyPassReverse / http://127.0.0.1:8010/
+EOF
+    sudo systemctl restart apache2
+    echo "[i] Apache proxy configurado ✅"
+else
+    echo "[i] Apache proxy ya configurado, saltando..."
+fi
+
 # --- Levantar Docker ---
 echo "[1/3] Construyendo e iniciando contenedores..."
 docker compose -f "$COMPOSE" --env-file "$ENV_FILE" up -d --build
