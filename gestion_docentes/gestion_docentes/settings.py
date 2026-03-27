@@ -10,79 +10,220 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
+import sys
+from datetime import timedelta
 from pathlib import Path
+
+from django.templatetags.static import static
+from django.urls import reverse_lazy
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = BASE_DIR.parent
+
+
+def env_bool(name, default=False):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in ("true", "1", "t", "yes", "on")
+
+
+def env_list(name, default=None):
+    value = os.environ.get(name)
+    if not value:
+        return default[:] if default else []
+    return [item.strip() for item in value.split(",") if item.strip()]
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
+DJANGO_ENV = os.environ.get("DJANGO_ENV", "local").strip().lower()
+IS_PRODUCTION = DJANGO_ENV in {"production", "prod"}
+APP_DOMAIN = os.environ.get("APP_DOMAIN", "").strip()
+
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-=w1huy-2d3)$32m)$+8+*kkuz(+#hx)eio37q8(+94@o-+av&s'
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    if IS_PRODUCTION:
+        raise RuntimeError("SECRET_KEY es obligatorio cuando DJANGO_ENV=production.")
+    SECRET_KEY = "django-insecure-local-dev-only"
+
+# Key for encrypting IDs
+ID_ENCRYPTION_KEY = os.environ.get("ID_ENCRYPTION_KEY", "").encode()
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env_bool("DEBUG", default=not IS_PRODUCTION)
 
-ALLOWED_HOSTS = []
+default_allowed_hosts = ["localhost", "127.0.0.1"]
+if APP_DOMAIN:
+    default_allowed_hosts.extend([APP_DOMAIN, f"www.{APP_DOMAIN}"])
+ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", default_allowed_hosts)
+
+default_csrf_origins = []
+for host in ALLOWED_HOSTS:
+    if host not in {"localhost", "127.0.0.1"}:
+        default_csrf_origins.append(f"https://{host}")
+        if DEBUG:
+            default_csrf_origins.append(f"http://{host}")
+CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", default_csrf_origins)
+
+# Settings for running behind a reverse proxy like Nginx
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
 
 
 # Application definition
 
 INSTALLED_APPS = [
-    'jazzmin',
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    'core',
-    'tailwind',
-    
+    "daphne",
+    "channels",
+    "unfold",
+    "unfold.contrib.forms",
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "rest_framework",
+    "core",
+    "tailwind",
+    "drf_spectacular",
+    "simple_history",
 ]
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "simple_history.middleware.HistoryRequestMiddleware",
 ]
 
-ROOT_URLCONF = 'gestion_docentes.urls'
+ROOT_URLCONF = "gestion_docentes.urls"
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [BASE_DIR / "templates"],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+                "core.context_processors.unread_notifications_context",
+                "core.context_processors.site_configuration_context",
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'gestion_docentes.wsgi.application'
+WSGI_APPLICATION = "gestion_docentes.wsgi.application"
+ASGI_APPLICATION = "gestion_docentes.asgi.application"
+
+# Channel Layers are configured below based on environment
+
+# If in DEBUG mode, override channel layer to use in-memory for local development
+# This avoids needing a Redis server running locally.
+# Start channels layer configuration
+redis_host = os.environ.get("REDIS_HOST")
+redis_port = os.environ.get("REDIS_PORT", 6379)
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [(redis_host if redis_host else "redis", redis_port)],
+        },
+    },
+}
+
+# If in DEBUG mode, override channel layer to use in-memory for local development
+# This avoids needing a Redis server running locally.
+if DEBUG and not redis_host:
+    CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
+
+# --- Cache Configuration (Redis) ---
+if os.environ.get("REDIS_HOST"):
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": f"redis://{os.environ.get('REDIS_HOST')}:{os.environ.get('REDIS_PORT')}/1",
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            }
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        }
+    }
+    
+# --- Email Configuration ---
+EMAIL_BACKEND = os.environ.get(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.console.EmailBackend"
+    if DEBUG
+    else "django.core.mail.backends.smtp.EmailBackend",
+)
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "localhost")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "25"))
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", default=not DEBUG)
+EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", default=False)
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "no-reply@sigedo.local")
+SERVER_EMAIL = os.environ.get("SERVER_EMAIL", DEFAULT_FROM_EMAIL)
 
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+if os.environ.get("POSTGRES_DB"):
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.environ.get("POSTGRES_DB"),
+            "USER": os.environ.get("POSTGRES_USER", ""),
+            "PASSWORD": os.environ.get("POSTGRES_PASSWORD", ""),
+            "HOST": os.environ.get("POSTGRES_HOST", os.environ.get("DB_HOST", "127.0.0.1")),
+            "PORT": os.environ.get("POSTGRES_PORT", os.environ.get("DB_PORT", "5432")),
+            "CONN_MAX_AGE": int(os.environ.get("DB_CONN_MAX_AGE", "60")),
+            "OPTIONS": {},
+        }
     }
-}
+else:
+    sqlite_name = os.environ.get("SQLITE_PATH", str(BASE_DIR / "db.sqlite3"))
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": sqlite_name,
+        }
+    }
+
+# Use in-memory SQLite database and an in-memory channel layer for tests
+if "test" in sys.argv:
+    DATABASES["default"] = {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": ":memory:",
+    }
+    CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
 
 
 # Password validation
@@ -90,26 +231,32 @@ DATABASES = {
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
+]
+
+
+AUTHENTICATION_BACKENDS = [
+    "core.backends.DniOrUsernameBackend",
+    "django.contrib.auth.backends.ModelBackend",  # Mantenemos el backend por defecto como fallback
 ]
 
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'es-pe'
+LANGUAGE_CODE = "es-pe"
 
-TIME_ZONE = 'America/Lima'
+TIME_ZONE = "America/Lima"
 
 USE_I18N = True
 
@@ -119,85 +266,354 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = '/static/'
-STATICFILES_DIRS = [BASE_DIR / 'static']
+PUBLIC_ROOT = Path(os.environ.get("PUBLIC_ROOT", PROJECT_ROOT / "public_html"))
+STATIC_URL = os.environ.get("STATIC_URL", "/static/")
+MEDIA_URL = os.environ.get("MEDIA_URL", "/media/")
+STATIC_ROOT = Path(
+    os.environ.get(
+        "STATIC_ROOT",
+        PUBLIC_ROOT / "static" if IS_PRODUCTION else BASE_DIR / "staticfiles",
+    )
+)
+MEDIA_ROOT = Path(
+    os.environ.get(
+        "MEDIA_ROOT",
+        PUBLIC_ROOT / "media" if IS_PRODUCTION else BASE_DIR / "media",
+    )
+)
+STATICFILES_DIRS = [BASE_DIR / "static"]
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
+        if not DEBUG
+        else "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-AUTH_USER_MODEL = 'core.Docente'
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+# --- REST Framework Configuration ---
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ),
+    "DEFAULT_PERMISSION_CLASSES": (
+        "rest_framework.permissions.IsAuthenticated",
+    ),
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.ScopedRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "100/day",
+        "user": "1000/day",
+        "kiosk_lookup": "120/min",
+        "kiosk_attendance": "60/min",
+        "password_reset": "5/hour",
+    },
+}
 
-LOGIN_REDIRECT_URL = 'dashboard'
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    "ROTATE_REFRESH_TOKENS": False,
+    "BLACKLIST_AFTER_ROTATION": False,
+    "UPDATE_LAST_LOGIN": True,
+    "ALGORITHM": "HS256",
+    "SIGNING_KEY": SECRET_KEY,
+    "VERIFYING_KEY": None,
+    "AUDIENCE": None,
+    "ISSUER": None,
+    "JWK_URL": None,
+    "LEEWAY": 0,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "AUTH_HEADER_NAME": "HTTP_AUTHORIZATION",
+    "USER_ID_FIELD": "id",
+    "USER_ID_CLAIM": "user_id",
+    "USER_AUTHENTICATION_RULE": "rest_framework_simplejwt.authentication.default_user_authentication_rule",
+    "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
+    "TOKEN_TYPE_CLAIM": "token_type",
+    "TOKEN_USER_CLASS": "rest_framework_simplejwt.models.TokenUser",
+    "JTI_CLAIM": "jti",
+}
+
+# --- Web Security Enhancements ---
+if not DEBUG:
+    # Redirect all HTTP traffic to HTTPS
+    SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", default=True)
+    # Use valid HSTS policy
+    SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "31536000"))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool(
+        "SECURE_HSTS_INCLUDE_SUBDOMAINS", default=True
+    )
+    SECURE_HSTS_PRELOAD = env_bool("SECURE_HSTS_PRELOAD", default=True)
+    # Ensure cookies are only sent over HTTPS
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = os.environ.get(
+        "SECURE_REFERRER_POLICY", "strict-origin-when-cross-origin"
+    )
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = os.environ.get(
+        "SECURE_CROSS_ORIGIN_OPENER_POLICY", "same-origin"
+    )
+
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = os.environ.get("SESSION_COOKIE_SAMESITE", "Lax")
+CSRF_COOKIE_SAMESITE = os.environ.get("CSRF_COOKIE_SAMESITE", "Lax")
+
+UNFOLD = {
+    "SITE_HEADER": "Gestión de Docentes",
+    "DASHBOARD_CALLBACK": "core.dashboard.dashboard_callback",
+    "STYLES": [
+        "https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css",
+        "https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css",
+        lambda request: static("css/admin_custom.css"),
+    ],
+    "SCRIPTS": [
+        "https://cdn.jsdelivr.net/npm/flatpickr",
+        "https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js",
+        lambda request: static("js/admin_custom.js"),
+    ],
+    "SIDEBAR": {
+        "show_search": False,
+        "navigation": [
+            {
+                "title": "Principal",
+                "items": [
+                    {
+                        "title": "Dashboard",
+                        "icon": "dashboard",
+                        "link": reverse_lazy("admin:index"),
+                    },
+                    {
+                        "title": "Centro de Control",
+                        "icon": "monitor_heart",
+                        "link": reverse_lazy("dashboard_feed"),
+                    },
+                ],
+            },
+            {
+                "title": "Gestión Académica",
+                "icon": "school",
+                "items": [
+                    {
+                        "title": "Semestres",
+                        "icon": "date_range",
+                        "link": reverse_lazy("admin:core_semestre_changelist"),
+                    },
+                    {
+                        "title": "Carreras",
+                        "icon": "account_balance",
+                        "link": reverse_lazy("admin:core_carrera_changelist"),
+                    },
+                    {
+                        "title": "Especialidades",
+                        "icon": "category",
+                        "link": reverse_lazy("admin:core_especialidad_changelist"),
+                    },
+                    {
+                        "title": "Cursos",
+                        "icon": "book",
+                        "link": reverse_lazy("admin:core_curso_changelist"),
+                    },
+                    {
+                        "title": "Franjas Horarias",
+                        "icon": "schedule",
+                        "link": reverse_lazy("admin:core_franjahoraria_changelist"),
+                    },
+                    {
+                        "title": "Días Especiales",
+                        "icon": "event",
+                        "link": reverse_lazy("admin:core_diaespecial_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Gestión de Inventario",
+                "icon": "inventory_2",
+                "items": [
+                    {
+                        "title": "Tipos de Activo",
+                        "icon": "category",
+                        "link": reverse_lazy("admin:core_tipoactivo_changelist"),
+                    },
+                    {
+                        "title": "Activos",
+                        "icon": "inventory",
+                        "link": reverse_lazy("admin:core_activo_changelist"),
+                    },
+                    {
+                        "title": "Reservas y Préstamos",
+                        "icon": "event_available",
+                        "link": reverse_lazy("admin:core_reserva_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Personal",
+                "icon": "group",
+                "items": [
+                    {
+                        "title": "Docentes",
+                        "icon": "person",
+                        "link": reverse_lazy("admin:core_personaldocente_changelist"),
+                    },
+                    {
+                        "title": "Administradores",
+                        "icon": "shield_person",
+                        "link": reverse_lazy("admin:core_administrador_changelist"),
+                    },
+                    {
+                        "title": "Grupos",
+                        "icon": "groups",
+                        "link": reverse_lazy("admin:core_grupo_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Documentos y Justificaciones",
+                "icon": "folder_managed",
+                "items": [
+                    {
+                        "title": "Documentos",
+                        "icon": "folder",
+                        "link": reverse_lazy("admin:core_documento_changelist"),
+                        "badge": "core.badge_callbacks.documentos_badge_callback",
+                    },
+                    {
+                        "title": "Tipos de Documento",
+                        "icon": "description",
+                        "link": reverse_lazy("admin:core_tipodocumento_changelist"),
+                    },
+                    {
+                        "title": "Justificaciones",
+                        "icon": "assignment_turned_in",
+                        "link": reverse_lazy("admin:core_justificacion_changelist"),
+                        "badge": "core.badge_callbacks.justificaciones_badge_callback",
+                    },
+                    {
+                        "title": "Tipos de Justificación",
+                        "icon": "rule",
+                        "link": reverse_lazy("admin:core_tipojustificacion_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Asistencia",
+                "icon": "event_available",
+                "items": [
+                    {
+                        "title": "Registros de Asistencia",
+                        "icon": "person_check",
+                        "link": reverse_lazy("admin:core_asistencia_changelist"),
+                    },
+                    {
+                        "title": "Asistencia Diaria",
+                        "icon": "today",
+                        "link": reverse_lazy("admin:core_asistenciadiaria_changelist"),
+                    },
+                    {
+                        "title": "Recuperación de Clases",
+                        "icon": "restore",
+                        "link": reverse_lazy("admin:core_recuperacionclase_changelist"),
+                        "badge": "core.badge_callbacks.recuperaciones_badge_callback",
+                    },
+                    {
+                        "title": "Solicitudes de Intercambio",
+                        "icon": "swap_horiz",
+                        "link": reverse_lazy(
+                            "admin:core_solicitudintercambio_changelist"
+                        ),
+                        "badge": "core.badge_callbacks.solicitudes_intercambio_badge_callback",
+                    },
+                ],
+            },
+            {
+                "title": "Comunicación",
+                "icon": "campaign",
+                "items": [
+                    {
+                        "title": "Anuncios",
+                        "icon": "campaign",
+                        "link": reverse_lazy("admin:core_anuncio_changelist"),
+                    },
+                    {
+                        "title": "Notificaciones",
+                        "icon": "notifications",
+                        "link": reverse_lazy("admin:core_notificacion_changelist"),
+                        "badge": "core.badge_callbacks.notificaciones_badge_callback",
+                    },
+                ],
+            },
+            {
+                "title": "Configuración",
+                "icon": "settings",
+                "items": [
+                    {
+                        "title": "Configuración de la Institución",
+                        "icon": "settings_applications",
+                        "link": reverse_lazy(
+                            "admin:core_configuracioninstitucion_changelist"
+                        ),
+                    },
+                ],
+            },
+        ],
+    },
+}
 
 
+AUTH_USER_MODEL = "core.Docente"
 
+LOGIN_REDIRECT_URL = "dashboard"
+LOGOUT_REDIRECT_URL = "login"
 
-JAZZMIN_SETTINGS = {
-    # Título de la ventana (se verá en la pestaña del navegador)
-    "site_title": "Gestión Docente Admin",
+X_FRAME_OPTIONS = os.environ.get(
+    "X_FRAME_OPTIONS", "SAMEORIGIN" if DEBUG else "DENY"
+)
 
-    # Título en la pantalla de login (puede ser corto)
-    "site_header": "Gestión Docente",
+# Geolocalización (Anti-Fraude)
+# Coordenadas de prueba (Plaza de Armas de Lima)
+CAMPUS_LOCATION = (-12.046374, -77.042793) 
+ALLOWED_RADIUS_METERS = 200 # Radio en metros
 
-    # Título en el logo (puede ser más corto)
-    "site_brand": "GD-Admin",
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Gestión de Docentes API",
+    "DESCRIPTION": "API para la gestión de docentes, asistencia e inventario.",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    # OTHER SETTINGS
+}
 
-    # Logo para la pantalla de login
-    "login_logo": "/static/placeholder.png", # Puedes cambiar esto a la ruta de tu logo
+ENABLE_API_DOCS = env_bool("ENABLE_API_DOCS", default=DEBUG)
+ALLOW_LOCAL_FIREBASE_FILE = env_bool("ALLOW_LOCAL_FIREBASE_FILE", default=DEBUG)
 
-    # Logo para la barra lateral en modo oscuro
-    "site_logo_dark": "/static/placeholder.png", # Puedes cambiar esto
-
-    # Temas de Bootswatch https://bootswatch.com/
-    "theme": "darkly",
-
-    # Opciones de la interfaz de usuario
-    "ui_tweaks": {
-        "navbar_small_text": False,
-        "footer_small_text": False,
-        "body_small_text": False,
-        "brand_small_text": False,
-        "brand_colour": "navbar-dark",
-        "accent": "accent-primary",
-        "navbar": "navbar-dark",
-        "no_navbar_border": False,
-        "sidebar": "sidebar-dark-primary",
-        "sidebar_nav_small_text": False,
-        "sidebar_disable_expand": False,
-        "sidebar_nav_child_indent": False,
-        "sidebar_nav_compact_style": False,
-        "sidebar_nav_legacy_style": False,
-        "sidebar_nav_flat_style": False,
-        "theme": "darkly",
-        "dark_mode_theme": "darkly",
-        "button_classes": {
-            "primary": "btn-primary",
-            "secondary": "btn-secondary",
-            "info": "btn-info",
-            "warning": "btn-warning",
-            "danger": "btn-danger",
-            "success": "btn-success"
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {
+            "format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         }
     },
-
-    # --- ORGANIZACIÓN DEL MENÚ LATERAL ---
-    "show_sidebar": True,
-    "navigation_expanded": True,
-    "order_with_respect_to": [
-        # Autenticación y Usuarios
-        "auth", "core.docente", "core.personal", "core.administrador",
-
-        # Organización Académica
-        "core.semestre", "core.carrera", "core.especialidad", "core.grupo", "core.curso",
-
-        # Asistencia y Horarios
-        "core.asistenciadiaria", "core.asistencia", "core.franjahoraria", "core.diaespecial",
-
-        # Otros
-        "core.documento", "core.tipodocumento", "core.solicitudintercambio"
-    ],
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "standard",
+        }
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": os.environ.get("LOG_LEVEL", "INFO"),
+    },
 }

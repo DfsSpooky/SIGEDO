@@ -1,0 +1,351 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Mi Horario{% endblock title %}
+{% block breadcrumb %}Mi Horario{% endblock breadcrumb %}
+
+{% block content %}
+<style>
+@keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+@keyframes shimmer { 0%{background-position:-400px 0} 100%{background-position:400px 0} }
+.sched-fade { animation: fadeUp 0.4s ease both; }
+.skel { background: linear-gradient(90deg,#f0f0f0 25%,#e8e8e8 50%,#f0f0f0 75%); background-size:400px 100%; animation:shimmer 1.2s infinite; border-radius:10px; }
+.day-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.13); }
+.chip-btn:hover { opacity: 0.85; transform: translateY(-1px); }
+dialog::backdrop { background: rgba(0,0,0,0.45); }
+
+.sched-container { max-width:1200px; margin:0 auto; }
+.sched-header { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:20px; }
+.h1-title { font-size:1.5rem; font-weight:900; color:#111827; margin:0; line-height:1.2; }
+.subtitle { font-size:0.8rem; color:#9ca3af; margin:4px 0 0; }
+.semestre-badge { color:#6366f1; font-weight:700; }
+.sin-semestre { color:#f59e0b; font-weight:700; }
+.nav-controls { display:flex; align-items:center; gap:8px; }
+.nav-btn-sq { width:36px;height:36px;border-radius:10px;border:1px solid #e5e7eb;background:white;cursor:pointer;color:#6b7280;font-size:0.85rem;display:flex;align-items:center;justify-content:center;transition:all 0.2s; }
+.nav-btn-pill { padding:0 16px;height:36px;border-radius:10px;border:1px solid #e5e7eb;background:white;cursor:pointer;font-weight:600;font-size:0.85rem;color:#374151;transition:all 0.2s; }
+.week-label-span { font-size:0.8rem;font-weight:600;color:#6b7280;white-space:nowrap;margin-left:4px; }
+.banner-today { background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;border-radius:18px;padding:14px 20px;display:none;align-items:center;gap:14px;margin-bottom:16px;box-shadow:0 4px 20px rgba(99,102,241,0.3); }
+.banner-icon { width:42px;height:42px;background:rgba(255,255,255,0.2);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0; }
+.banner-content { flex:1;min-width:0; }
+.banner-sub { font-size:0.6rem;font-weight:800;opacity:0.8;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 6px; }
+.chips-container { display:flex;gap:6px;flex-wrap:wrap; }
+.banner-free { display:none;align-items:center;gap:12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:16px;padding:14px 20px;margin-bottom:16px; }
+.free-icon { font-size:1.5rem; }
+.free-text { font-size:0.85rem;color:#6b7280;font-weight:500;margin:0; }
+.grid-week { display:flex;gap:12px; }
+.view-mobile { display:none; }
+.tabs-mob { display:flex;gap:4px;background:#f3f4f6;border-radius:14px;padding:4px;margin-bottom:14px; }
+.modal-dialog { border:none;border-radius:20px;padding:0;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,0.2); }
+.modal-stripe-top { height:4px;border-radius:20px 20px 0 0; }
+.modal-body { padding:20px; }
+.modal-horiz { display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px; }
+.modal-icon-bg { width:48px;height:48px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0; }
+.modal-close { width:32px;height:32px;border-radius:50%;border:none;background:#f3f4f6;color:#9ca3af;cursor:pointer;font-size:0.85rem;display:flex;align-items:center;justify-content:center; }
+</style>
+
+<div class="sched-fade sched-container">
+
+    <!-- ── HEADER ── -->
+    <div class="sched-header">
+        <div>
+            <h1 class="h1-title">Mi Horario Semanal</h1>
+            <p class="subtitle">
+                {% if semestre_activo %}
+                    <span class="semestre-badge">{{ semestre_activo.nombre }}</span>
+                    • {{ semestre_activo.fecha_inicio|date:"d M" }} – {{ semestre_activo.fecha_fin|date:"d M Y" }}
+                {% else %}
+                    <span class="sin-semestre"><i class="fas fa-exclamation-circle"></i> Sin semestre activo</span>
+                {% endif %}
+            </p>
+        </div>
+        <div class="nav-controls">
+            <button id="btn-prev" onclick="changeWeek(-1)" class="nav-btn-sq"
+                onmouseover="this.style.background='#eef2ff';this.style.color='#6366f1'" onmouseout="this.style.background='white';this.style.color='#6b7280'">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <button onclick="goToday()" class="nav-btn-pill"
+                onmouseover="this.style.background='#eef2ff';this.style.color='#6366f1'" onmouseout="this.style.background='white';this.style.color='#374151'">
+                Hoy
+            </button>
+            <button id="btn-next" onclick="changeWeek(1)" class="nav-btn-sq"
+                onmouseover="this.style.background='#eef2ff';this.style.color='#6366f1'" onmouseout="this.style.background='white';this.style.color='#6b7280'">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+            <span id="week-label" class="week-label-span"></span>
+        </div>
+    </div>
+
+    <!-- ── TODAY BANNER ── -->
+    <div id="today-banner" class="banner-today">
+        <div class="banner-icon">📚</div>
+        <div class="banner-content">
+            <p class="banner-sub">Clases de Hoy</p>
+            <div id="today-chips" class="chips-container"></div>
+        </div>
+    </div>
+    <div id="free-banner" class="banner-free">
+        <span class="free-icon">☕</span>
+        <p class="free-text">No tienes clases hoy — ¡disfruta tu día!</p>
+    </div>
+
+    <!-- ── WEEK GRID (desktop) ── -->
+    <div id="week-grid" class="grid-week"></div>
+
+    <!-- ── MOBILE VIEW ── -->
+    <div id="mobile-view" class="view-mobile">
+        <div id="mob-tabs" class="tabs-mob"></div>
+        <div id="mob-content"></div>
+    </div>
+
+</div>
+
+<!-- ── DETAIL MODAL ── -->
+<dialog id="detail-modal" class="modal-dialog">
+    <div id="modal-stripe" class="modal-stripe-top"></div>
+    <div class="modal-body">
+        <div class="modal-horiz">
+            <div id="modal-icon" class="modal-icon-bg"></div>
+            <button onclick="document.getElementById('detail-modal').close()" class="modal-close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div id="modal-content"></div>
+    </div>
+</dialog>
+
+<script>
+// ── Data ──────────────────────────────────────────────────────────────
+const DAYS_SHORT = ['Lun','Mar','Mié','Jue','Vie'];
+const DAYS_FULL  = ['Lunes','Martes','Miércoles','Jueves','Viernes'];
+const MONTHS     = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const PALETTE    = [
+    ['#6366f1','#eef2ff'], // indigo
+    ['#8b5cf6','#f5f3ff'], // violet
+    ['#ec4899','#fdf2f8'], // pink
+    ['#0ea5e9','#f0f9ff'], // sky
+    ['#10b981','#ecfdf5'], // emerald
+    ['#f59e0b','#fffbeb'], // amber
+    ['#ef4444','#fef2f2'], // red
+    ['#06b6d4','#ecfeff'], // cyan
+];
+let weekOffset = 0;
+let allEvents  = [];
+let courseMap  = {};  // course name → palette index
+let palIdx     = 0;
+let mobDay     = 0;
+
+// ── Utils ─────────────────────────────────────────────────────────────
+function getMonday(offset=0) {
+    const d = new Date();
+    const dow = d.getDay();
+    d.setDate(d.getDate() + (dow===0 ? -6 : 1-dow) + offset*7);
+    d.setHours(0,0,0,0);
+    return d;
+}
+function addDays(d,n){ const r=new Date(d); r.setDate(r.getDate()+n); return r; }
+function sameDay(a,b){ return a.toDateString()===b.toDateString(); }
+function fmt(d){ return `${d.getDate()} ${MONTHS[d.getMonth()]}`; }
+function fmtT(t){ return t?t.slice(0,5):''; }
+
+function getPalette(name) {
+    if (courseMap[name]===undefined) { courseMap[name]=palIdx++ % PALETTE.length; }
+    return PALETTE[courseMap[name]];
+}
+
+function eventsForDay(gridIdx, weekStart) {
+    const fcDow = gridIdx+1; // 1=Mon..5=Fri
+    const dayDate = addDays(weekStart, gridIdx);
+    return allEvents.filter(ev=>{
+        if (!ev.daysOfWeek?.includes(fcDow)) return false;
+        if (ev.startRecur && dayDate < new Date(ev.startRecur)) return false;
+        if (ev.endRecur   && dayDate > new Date(ev.endRecur))   return false;
+        return true;
+    }).sort((a,b)=>(a.startTime||'').localeCompare(b.startTime||''));
+}
+
+// ── Build card (returns element) ──────────────────────────────────────
+function buildCard(ev) {
+    const [bg] = getPalette(ev.title);
+    const time = `${fmtT(ev.startTime)} – ${fmtT(ev.endTime)}`;
+    const btn  = document.createElement('button');
+    btn.className = 'day-card';
+    btn.style.cssText = `
+        width:100%; background:${bg}; color:white; border:none; cursor:pointer;
+        border-radius:14px; padding:10px 12px; text-align:left;
+        margin-bottom:8px; position:relative; overflow:hidden;
+        transition:transform 0.15s,box-shadow 0.15s;
+        box-shadow:0 2px 8px rgba(0,0,0,0.15);`;
+    btn.innerHTML = `
+        <div style="position:absolute;top:0;left:0;width:4px;height:100%;background:rgba(255,255,255,0.4);border-radius:14px 0 0 14px;"></div>
+        <div style="font-size:0.65rem;font-weight:700;opacity:0.8;margin-bottom:3px;padding-left:6px;">${time}</div>
+        <div style="font-size:0.83rem;font-weight:800;line-height:1.3;padding-left:6px;">${ev.title}</div>
+        ${ev.classroom?`<div style="font-size:0.62rem;font-weight:600;opacity:0.75;padding-left:6px;margin-top:4px;display:flex;align-items:center;gap:4px;"><i class="fas fa-door-open" style="font-size:0.55rem"></i>${ev.classroom}</div>`:''}`;
+    btn.addEventListener('click', ()=>openModal(ev));
+    return btn;
+}
+
+// ── Render ────────────────────────────────────────────────────────────
+function render() {
+    const weekStart = getMonday(weekOffset);
+    const weekEnd   = addDays(weekStart,4);
+    const today     = new Date(); today.setHours(0,0,0,0);
+
+    document.getElementById('week-label').textContent = `${fmt(weekStart)} – ${fmt(weekEnd)} ${weekEnd.getFullYear()}`;
+
+    // Today banner
+    const banner   = document.getElementById('today-banner');
+    const freeBan  = document.getElementById('free-banner');
+    banner.style.display = 'none';
+    freeBan.style.display = 'none';
+
+    if (weekOffset===0) {
+        const dow = today.getDay();
+        if (dow>=1 && dow<=5) {
+            const todayEvs = eventsForDay(dow-1, weekStart);
+            if (todayEvs.length) {
+                banner.style.display = 'flex';
+                document.getElementById('today-chips').innerHTML = todayEvs.map(ev=>
+                    `<span style="background:rgba(255,255,255,0.2);border-radius:20px;padding:3px 10px;font-size:0.72rem;font-weight:700;">${fmtT(ev.startTime)} · ${ev.title}</span>`
+                ).join('');
+            } else {
+                freeBan.style.display = 'flex';
+            }
+        }
+    }
+
+    // Desktop grid
+    const grid = document.getElementById('week-grid');
+    grid.innerHTML = '';
+    for (let i=0; i<5; i++) {
+        const colDate = addDays(weekStart,i);
+        const isToday = sameDay(colDate, today);
+        const dayEvs  = eventsForDay(i, weekStart);
+
+        const col = document.createElement('div');
+        col.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;';
+
+        // Day header
+        const hdr = document.createElement('div');
+        if (isToday) {
+            hdr.style.cssText = `border-radius:14px;padding:10px 8px;text-align:center;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;box-shadow:0 4px 16px rgba(99,102,241,0.35);margin-bottom:10px;`;
+            hdr.innerHTML = `<div style="font-size:0.6rem;font-weight:800;opacity:0.8;text-transform:uppercase;letter-spacing:0.1em;">${DAYS_SHORT[i]}</div><div style="font-size:1.5rem;font-weight:900;line-height:1;">${colDate.getDate()}</div><div style="font-size:0.55rem;font-weight:700;opacity:0.8;margin-top:2px;">HOY</div>`;
+        } else {
+            const hasCls = dayEvs.length > 0;
+            hdr.style.cssText = `border-radius:14px;padding:10px 8px;text-align:center;background:${hasCls?'#f9fafb':'#f3f4f6'};color:${hasCls?'#374151':'#9ca3af'};border:1px solid #f0f0f0;margin-bottom:10px;`;
+            hdr.innerHTML = `<div style="font-size:0.6rem;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;">${DAYS_SHORT[i]}</div><div style="font-size:1.5rem;font-weight:900;line-height:1;">${colDate.getDate()}</div><div style="font-size:0.55rem;font-weight:700;opacity:0.6;margin-top:2px;">${MONTHS[colDate.getMonth()]}</div>`;
+        }
+        col.appendChild(hdr);
+
+        if (dayEvs.length===0) {
+            const free = document.createElement('div');
+            free.style.cssText = 'border-radius:12px;padding:24px 8px;text-align:center;border:2px dashed #e5e7eb;color:#d1d5db;font-size:0.7rem;font-weight:600;';
+            free.innerHTML = `<i class="far fa-calendar" style="font-size:1.3rem;display:block;margin-bottom:6px;"></i>Libre`;
+            col.appendChild(free);
+        } else {
+            dayEvs.forEach(ev=>col.appendChild(buildCard(ev)));
+        }
+
+        grid.appendChild(col);
+    }
+
+    renderMobile(weekStart, today);
+}
+
+function renderMobile(weekStart, today) {
+    // Tabs
+    const tabs = document.getElementById('mob-tabs');
+    tabs.innerHTML = '';
+    for (let i=0; i<5; i++) {
+        const colDate = addDays(weekStart,i);
+        const isToday = sameDay(colDate,today);
+        const active  = i===mobDay;
+        const btn = document.createElement('button');
+        btn.style.cssText = `flex:1;padding:6px 2px;border-radius:10px;text-align:center;font-size:0.62rem;font-weight:700;border:none;cursor:pointer;transition:all 0.2s;
+            background:${active?'white':'transparent'};
+            color:${isToday?'#6366f1':(active?'#6366f1':'#6b7280')};
+            box-shadow:${active?'0 2px 8px rgba(0,0,0,0.08)':'none'};`;
+        btn.innerHTML = `<span style="font-size:1rem;font-weight:900;display:block;line-height:1;">${colDate.getDate()}</span><span style="text-transform:uppercase;letter-spacing:0.05em;">${DAYS_SHORT[i]}</span>`;
+        btn.addEventListener('click',()=>{ mobDay=i; renderMobile(weekStart,today); });
+        tabs.appendChild(btn);
+    }
+    // Content
+    const content = document.getElementById('mob-content');
+    content.innerHTML = '';
+    const dayEvs = eventsForDay(mobDay, weekStart);
+    if (dayEvs.length===0) {
+        content.innerHTML = `<div style="border-radius:16px;padding:40px 12px;text-align:center;border:2px dashed #e5e7eb;color:#d1d5db;"><i class="far fa-calendar" style="font-size:2rem;display:block;margin-bottom:10px;"></i>Sin clases este día</div>`;
+    } else {
+        dayEvs.forEach(ev=>content.appendChild(buildCard(ev)));
+    }
+}
+
+// ── Responsive ────────────────────────────────────────────────────────
+function adjustLayout() {
+    const isMobile = window.innerWidth < 768;
+    document.getElementById('week-grid').style.display  = isMobile ? 'none' : 'flex';
+    document.getElementById('mobile-view').style.display = isMobile ? 'block' : 'none';
+}
+window.addEventListener('resize', adjustLayout);
+adjustLayout();
+
+// ── Navigation ────────────────────────────────────────────────────────
+function changeWeek(dir) { weekOffset += dir; render(); }
+function goToday() {
+    weekOffset = 0;
+    const dow  = new Date().getDay();
+    mobDay = (dow>=1&&dow<=5) ? dow-1 : 0;
+    render();
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────
+function openModal(ev) {
+    const [bg, lightBg] = getPalette(ev.title);
+    document.getElementById('modal-stripe').style.background = `linear-gradient(90deg,${bg},${bg}99)`;
+    document.getElementById('modal-icon').style.background   = lightBg;
+    document.getElementById('modal-icon').innerHTML = '📖';
+
+    const row = (icon,label,val) => `
+        <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid #f1f5f9;">
+            <div style="width:32px;height:32px;border-radius:8px;background:${lightBg};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i class="${icon}" style="color:${bg};font-size:12px;"></i>
+            </div>
+            <div>
+                <p style="font-size:0.58rem;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.1em;margin:0;">${label}</p>
+                <p style="font-size:0.88rem;font-weight:700;color:#1e293b;margin:2px 0 0;">${val}</p>
+            </div>
+        </div>`;
+
+    document.getElementById('modal-content').innerHTML = `
+        <h2 style="font-size:1.05rem;font-weight:900;color:#1e293b;margin:0 0 12px;">${ev.title}</h2>
+        ${row('fas fa-clock','Horario',`${fmtT(ev.startTime)} – ${fmtT(ev.endTime)}`)}
+        ${ev.classroom?row('fas fa-door-open','Aula',ev.classroom):''}
+        ${ev.specialties?row('fas fa-users','Especialidades',ev.specialties):''}
+    `;
+    document.getElementById('detail-modal').showModal();
+}
+
+// ── Load ──────────────────────────────────────────────────────────────
+async function load() {
+    // Skeletons
+    const grid = document.getElementById('week-grid');
+    grid.innerHTML = Array(5).fill(0).map(()=>`
+        <div style="flex:1;display:flex;flex-direction:column;gap:8px;">
+            <div class="skel" style="height:72px;"></div>
+            <div class="skel" style="height:72px;"></div>
+        </div>`).join('');
+
+    // Default mobile day to today
+    const dow = new Date().getDay();
+    mobDay = (dow>=1&&dow<=5) ? dow-1 : 0;
+
+    try {
+        const r = await fetch("{% url 'api:horario_docente' %}", {headers:{'X-Requested-With':'XMLHttpRequest'}});
+        const d = await r.json();
+        allEvents = d.filter(ev=>ev.daysOfWeek?.length>0);
+    } catch(e) { console.error(e); }
+    render();
+}
+
+load();
+</script>
+{% endblock content %}
