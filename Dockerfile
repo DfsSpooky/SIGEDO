@@ -14,6 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy project
 COPY . /app/
+RUN chmod +x /app/docker/entrypoint.sh
 
 # Set the working directory to the Django project root
 WORKDIR /app/gestion_docentes
@@ -25,5 +26,5 @@ RUN SECRET_KEY='dummy-key-for-build' ID_ENCRYPTION_KEY='WPTnEteKbDAIR4cGw5PYHXeu
 # Expose port 8000
 EXPOSE 8000
 
-# Run gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "gestion_docentes.gestion_docentes.wsgi"]
+ENTRYPOINT ["/app/docker/entrypoint.sh"]
+CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "gestion_docentes.asgi:application"]

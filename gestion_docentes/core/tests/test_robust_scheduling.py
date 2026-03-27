@@ -1,11 +1,18 @@
 from datetime import time
 from django.test import TestCase
 from django.core.exceptions import ValidationError
-from core.models import BloqueHorario, Curso, FranjaHoraria, Semestre, Carrera, Especialidad, Grupo, Docente, Aula, BloqueNoLectivo
+from core.models import BloqueHorario, ConfiguracionInstitucion, Curso, FranjaHoraria, Semestre, Carrera, Especialidad, Grupo, Docente, Aula, BloqueNoLectivo
 
 class RobustSchedulingTests(TestCase):
     def setUp(self):
         # Setup basic data
+        self.config = ConfiguracionInstitucion.objects.create(
+            nombre_institucion="Robust Scheduler Test",
+            logo="configuracion/test.png",
+            max_horas_diarias_docente=10,
+            max_horas_diarias_especialidad=10,
+            max_bloques_consecutivos_docente=5,
+        )
         self.semestre = Semestre.objects.create(
             nombre="2024-I",
             fecha_inicio="2024-01-01",
@@ -95,7 +102,10 @@ class RobustSchedulingTests(TestCase):
         self.assertIn("bloque no lectivo", str(cm.exception))
 
     def test_student_daily_load_limit(self):
-        """Test max 6 hours per day for student group."""
+        """Test configurable max 6 hours per day for student group."""
+        self.config.max_horas_diarias_especialidad = 6
+        self.config.save(update_fields=["max_horas_diarias_especialidad"])
+
         # Assign 6 hours
         for i in range(6):
             BloqueHorario.objects.create(
@@ -118,7 +128,10 @@ class RobustSchedulingTests(TestCase):
         self.assertIn("excede el límite de 6 horas", str(cm.exception))
 
     def test_teacher_daily_load_limit(self):
-        """Test max 8 hours per day for teacher."""
+        """Test configurable max 8 hours per day for teacher."""
+        self.config.max_horas_diarias_docente = 8
+        self.config.save(update_fields=["max_horas_diarias_docente"])
+
         # Assign 8 hours
         for i in range(8):
             BloqueHorario.objects.create(
@@ -141,7 +154,10 @@ class RobustSchedulingTests(TestCase):
         self.assertIn("excede el límite de 8 horas", str(cm.exception))
 
     def test_continuous_load_limit(self):
-        """Test max 4 continuous hours (single block)."""
+        """Test configurable max consecutive blocks for teacher."""
+        self.config.max_bloques_consecutivos_docente = 4
+        self.config.save(update_fields=["max_bloques_consecutivos_docente"])
+
         bloque_largo = BloqueHorario(
             curso=self.curso,
             dia="Viernes",
@@ -151,4 +167,4 @@ class RobustSchedulingTests(TestCase):
 
         with self.assertRaises(ValidationError) as cm:
             bloque_largo.clean()
-        self.assertIn("más de 4 horas continuas", str(cm.exception))
+        self.assertIn("4 bloques consecutivos", str(cm.exception))

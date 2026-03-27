@@ -28,4 +28,4 @@ from .schedules import (
     vista_publica_horarios,
     ver_horario_docente_admin,
 )
-from .utils import remove_accents
+from .utils import health_check, remove_accents

@@ -7,6 +7,8 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'gestion_docentes.settings')
 django.setup()
 
 from core.models import Docente, Curso, Carrera, Especialidad, Semestre, Grupo
+from core.utils.docente_identity import normalize_docente_key
+
 
 def clean_name(raw_name):
     # Remove prefix like "Dr.", "Mg.", "Dra."
@@ -42,7 +44,14 @@ def import_data():
     carrera = Carrera.objects.get(nombre="Educación Secundaria")
     
     docentes_creados = {}
+    docentes_index = {}
     dni_counter = 10000001
+
+    for docente_existente in Docente.objects.filter(is_staff=False, is_superuser=False):
+        nombre_existente = f"{docente_existente.first_name} {docente_existente.last_name}".strip()
+        key = normalize_docente_key(nombre_existente)
+        if key and key not in docentes_index:
+            docentes_index[key] = docente_existente
     
     with open(csv_file, newline='', encoding='utf-8') as f, \
          open(output_csv, 'w', newline='', encoding='utf-8') as out_f:
@@ -59,12 +68,16 @@ def import_data():
             tipo_curso_raw = row['Especialidad o general'].strip()
             
             # --- 1. DOCENTE ---
-            if raw_name not in docentes_creados:
+            docente_key = normalize_docente_key(raw_name)
+            if docente_key and docente_key not in docentes_creados:
                 first_name, last_name = clean_name(raw_name)
                 dni = str(dni_counter)
-                
-                # Check if exists by name (in case script runs twice)
-                docente = Docente.objects.filter(first_name=first_name, last_name=last_name).first()
+
+                # Reusar docente existente por clave canónica para evitar duplicados.
+                docente = docentes_index.get(docente_key)
+                if not docente:
+                    docente = Docente.objects.filter(first_name=first_name, last_name=last_name).first()
+
                 if not docente:
                     docente = Docente.objects.create_user(
                         username=dni,
@@ -75,10 +88,14 @@ def import_data():
                     )
                     writer.writerow([raw_name, first_name, last_name, dni, '12345'])
                     dni_counter += 1
-                
-                docentes_creados[raw_name] = docente
+
+                if docente_key:
+                    docentes_index[docente_key] = docente
+                    docentes_creados[docente_key] = docente
+                else:
+                    docentes_creados[raw_name] = docente
             else:
-                docente = docentes_creados[raw_name]
+                docente = docentes_creados.get(docente_key) if docente_key else docentes_creados[raw_name]
                 
             # --- 2. ESPECIALIDAD ---
             # Try to find exactly or 'contains'

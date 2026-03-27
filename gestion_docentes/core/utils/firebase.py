@@ -36,15 +36,19 @@ def initialize_firebase():
             logger.info(f"Firebase initialized via path: {cert_path}")
             return True
 
-        # 3. Fallback to default path
-        default_path = os.path.join(settings.BASE_DIR, 'serviceAccountKey.json')
-        if os.path.exists(default_path):
+        # 3. Fallback to default path (solo desarrollo/local)
+        default_path = os.path.join(settings.BASE_DIR, "serviceAccountKey.json")
+        if getattr(settings, "ALLOW_LOCAL_FIREBASE_FILE", False) and os.path.exists(
+            default_path
+        ):
             cred = credentials.Certificate(default_path)
             firebase_admin.initialize_app(cred)
             logger.info("Firebase initialized via default local path")
             return True
-        
-        logger.warning("Firebase credentials not found. Push notifications will be disabled.")
+
+        logger.warning(
+            "Firebase credentials not found. Push notifications will be disabled."
+        )
         return False
 
     except Exception as e:

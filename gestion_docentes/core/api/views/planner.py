@@ -9,15 +9,16 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import Count, Q
-from django.views.decorators.csrf import csrf_exempt
 
 from core.models import (
     Aula,
     BloqueHorario,
     BloqueNoLectivo,
+    ConfiguracionInstitucion,
     Curso,
     Especialidad,
     FranjaHoraria,
+    Grupo,
     Semestre,
 )
 from core.utils.responses import (
@@ -76,7 +77,6 @@ def calcular_puntaje(docente_id, dia, franja_idx, duracion, carga_docente_dia, d
 
 
 @staff_member_required
-@csrf_exempt
 def api_asignar_horario(request):
     if request.method != "POST":
         return error_response("Método no permitido", status_code=405)
@@ -139,7 +139,6 @@ def api_asignar_horario(request):
 
 
 @staff_member_required
-@csrf_exempt
 def api_desasignar_horario(request):
     if request.method != "POST":
         return error_response("Método no permitido", status_code=405)
@@ -164,7 +163,6 @@ def api_desasignar_horario(request):
 
 
 @staff_member_required
-@csrf_exempt
 def api_mover_bloque(request):
     if request.method != "POST":
         return error_response("Método no permitido", status_code=405)
@@ -203,7 +201,6 @@ def api_mover_bloque(request):
 
 
 @staff_member_required
-@csrf_exempt
 def api_ajustar_duracion(request):
     if request.method != "POST":
         return error_response("Método no permitido", status_code=405)
@@ -373,6 +370,7 @@ def _get_planner_data(especialidad_id, semestre_cursado):
     cursos_asignados_json = []
     cursos_pendientes_generales = []
     cursos_pendientes_especialidad = []
+    grupo_obj = None
 
     if especialidad_id and semestre_cursado:
         especialidad_obj = Especialidad.objects.get(id=especialidad_id)
@@ -456,6 +454,7 @@ def _get_planner_data(especialidad_id, semestre_cursado):
         "grupo_id": grupo_obj.id if especialidad_id and semestre_cursado else None,
         "grupo_nombre": grupo_nombre,
         "especialidades_en_grupo": especialidades_grupo,
+        "dias_preferidos_especialidad": grupo_obj.get_dias_preferidos_especialidad() if grupo_obj else [],
         "cursos_pendientes": {
             "generales": cursos_pendientes_generales,
             "especialidad": cursos_pendientes_especialidad,
@@ -465,7 +464,6 @@ def _get_planner_data(especialidad_id, semestre_cursado):
 
 
 @staff_member_required
-@csrf_exempt
 def api_auto_asignar(request):
     if request.method != "POST":
         return error_response("Método no permitido", status_code=405)
@@ -474,6 +472,9 @@ def api_auto_asignar(request):
         data = json.loads(request.body)
         especialidad_id = data.get("especialidad_id")
         semestre_cursado_num = data.get("semestre_cursado")
+        scheduler_limits = ConfiguracionInstitucion.get_scheduler_limits()
+        max_horas_docente = scheduler_limits["max_horas_diarias_docente"]
+        max_horas_especialidad = scheduler_limits["max_horas_diarias_especialidad"]
 
         # --- TRANSACCIÓN ATÓMICA ---
         with transaction.atomic():
@@ -604,7 +605,7 @@ def api_auto_asignar(request):
 
                     for dia in dias_semana_ordenados:
                         # Validar límites diarios antes de intentar buscar hueco
-                        if docente and carga_docente[docente.id][dia] + duracion_a_intentar > 10:
+                        if docente and carga_docente[docente.id][dia] + duracion_a_intentar > max_horas_docente:
                             continue
 
                         # Validar límite de especialidad para CADA especialidad asociada
@@ -612,7 +613,7 @@ def api_auto_asignar(request):
                         if semestre_cursado:
                             for esp in especialidades:
                                 key_esp = (esp.id, semestre_cursado)
-                                if carga_especialidad[key_esp][dia] + duracion_a_intentar > 8:
+                                if carga_especialidad[key_esp][dia] + duracion_a_intentar > max_horas_especialidad:
                                     especialidad_excede_limite = True
                                     break
                         if especialidad_excede_limite:
@@ -674,12 +675,17 @@ def api_auto_asignar(request):
                             if not bloque_valido:
                                 continue
 
-                            BloqueHorario.objects.create(
+                            bloque_candidato = BloqueHorario(
                                 curso=curso,
                                 dia=dia,
                                 franja_inicio=franja_inicio,
                                 duracion_bloques=duracion_a_intentar,
                             )
+                            try:
+                                bloque_candidato.full_clean()
+                                bloque_candidato.save()
+                            except ValidationError:
+                                continue
 
                             # Actualizar tracking de carga
                             if docente:
@@ -724,7 +730,6 @@ def api_auto_asignar(request):
 
 
 @staff_member_required
-@csrf_exempt
 def generar_horario_automatico(request):
     if request.method != "POST":
         return error_response("Método no permitido", status_code=405)
@@ -734,12 +739,29 @@ def generar_horario_automatico(request):
         
         # Parse optional grupo_id from body
         grupo_id = None
+        dias_especialidad = None
         if request.body:
             try:
                 data = json.loads(request.body)
                 grupo_id = data.get("grupo_id")
+                dias_especialidad = data.get("dias_especialidad")
             except json.JSONDecodeError:
                 pass
+
+        dias_validos = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
+        if dias_especialidad is not None:
+            if not isinstance(dias_especialidad, list):
+                return error_response(
+                    "La regla de días para cursos de especialidad debe enviarse como lista.",
+                    status_code=400,
+                )
+
+            dias_especialidad = [dia for dia in dias_especialidad if dia in dias_validos]
+            if len(dias_especialidad) != 2:
+                return error_response(
+                    "Debes seleccionar exactamente 2 días para los cursos de especialidad.",
+                    status_code=400,
+                )
 
         # --- TRANSACCIÓN ATÓMICA ---
         with transaction.atomic():
@@ -749,8 +771,18 @@ def generar_horario_automatico(request):
                     "No hay un semestre activo configurado.", status_code=400
                 )
 
+            if grupo_id and dias_especialidad:
+                Grupo.objects.filter(pk=grupo_id).update(
+                    dia_preferido_especialidad_1=dias_especialidad[0],
+                    dia_preferido_especialidad_2=dias_especialidad[1],
+                )
+
             # Instanciar y ejecutar el solver de OR-Tools
-            solver = TimetableSolver(semestre_activo, grupo_id=grupo_id)
+            solver = TimetableSolver(
+                semestre_activo,
+                grupo_id=grupo_id,
+                dias_especialidad=dias_especialidad,
+            )
             success, message = solver.solve()
 
             if success:
@@ -765,7 +797,6 @@ def generar_horario_automatico(request):
 
 
 @staff_member_required
-@csrf_exempt
 def clear_horario(request):
     """
     Desasigna todos los bloques horarios según el alcance especificado.
@@ -824,6 +855,9 @@ def api_get_placement_suggestions(request):
         curso = Curso.objects.get(id=curso_id)
         docente = curso.docente
         semestre_activo = Semestre.objects.filter(estado="ACTIVO").first()
+        scheduler_limits = ConfiguracionInstitucion.get_scheduler_limits()
+        max_horas_docente = scheduler_limits["max_horas_diarias_docente"]
+        max_horas_especialidad = scheduler_limits["max_horas_diarias_especialidad"]
 
         # No retornamos error si no hay docente, permitimos sugerencias basadas en otros factores
         # if not docente:
@@ -916,13 +950,13 @@ def api_get_placement_suggestions(request):
         # --- EVALUAR TODAS LAS POSICIONES ---
         for dia in dias_semana:
             # Check límite diario docente
-            if docente and carga_docente_diaria[dia] + duracion > 10:
+            if docente and carga_docente_diaria[dia] + duracion > max_horas_docente:
                  # Todo el día bloqueado
                  for f in franjas_horarias:
                      conflicts.append({
                          'dia': dia,
                          'franja_id': f.id,
-                         'razon': 'Carga diaria máxima (10h) excedida para el docente'
+                         'razon': f'Carga diaria máxima ({max_horas_docente}h) excedida para el docente'
                      })
                  continue
                  
@@ -930,9 +964,9 @@ def api_get_placement_suggestions(request):
             excede_esp = False
             razon_limite_esp = ""
             for esp in especialidades_curso:
-                if carga_especialidad_diaria.get(esp.id, {}).get(dia, 0) + duracion > 8:
+                if carga_especialidad_diaria.get(esp.id, {}).get(dia, 0) + duracion > max_horas_especialidad:
                     excede_esp = True
-                    razon_limite_esp = f"La especialidad {esp.nombre} excede su límite de 8h diarias"
+                    razon_limite_esp = f"La especialidad {esp.nombre} excede su límite de {max_horas_especialidad}h diarias"
                     break
                     
             if excede_esp:

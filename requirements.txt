@@ -37,7 +37,7 @@ txaio==25.6.1
 typing_extensions==4.14.1
 tzdata==2025.2
 zope.interface==7.2
-gunicorn
+gunicorn==23.0.0
 psycopg2-binary
 channels_redis
 python-dotenv
@@ -54,3 +54,4 @@ django-simple-history
 django-redis
 ortools
 google-generativeai
+whitenoise

@@ -220,6 +220,26 @@ class EspecialidadAdmin(ModelAdmin):
         return format_html(f'<a href="{change_url}" class="button">Editar</a>')
 
 
+@admin.register(Grupo)
+class GrupoAdmin(ModelAdmin):
+    list_display = (
+        "nombre",
+        "dia_preferido_especialidad_1",
+        "dia_preferido_especialidad_2",
+        "acciones",
+    )
+    list_display_links = None
+    search_fields = ("nombre",)
+    search_as_command = True
+
+    @admin.display(description="Acciones")
+    def acciones(self, obj):
+        change_url = reverse(
+            f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change", args=[obj.pk]
+        )
+        return format_html(f'<a href="{change_url}" class="button">Editar</a>')
+
+
 @admin.register(Carrera)
 class CarreraAdmin(ModelAdmin):
     list_display = ("nombre", "acciones")
@@ -475,7 +495,27 @@ class ConfiguracionInstitucionAdmin(ModelAdmin):
             "Información Principal",
             {"fields": ("nombre_institucion", "logo", "facultad", "nombre_dashboard")},
         ),
-        ("Parámetros del Sistema", {"fields": ("tiempo_limite_tardanza", "validar_geolocalizacion", "hora_inicio_asistencia_general", "hora_fin_asistencia_general")}),
+        (
+            "Parámetros del Sistema",
+            {
+                "fields": (
+                    "tiempo_limite_tardanza",
+                    "validar_geolocalizacion",
+                    "hora_inicio_asistencia_general",
+                    "hora_fin_asistencia_general",
+                )
+            },
+        ),
+        (
+            "Reglas del Planificador",
+            {
+                "fields": (
+                    "max_horas_diarias_docente",
+                    "max_horas_diarias_especialidad",
+                    "max_bloques_consecutivos_docente",
+                )
+            },
+        ),
         (
             "Datos de Contacto (Opcional)",
             {
@@ -848,6 +888,5 @@ class SolicitudIntercambioAdmin(ModelAdmin):
 
 
 # --- REGISTRO DEL RESTO DE MODELOS ---
-admin.site.register(Grupo)
 admin.site.register(AsistenciaDiaria)
 admin.site.register(BloqueHorario)

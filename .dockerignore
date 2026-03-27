@@ -1,5 +1,7 @@
 # Secrets
 .env
+.env.*
+gestion_docentes/serviceAccountKey.json
 
 # Git
 .git
@@ -20,3 +22,14 @@ __pycache__
 venv/
 .venv/
 env/
+
+# Runtime artifacts
+gestion_docentes/media/
+gestion_docentes/staticfiles/
+gestion_docentes/db.sqlite3
+gestion_docentes/db.sqlite3.backup
+gestion_docentes/server.log
+gestion_docentes/debug_output.txt
+gestion_docentes/data_temp/
+public_html/static/
+public_html/media/

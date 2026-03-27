@@ -33,6 +33,7 @@ class TeacherInfoView(APIView):
     Reemplaza la función original get_teacher_info con una vista basada en clases de DRF.
     """
     permission_classes = [permissions.AllowAny]
+    throttle_scope = "kiosk_lookup"
 
     def post(self, request, *args, **kwargs):
         qr_id = request.data.get("qrId")
@@ -72,6 +73,7 @@ class MarkAttendanceView(APIView):
     Reemplaza la función mark_attendance_kiosk.
     """
     permission_classes = [permissions.AllowAny]
+    throttle_scope = "kiosk_attendance"
 
     def post(self, request, *args, **kwargs):
         serializer = MarkAttendanceSerializer(data=request.data)
@@ -333,6 +335,7 @@ class RegistrarAsistenciaRfidView(APIView):
     Reemplaza la función registrar_asistencia_rfid.
     """
     permission_classes = [permissions.AllowAny]
+    throttle_scope = "kiosk_attendance"
 
     def post(self, request, *args, **kwargs):
         serializer = RegistrarAsistenciaRfidSerializer(data=request.data)

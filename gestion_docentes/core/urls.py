@@ -9,6 +9,7 @@ from core.api.views import planner
 from core.views.realtime_dashboard import RealTimeDashboardView
 
 urlpatterns = [
+    path("health/", views.health_check, name="health_check"),
     # --- Gestión de Documentos ---
     path("subir_documento/", views.subir_documento, name="subir_documento"),
     path(

@@ -2,12 +2,26 @@
 import collections
 from ortools.sat.python import cp_model
 from django.db.models import Q
-from core.models import Curso, BloqueHorario, FranjaHoraria, Especialidad, Docente, Grupo
+from core.models import (
+    BloqueHorario,
+    BloqueNoLectivo,
+    ConfiguracionInstitucion,
+    Curso,
+    Docente,
+    Especialidad,
+    FranjaHoraria,
+    Grupo,
+)
 
 class TimetableSolver:
-    def __init__(self, semestre, grupo_id=None):
+    def __init__(self, semestre, grupo_id=None, dias_especialidad=None):
         self.semestre = semestre
         self.grupo_id = grupo_id
+        self.dias_especialidad = set(dias_especialidad or [])
+        scheduler_limits = ConfiguracionInstitucion.get_scheduler_limits()
+        self.max_horas_diarias_docente = scheduler_limits["max_horas_diarias_docente"]
+        self.max_horas_diarias_especialidad = scheduler_limits["max_horas_diarias_especialidad"]
+        self.max_bloques_consecutivos_docente = scheduler_limits["max_bloques_consecutivos_docente"]
         self.model = cp_model.CpModel()
         self.solver = cp_model.CpSolver()
         self.solver.parameters.max_time_in_seconds = 30.0  # Limit to 30s
@@ -50,7 +64,10 @@ class TimetableSolver:
         status = self.solver.Solve(self.model)
         
         if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
-            return self._save_results()
+            try:
+                return self._save_results()
+            except Exception as exc:
+                return False, f"La solución encontrada no pasó las validaciones finales: {exc}"
         else:
             return False, "No se pudo encontrar una solución factible con las restricciones dadas."
 
@@ -69,6 +86,15 @@ class TimetableSolver:
                     for esp in b.curso.especialidades.all():
                         extern_grupo_ocupado[(esp.grupo_id, b.curso.semestre_cursado, esp.id)].add((b.dia, slot))
             except KeyError: continue
+
+        for b in BloqueNoLectivo.objects.select_related("docente", "franja_inicio"):
+            try:
+                s_start = self.franja_map[b.franja_inicio_id]
+                for i in range(b.duracion_bloques):
+                    slot = s_start + i
+                    extern_docente_ocupado[b.docente_id].add((b.dia, slot))
+            except KeyError:
+                continue
 
         # 1. Weekly Hours Requirement
         for c in self.cursos:
@@ -111,6 +137,12 @@ class TimetableSolver:
             for d in self.dias:
                 for s_idx, f in enumerate(self.franjas):
                     valid = True
+                    if (
+                        c.tipo_curso == "ESPECIALIDAD"
+                        and self.dias_especialidad
+                        and d not in self.dias_especialidad
+                    ):
+                        valid = False
                     if doc.disponibilidad == "MANANA" and f.turno != "MANANA": valid = False
                     if doc.disponibilidad == "TARDE" and f.turno != "TARDE": valid = False
                     if c.semestre_cursado:
@@ -127,14 +159,20 @@ class TimetableSolver:
                 c_ids = [c.id for c in self.cursos if c.docente_id == doc.id]
                 # Horas externas ya asignadas a este docente este día
                 h_externas = sum(1 for (dia, slot) in extern_docente_ocupado[doc.id] if dia == d)
-                self.model.Add(sum(self.x[(cid, d, s)] for cid in c_ids for s in range(len(self.franjas))) <= (8 - h_externas))
+                self.model.Add(
+                    sum(self.x[(cid, d, s)] for cid in c_ids for s in range(len(self.franjas)))
+                    <= max(0, self.max_horas_diarias_docente - h_externas)
+                )
             
             for esp in Especialidad.objects.all():
                 for sem in range(1, 11):
                     c_ids = [c.id for c in self.cursos if esp in c.especialidades.all() and c.semestre_cursado == sem]
                     if c_ids:
                         h_externas = sum(1 for (dia, slot) in extern_grupo_ocupado[(esp.grupo_id, sem, esp.id)] if dia == d)
-                        self.model.Add(sum(self.x[(cid, d, s)] for cid in c_ids for s in range(len(self.franjas))) <= (6 - h_externas))
+                        self.model.Add(
+                            sum(self.x[(cid, d, s)] for cid in c_ids for s in range(len(self.franjas)))
+                            <= max(0, self.max_horas_diarias_especialidad - h_externas)
+                        )
 
         # 6. Minimum session length (at least 2 consecutive slots)
         # This prevents isolated 1-hour blocks
@@ -150,6 +188,25 @@ class TimetableSolver:
                         else:
                             # x[s] == 1 => x[s-1] == 1 OR x[s+1] == 1
                             self.model.Add(self.x[(c.id, d, s)] <= self.x[(c.id, d, s-1)] + self.x[(c.id, d, s+1)])
+
+        # 7. Maximum consecutive load per teacher
+        docentes_por_id = {c.docente_id for c in self.cursos if c.docente_id}
+        max_consecutivos = self.max_bloques_consecutivos_docente
+        if max_consecutivos > 0 and len(self.franjas) > max_consecutivos:
+            for d in self.dias:
+                for docente_id in docentes_por_id:
+                    c_ids = [c.id for c in self.cursos if c.docente_id == docente_id]
+                    if not c_ids:
+                        continue
+
+                    for start in range(len(self.franjas) - max_consecutivos):
+                        self.model.Add(
+                            sum(
+                                self.x[(cid, d, slot)]
+                                for cid in c_ids
+                                for slot in range(start, start + max_consecutivos + 1)
+                            ) <= max_consecutivos
+                        )
 
     def _set_objective(self):
         # Goal: Group General and Specialty courses on specific days
@@ -202,23 +259,32 @@ class TimetableSolver:
                     else:
                         if current_start:
                             # Save block
-                            BloqueHorario.objects.create(
+                            bloque = BloqueHorario(
                                 curso=c,
                                 dia=d,
                                 franja_inicio=current_start,
                                 duracion_bloques=duration
                             )
+                            bloque.full_clean()
+                            bloque.save()
                             bloques_creados += 1
                             current_start = None
                             duration = 0
                 # Final block if any
                 if current_start:
-                    BloqueHorario.objects.create(
+                    bloque = BloqueHorario(
                         curso=c,
                         dia=d,
                         franja_inicio=current_start,
                         duracion_bloques=duration
                     )
+                    bloque.full_clean()
+                    bloque.save()
                     bloques_creados += 1
         
-        return True, f"Asignación automática exitosa. Se crearon {bloques_creados} bloques horarios."
+        detalle_dias = ""
+        if self.dias_especialidad:
+            dias_texto = ", ".join(sorted(self.dias_especialidad, key=self.dias.index))
+            detalle_dias = f" Cursos de especialidad restringidos a: {dias_texto}."
+
+        return True, f"Asignación automática exitosa. Se crearon {bloques_creados} bloques horarios.{detalle_dias}"

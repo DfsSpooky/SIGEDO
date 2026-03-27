@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.mail import send_mail
+from django.conf import settings
 from rest_framework import status, views
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 class RequestPasswordResetView(views.APIView):
     permission_classes = [AllowAny]
-    throttle_scope = 'anon' # Limit attempts
+    throttle_scope = "password_reset"
 
     @extend_schema(
         summary="Solicitar código de recuperación",
@@ -53,7 +54,7 @@ class RequestPasswordResetView(views.APIView):
             send_mail(
                 subject="[SIGEDO] Código de Recuperación de Contraseña",
                 message=f"Hola {user.first_name},\n\nTu código de recuperación es: {otp}\n\nEste código expira en 5 minutos.",
-                from_email="no-reply@sigedo.com",
+                from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[email],
                 fail_silently=False,
             )
@@ -67,7 +68,7 @@ class RequestPasswordResetView(views.APIView):
 
 class ResetPasswordView(views.APIView):
     permission_classes = [AllowAny]
-    throttle_scope = 'anon'
+    throttle_scope = "password_reset"
 
     @extend_schema(
         summary="Restablecer contraseña con código",

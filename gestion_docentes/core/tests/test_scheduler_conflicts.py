@@ -81,7 +81,7 @@ class SchedulerConflictTests(TestCase):
         with self.assertRaises(ValidationError) as cm:
             bloque_conflictivo.clean()
 
-        self.assertIn("ya tiene clase asignada en este horario", str(cm.exception))
+        self.assertIn("Conflicto de Grupo", str(cm.exception))
 
     def test_docente_conflict_same_time(self):
         """

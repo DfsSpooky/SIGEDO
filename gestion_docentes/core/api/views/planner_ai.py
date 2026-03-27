@@ -3,7 +3,6 @@ import logging
 import google.generativeai as genai
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
-from django.views.decorators.csrf import csrf_exempt
 from core.models import Curso, BloqueHorario, Docente, Especialidad, Semestre, FranjaHoraria
 from core.utils.responses import error_response, success_response, server_error_response
 from django.db import transaction
@@ -93,7 +92,6 @@ def get_planner_context(especialidad_id=None, semestre_cursado=None):
     return context
 
 @staff_member_required
-@csrf_exempt
 def api_planner_chat(request):
     if request.method != 'POST': return error_response("Método no permitido", status_code=405)
     if not GEMINI_API_KEY: return error_response("API Key de Gemini no configurada.", status_code=500)

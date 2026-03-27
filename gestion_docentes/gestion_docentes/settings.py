@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 import os
 import sys
+from datetime import timedelta
 from pathlib import Path
 
 from django.templatetags.static import static
@@ -22,25 +23,56 @@ load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = BASE_DIR.parent
+
+
+def env_bool(name, default=False):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in ("true", "1", "t", "yes", "on")
+
+
+def env_list(name, default=None):
+    value = os.environ.get(name)
+    if not value:
+        return default[:] if default else []
+    return [item.strip() for item in value.split(",") if item.strip()]
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
+DJANGO_ENV = os.environ.get("DJANGO_ENV", "local").strip().lower()
+IS_PRODUCTION = DJANGO_ENV in {"production", "prod"}
+APP_DOMAIN = os.environ.get("APP_DOMAIN", "").strip()
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    if IS_PRODUCTION:
+        raise RuntimeError("SECRET_KEY es obligatorio cuando DJANGO_ENV=production.")
+    SECRET_KEY = "django-insecure-local-dev-only"
 
 # Key for encrypting IDs
 ID_ENCRYPTION_KEY = os.environ.get("ID_ENCRYPTION_KEY", "").encode()
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get("DEBUG", "False").lower() in ("true", "1", "t")
+DEBUG = env_bool("DEBUG", default=not IS_PRODUCTION)
 
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost").split(",") + ["oversophisticated-dedra-overgross.ngrok-free.dev"]
-# ... cerca de ALLOWED_HOSTS ...
+default_allowed_hosts = ["localhost", "127.0.0.1"]
+if APP_DOMAIN:
+    default_allowed_hosts.extend([APP_DOMAIN, f"www.{APP_DOMAIN}"])
+ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", default_allowed_hosts)
 
-CSRF_TRUSTED_ORIGINS = ["https://aquienpasco.lat", "https://www.aquienpasco.lat", "https://oversophisticated-dedra-overgross.ngrok-free.dev" ]
+default_csrf_origins = []
+for host in ALLOWED_HOSTS:
+    if host not in {"localhost", "127.0.0.1"}:
+        default_csrf_origins.append(f"https://{host}")
+        if DEBUG:
+            default_csrf_origins.append(f"http://{host}")
+CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", default_csrf_origins)
 
 # Settings for running behind a reverse proxy like Nginx
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -69,6 +101,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -142,29 +175,47 @@ else:
         }
     }
     
-# --- Email Configuration (Console for Development) ---
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+# --- Email Configuration ---
+EMAIL_BACKEND = os.environ.get(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.console.EmailBackend"
+    if DEBUG
+    else "django.core.mail.backends.smtp.EmailBackend",
+)
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "localhost")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "25"))
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", default=not DEBUG)
+EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", default=False)
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "no-reply@sigedo.local")
+SERVER_EMAIL = os.environ.get("SERVER_EMAIL", DEFAULT_FROM_EMAIL)
 
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+if os.environ.get("POSTGRES_DB"):
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.environ.get("POSTGRES_DB"),
+            "USER": os.environ.get("POSTGRES_USER", ""),
+            "PASSWORD": os.environ.get("POSTGRES_PASSWORD", ""),
+            "HOST": os.environ.get("POSTGRES_HOST", os.environ.get("DB_HOST", "127.0.0.1")),
+            "PORT": os.environ.get("POSTGRES_PORT", os.environ.get("DB_PORT", "5432")),
+            "CONN_MAX_AGE": int(os.environ.get("DB_CONN_MAX_AGE", "60")),
+            "OPTIONS": {},
+        }
     }
-}
-
-# Para usar PostgreSQL (Descomentar y configurar en .env si se desea migrar)
-# if os.environ.get("POSTGRES_DB"):
-#     DATABASES = {
-#         "default": {
-#             "ENGINE": "django.db.backends.postgresql",
-#             "NAME": os.environ.get("POSTGRES_DB"),
-#             ...
-#         }
-#     }
+else:
+    sqlite_name = os.environ.get("SQLITE_PATH", str(BASE_DIR / "db.sqlite3"))
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": sqlite_name,
+        }
+    }
 
 # Use in-memory SQLite database and an in-memory channel layer for tests
 if "test" in sys.argv:
@@ -215,9 +266,32 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = "/static/"
-STATIC_ROOT = BASE_DIR / "staticfiles"
+PUBLIC_ROOT = Path(os.environ.get("PUBLIC_ROOT", PROJECT_ROOT / "public_html"))
+STATIC_URL = os.environ.get("STATIC_URL", "/static/")
+MEDIA_URL = os.environ.get("MEDIA_URL", "/media/")
+STATIC_ROOT = Path(
+    os.environ.get(
+        "STATIC_ROOT",
+        PUBLIC_ROOT / "static" if IS_PRODUCTION else BASE_DIR / "staticfiles",
+    )
+)
+MEDIA_ROOT = Path(
+    os.environ.get(
+        "MEDIA_ROOT",
+        PUBLIC_ROOT / "media" if IS_PRODUCTION else BASE_DIR / "media",
+    )
+)
 STATICFILES_DIRS = [BASE_DIR / "static"]
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
+        if not DEBUG
+        else "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -237,14 +311,16 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.ScopedRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
         "anon": "100/day",
         "user": "1000/day",
+        "kiosk_lookup": "120/min",
+        "kiosk_attendance": "60/min",
+        "password_reset": "5/hour",
     },
 }
-
-from datetime import timedelta
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
@@ -273,17 +349,27 @@ SIMPLE_JWT = {
 # --- Web Security Enhancements ---
 if not DEBUG:
     # Redirect all HTTP traffic to HTTPS
-    SECURE_SSL_REDIRECT = True
+    SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", default=True)
     # Use valid HSTS policy
-    SECURE_HSTS_SECONDS = 31536000 # 1 year
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
+    SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "31536000"))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool(
+        "SECURE_HSTS_INCLUDE_SUBDOMAINS", default=True
+    )
+    SECURE_HSTS_PRELOAD = env_bool("SECURE_HSTS_PRELOAD", default=True)
     # Ensure cookies are only sent over HTTPS
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    # Browser security headers
-    SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = os.environ.get(
+        "SECURE_REFERRER_POLICY", "strict-origin-when-cross-origin"
+    )
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = os.environ.get(
+        "SECURE_CROSS_ORIGIN_OPENER_POLICY", "same-origin"
+    )
+
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = os.environ.get("SESSION_COOKIE_SAMESITE", "Lax")
+CSRF_COOKIE_SAMESITE = os.environ.get("CSRF_COOKIE_SAMESITE", "Lax")
 
 UNFOLD = {
     "SITE_HEADER": "Gestión de Docentes",
@@ -488,13 +574,13 @@ UNFOLD = {
 
 
 AUTH_USER_MODEL = "core.Docente"
-MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
 
 LOGIN_REDIRECT_URL = "dashboard"
 LOGOUT_REDIRECT_URL = "login"
 
-X_FRAME_OPTIONS = "SAMEORIGIN"
+X_FRAME_OPTIONS = os.environ.get(
+    "X_FRAME_OPTIONS", "SAMEORIGIN" if DEBUG else "DENY"
+)
 
 # Geolocalización (Anti-Fraude)
 # Coordenadas de prueba (Plaza de Armas de Lima)
@@ -507,4 +593,27 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     # OTHER SETTINGS
+}
+
+ENABLE_API_DOCS = env_bool("ENABLE_API_DOCS", default=DEBUG)
+ALLOW_LOCAL_FIREBASE_FILE = env_bool("ALLOW_LOCAL_FIREBASE_FILE", default=DEBUG)
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {
+            "format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        }
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "standard",
+        }
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": os.environ.get("LOG_LEVEL", "INFO"),
+    },
 }

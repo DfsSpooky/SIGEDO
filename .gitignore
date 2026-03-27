@@ -1,5 +1,9 @@
 # Archivos de entorno y secretos
 .env
+.env.local
+.env.production
+.env.*.local
+gestion_docentes/serviceAccountKey.json
 certbot/
 
 # Archivos de Python compilados
@@ -8,6 +12,18 @@ __pycache__/
 
 # Archivos de la base de datos local (si la tuvieras)
 db.sqlite3
+gestion_docentes/db.sqlite3
+gestion_docentes/db.sqlite3.backup
+
+# Archivos generados en runtime
+gestion_docentes/media/
+gestion_docentes/staticfiles/
+public_html/static/
+public_html/media/
+gestion_docentes/server.log
+gestion_docentes/debug_output.txt
+gestion_docentes/data_temp/
+*.log
 
 # Archivos de sistema
 .DS_Store

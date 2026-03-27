@@ -1,4 +1,4 @@
-from datetime import datetime, date
+from datetime import datetime, date, time
 from django.core.exceptions import ValidationError
 from django.db import models
 
@@ -307,18 +307,24 @@ class BloqueHorario(models.Model):
                 )
 
         # 5. Validar Carga Académica Diaria del Docente (Max 10 horas)
+        from .settings import ConfiguracionInstitucion
+        scheduler_limits = ConfiguracionInstitucion.get_scheduler_limits()
+        max_horas_docente = scheduler_limits["max_horas_diarias_docente"]
+        max_horas_especialidad = scheduler_limits["max_horas_diarias_especialidad"]
+        max_bloques_consecutivos_docente = scheduler_limits["max_bloques_consecutivos_docente"]
+
         if self.curso.docente:
             horas_existentes = BloqueHorario.objects.filter(
                 curso__docente=self.curso.docente,
                 dia=self.dia
             ).exclude(pk=self.pk).aggregate(total=models.Sum("duracion_bloques"))["total"] or 0
 
-            if horas_existentes + self.duracion_bloques > 10:
+            if horas_existentes + self.duracion_bloques > max_horas_docente:
                 raise ValidationError(
-                    f"El docente {self.curso.docente} excede el límite de 10 horas diarias."
+                    f"El docente {self.curso.docente} excede el límite de {max_horas_docente} horas diarias."
                 )
 
-        # 6. Validar Carga Académica Diaria de la Especialidad (Max 8 horas)
+        # 6. Validar Carga Académica Diaria de la Especialidad
         if self.curso.pk:
             # Obtener las especialidades de este curso
             especialidades = self.curso.especialidades.all()
@@ -340,12 +346,12 @@ class BloqueHorario(models.Model):
                  
                  horas_esp = bloques_esp_q.aggregate(total=models.Sum("duracion_bloques"))["total"] or 0
 
-                 if horas_esp + self.duracion_bloques > 8:
+                 if horas_esp + self.duracion_bloques > max_horas_especialidad:
                       raise ValidationError(
-                            f"La especialidad {esp.nombre} excede el límite de 8 horas diarias ({horas_esp}h + {self.duracion_bloques}h > 8h)."
+                            f"La especialidad {esp.nombre} excede el límite de {max_horas_especialidad} horas diarias ({horas_esp}h + {self.duracion_bloques}h > {max_horas_especialidad}h)."
                         )
 
-        # 7. Validar Carga Continua del Docente (Max 5 bloques seguidos ~ 4h 10m)
+        # 7. Validar Carga Continua del Docente
         if self.curso.docente:
             # Estrategia: Reconstruir la línea de tiempo del día
             bloques_dia = list(BloqueHorario.objects.filter(
@@ -384,9 +390,9 @@ class BloqueHorario(models.Model):
                 if current_consecutive > max_consecutive:
                     max_consecutive = current_consecutive
             
-            if max_consecutive > 5:
+            if max_consecutive > max_bloques_consecutivos_docente:
                 raise ValidationError(
-                    f"El docente {self.curso.docente} excedería el límite de 5 bloques consecutivos sin descanso ({max_consecutive} bloques)."
+                    f"El docente {self.curso.docente} excedería el límite de {max_bloques_consecutivos_docente} bloques consecutivos sin descanso ({max_consecutive} bloques)."
                 )
 
         # 8. Validar Reglas de Turno por Semestre

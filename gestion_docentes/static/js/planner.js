@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', function () {
 
     let currentPlannerData = null;
+    const WEEK_DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
 
     // --- API & UTILITY FUNCTIONS ---
     async function callApi(url, method = 'GET', body = null) {
@@ -615,11 +616,14 @@ document.addEventListener('DOMContentLoaded', function () {
             icon: 'warning', showCancelButton: true, confirmButtonText: 'Sí, ¡generar ahora!', cancelButtonText: 'Cancelar', reverseButtons: true
         }).then(async (result) => {
             if (result.isConfirmed) {
+                const diasEspecialidad = await promptSpecialtyDays('global', currentPlannerData?.dias_preferidos_especialidad || []);
+                if (!diasEspecialidad) return;
+
                 const btn = DOMElements.globalAutoAssignBtn;
                 btn.classList.add('loading', 'btn-disabled');
                 Swal.fire({ title: 'Procesando...', text: 'Generando horarios. Por favor, espera.', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
                 try {
-                    const data = await callApi('/api/generar-horario-automatico/', 'POST');
+                    const data = await callApi('/api/generar-horario-automatico/', 'POST', { dias_especialidad: diasEspecialidad });
                     Swal.close();
                     Swal.fire({ title: '¡Proceso Finalizado!', text: data.message, icon: 'success' });
                     loadPlannerData();
@@ -663,11 +667,17 @@ document.addEventListener('DOMContentLoaded', function () {
             width: '32rem'
         }).then(async (result) => {
             if (result.isConfirmed) {
+                const diasEspecialidad = await promptSpecialtyDays(groupName, currentPlannerData?.dias_preferidos_especialidad || []);
+                if (!diasEspecialidad) return;
+
                 const btn = DOMElements.groupAutoAssignBtn;
                 btn.classList.add('loading', 'btn-disabled');
                 Swal.fire({ title: 'Procesando...', text: 'Optimizando horario del grupo...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
                 try {
-                    const data = await callApi('/api/generar-horario-automatico/', 'POST', { grupo_id: currentPlannerData.grupo_id });
+                    const data = await callApi('/api/generar-horario-automatico/', 'POST', {
+                        grupo_id: currentPlannerData.grupo_id,
+                        dias_especialidad: diasEspecialidad
+                    });
                     Swal.close();
                     Swal.fire({ title: '¡Grupo Completado!', text: data.message, icon: 'success' });
                     loadPlannerData();
@@ -678,6 +688,50 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
         });
+    }
+
+    async function promptSpecialtyDays(scopeLabel, preselectedDays = []) {
+        const checkboxHtml = WEEK_DAYS.map((day) => `
+            <label class="flex items-center gap-3 p-3 rounded-lg border border-base-300 hover:border-primary cursor-pointer">
+                <input type="checkbox" class="checkbox checkbox-primary specialty-day-checkbox" value="${day}" ${preselectedDays.includes(day) ? 'checked' : ''}>
+                <span class="font-medium">${day}</span>
+            </label>
+        `).join('');
+
+        const result = await Swal.fire({
+            title: 'Días para Especialidad',
+            html: `
+                <div class="text-left space-y-3">
+                    <p class="text-sm">
+                        Elige exactamente <strong>2 días</strong> en los que se programarán los cursos de especialidad para <strong>${scopeLabel}</strong>.
+                    </p>
+                    <div class="grid grid-cols-1 gap-2 mt-3">
+                        ${checkboxHtml}
+                    </div>
+                    <p class="text-xs text-base-content/60">
+                        Ejemplo: Lunes y Viernes, o Martes y Jueves.
+                    </p>
+                </div>
+            `,
+            width: '34rem',
+            showCancelButton: true,
+            confirmButtonText: 'Usar estos días',
+            cancelButtonText: 'Cancelar',
+            focusConfirm: false,
+            preConfirm: () => {
+                const selected = Array.from(document.querySelectorAll('.specialty-day-checkbox:checked'))
+                    .map((input) => input.value);
+
+                if (selected.length !== 2) {
+                    Swal.showValidationMessage('Selecciona exactamente 2 días.');
+                    return false;
+                }
+
+                return selected;
+            }
+        });
+
+        return result.isConfirmed ? result.value : null;
     }
 
     if (DOMElements.toggleGeneralEdit) {

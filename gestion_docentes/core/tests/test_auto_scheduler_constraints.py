@@ -1,7 +1,7 @@
 from datetime import time
 from django.test import TestCase
 from django.db import models
-from core.models import BloqueHorario, Curso, FranjaHoraria, Semestre, Carrera, Especialidad, Grupo, Docente, BloqueNoLectivo, Aula
+from core.models import BloqueHorario, ConfiguracionInstitucion, Curso, FranjaHoraria, Semestre, Carrera, Especialidad, Grupo, Docente, BloqueNoLectivo, Aula
 from core.api.views.planner import generar_horario_automatico
 from django.test.client import RequestFactory
 from django.contrib.auth.models import AnonymousUser
@@ -21,6 +21,13 @@ class AutoSchedulerConstraintsTests(TestCase):
         self.especialidad = Especialidad.objects.create(nombre="Sistemas", grupo=self.grupo_a)
         self.docente = Docente.objects.create(username="docente_auto", dni="33333333", first_name="Juan", last_name="Auto", disponibilidad="MANANA")
         self.admin = Docente.objects.create(username="admin", dni="99999999", is_staff=True)
+        self.config = ConfiguracionInstitucion.objects.create(
+            nombre_institucion="Test Scheduler",
+            logo="configuracion/test.png",
+            max_horas_diarias_docente=10,
+            max_horas_diarias_especialidad=10,
+            max_bloques_consecutivos_docente=5,
+        )
 
         # Create many time slots (10 slots)
         self.franjas = []
@@ -95,8 +102,8 @@ class AutoSchedulerConstraintsTests(TestCase):
 
     def test_auto_scheduler_respects_daily_limits(self):
         """
-        Create a course with enough hours that it MIGHT try to stack them.
-        Ensure no day has > 8 hours for teacher.
+        Create a course with enough hours that forces a dense schedule.
+        Ensure the generator still respects daily and consecutive-load limits.
         """
         # 40 hours/week course (extreme case)
         self.curso_pesado.horas_academicas_semanales = 40
@@ -112,11 +119,35 @@ class AutoSchedulerConstraintsTests(TestCase):
         response = generar_horario_automatico(request)
         self.assertEqual(response.status_code, 200)
 
-        # Check max daily hours
         for dia in ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]:
-            horas = BloqueHorario.objects.filter(
-                curso__docente=self.docente,
-                dia=dia
-            ).aggregate(total=models.Sum("duracion_bloques"))["total"] or 0
+            bloques_dia = list(
+                BloqueHorario.objects.filter(
+                    curso__docente=self.docente,
+                    dia=dia
+                ).order_by("franja_inicio__hora_inicio")
+            )
 
-            self.assertLessEqual(horas, 8, f"Teacher daily limit exceeded on {dia}: {horas}")
+            horas = sum(b.duracion_bloques for b in bloques_dia)
+            self.assertLessEqual(horas, 10, f"Teacher daily limit exceeded on {dia}: {horas}")
+
+            slots = []
+            for bloque in bloques_dia:
+                start_idx = self.franjas.index(bloque.franja_inicio)
+                slots.extend(range(start_idx, start_idx + bloque.duracion_bloques))
+
+            max_consecutive = 0
+            current = 0
+            prev = None
+            for slot in sorted(slots):
+                if prev is not None and slot == prev + 1:
+                    current += 1
+                else:
+                    current = 1
+                prev = slot
+                max_consecutive = max(max_consecutive, current)
+
+            self.assertLessEqual(
+                max_consecutive,
+                self.config.max_bloques_consecutivos_docente,
+                f"Teacher consecutive limit exceeded on {dia}: {max_consecutive}",
+            )

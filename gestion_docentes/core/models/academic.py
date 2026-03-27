@@ -3,9 +3,31 @@ from django.db import models
 
 class Grupo(models.Model):
     nombre = models.CharField(max_length=100, help_text="Ej: Grupo A, Grupo B, Grupo C")
+    dia_preferido_especialidad_1 = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        help_text="Primer día preferido para programar cursos de especialidad.",
+    )
+    dia_preferido_especialidad_2 = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        help_text="Segundo día preferido para programar cursos de especialidad.",
+    )
 
     def __str__(self):
         return self.nombre
+
+    def get_dias_preferidos_especialidad(self):
+        return [
+            dia
+            for dia in [
+                self.dia_preferido_especialidad_1,
+                self.dia_preferido_especialidad_2,
+            ]
+            if dia
+        ]
 
 
 class Carrera(models.Model):

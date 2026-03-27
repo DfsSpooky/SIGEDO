@@ -50,6 +50,18 @@ class ConfiguracionInstitucion(models.Model):
         default="23:00",
         help_text="Hora hasta la cual se permite marcar la Entrada General.",
     )
+    max_horas_diarias_docente = models.PositiveIntegerField(
+        default=10,
+        help_text="Máximo de bloques que un docente puede dictar por día en el planificador.",
+    )
+    max_horas_diarias_especialidad = models.PositiveIntegerField(
+        default=10,
+        help_text="Máximo de bloques que una especialidad/grupo de estudiantes puede llevar por día en el planificador.",
+    )
+    max_bloques_consecutivos_docente = models.PositiveIntegerField(
+        default=5,
+        help_text="Máximo de bloques consecutivos que un docente puede dictar sin descanso en el planificador.",
+    )
 
     class Meta:
         verbose_name = "Configuración de la Institución"
@@ -62,8 +74,22 @@ class ConfiguracionInstitucion(models.Model):
     def load(cls):
         obj = cls.objects.first()
         if obj is None:
-            obj = cls.objects.create(nombre_institucion="Mi Institución")
+            obj = cls(
+                nombre_institucion="Mi Institución",
+                max_horas_diarias_docente=10,
+                max_horas_diarias_especialidad=10,
+                max_bloques_consecutivos_docente=5,
+            )
         return obj
+
+    @classmethod
+    def get_scheduler_limits(cls):
+        config = cls.objects.first()
+        return {
+            "max_horas_diarias_docente": getattr(config, "max_horas_diarias_docente", 10) or 10,
+            "max_horas_diarias_especialidad": getattr(config, "max_horas_diarias_especialidad", 10) or 10,
+            "max_bloques_consecutivos_docente": getattr(config, "max_bloques_consecutivos_docente", 5) or 5,
+        }
 
     def validar_ubicacion(self, lat, lng):
         """

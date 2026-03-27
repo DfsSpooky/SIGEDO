@@ -1,78 +1,52 @@
-# Guía de Despliegue de Actualizaciones
+# Despliegue en Docker detrás de Hestia
 
-Esta guía describe los pasos necesarios para desplegar y actualizar la aplicación en el servidor de producción.
+Este proyecto queda pensado para:
 
-## Prerrequisitos
+- Docker en el VPS
+- Hestia como panel del dominio y SSL
+- `nginx + apache` en Hestia
+- reverse proxy desde Hestia hacia `127.0.0.1:8000`
+- `static` y `media` persistidos en el `public_html` del usuario `sigedo`
 
-- Acceso SSH al servidor.
-- Docker y Docker Compose instalados.
-- Estar en el directorio raíz del proyecto.
+## Arquitectura
 
-## 🔒 Manejo de Archivos Sensibles (Secretos)
-
-**IMPORTANTE**: Por seguridad, los siguientes archivos **NO se guardan en el repositorio** y deben crearse o subirse manualmente al servidor antes de iniciar:
-
-1.  **`.env`**: Variables de entorno (Base de datos, claves secretas).
-2.  **`serviceAccountKey.json`**: Credenciales de Firebase.
-
-### ¿Cómo subirlos?
-
-Si estás en tu máquina local y necesitas enviarlos al servidor (VPS), usa `scp`:
-
-```bash
-# Ejemplo para subir el .env
-scp .env usuario@tu-servidor-ip:/ruta/al/proyecto/.env
-
-# Ejemplo para subir la llave de Firebase
-scp serviceAccountKey.json usuario@tu-servidor-ip:/ruta/al/proyecto/serviceAccountKey.json
+```text
+Internet
+  -> Hestia Nginx/SSL
+  -> proxy_pass 127.0.0.1:8000
+  -> contenedor web (Daphne / Django ASGI)
+  -> contenedor db (PostgreSQL)
+  -> contenedor redis
 ```
 
-Una vez que los archivos estén en la carpeta del proyecto en el servidor, **Docker los detectará automáticamente** porque usamos "volúmenes" en `docker-compose.yml`.
+Los archivos:
 
----
+- `static` se escriben en `/home/sigedo/web/sigedo.ddnsgeek.com/public_html/static`
+- `media` se escriben en `/home/sigedo/web/sigedo.ddnsgeek.com/public_html/media`
 
-## Pasos para el Despliegue / Actualización
+## Archivos de apoyo
 
-### 1. Obtener los Últimos Cambios del Código
+- env base: [`.env.example`](/Users/miguel/Documents/GitHub/SIGEDO/.env.example)
+- env producción Hestia: [`.env.hestia.example`](/Users/miguel/Documents/GitHub/SIGEDO/.env.hestia.example)
+- compose producción: [`docker-compose.prod.yml`](/Users/miguel/Documents/GitHub/SIGEDO/docker-compose.prod.yml)
+- checklist operativo: [HESTIA_CHECKLIST.md](/Users/miguel/Documents/GitHub/SIGEDO/HESTIA_CHECKLIST.md)
 
-```bash
-git pull origin main
-```
-
-### 2. Verificar Archivos Secretos
-Asegúrate de que `.env` y `serviceAccountKey.json` existan en la carpeta actual.
-```bash
-ls -la .env serviceAccountKey.json
-```
-
-### 3. Construir y Levantar Contenedores
+## Comando principal
 
 ```bash
-# Construye las imágenes (sin incluir los secretos dentro de la imagen)
-docker-compose build
-
-# Levanta los servicios (montando los secretos desde la carpeta actual)
-docker-compose up -d
+docker compose -f docker-compose.prod.yml --env-file .env up -d --build
 ```
 
-### 4. Tareas de Mantenimiento (Solo si es necesario)
-
-Si hubo cambios en dependencias o base de datos:
+## Validaciones recomendadas
 
 ```bash
-# Instalar nuevas dependencias
-docker-compose exec web pip install -r requirements.txt
-
-# Ejecutar migraciones
-docker-compose exec web python gestion_docentes/manage.py migrate
-
-# Recopilar archivos estáticos
-docker-compose exec web python gestion_docentes/manage.py collectstatic --noinput
-
-# Reiniciar para aplicar cambios
-docker-compose restart web
+docker compose -f docker-compose.prod.yml --env-file .env ps
+curl -I http://127.0.0.1:8000/health/
+curl -I https://sigedo.ddnsgeek.com/health/
 ```
 
----
-**Nota sobre Docker y Archivos Ignorados**:
-Aunque `.dockerignore` evita que estos archivos se "quemen" dentro de la imagen durante el `build`, el archivo `docker-compose.yml` tiene una configuración de volúmenes (`volumes: - .:/app`) que "monta" tu carpeta actual dentro del contenedor al arrancar. Por eso, basta con que los archivos existan en tu servidor para que funcionen.
+## Observaciones
+
+- Hestia sirve el dominio; Docker no necesita exponer puertos públicos distintos.
+- El template nginx de Hestia debe manejar `/static/`, `/media/` y el proxy a `127.0.0.1:8000`.
+- Si cambias credenciales o `.env`, reinicia con `docker compose ... up -d`.
