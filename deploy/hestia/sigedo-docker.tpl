@@ -1,13 +1,11 @@
 #=========================================================================#
-# Hestia Nginx Template - Docker reverse proxy for SIGEDO                 #
-# Domain: sigedo.ddnsgeek.com                                             #
+# Hestia Nginx Template - SIGEDO Docker proxy                             #
+# Todo el tráfico (incl. /static/ y /media/) va al nginx de Docker        #
 # Copies go to: /usr/local/hestia/data/templates/web/nginx/               #
 #=========================================================================#
 server {
     listen      %ip%:%web_port%;
     server_name %domain_idn% %alias_idn%;
-    root        %docroot%;
-    index       index.html index.htm;
 
     access_log  /var/log/nginx/domains/%domain%.log combined;
     access_log  /var/log/nginx/domains/%domain%.bytes bytes;
@@ -18,20 +16,6 @@ server {
     location ~ /\.(?!well-known\/) {
         deny all;
         return 404;
-    }
-
-    location /static/ {
-        alias %docroot%/static/;
-        access_log off;
-        expires 30d;
-        add_header Cache-Control "public, immutable";
-    }
-
-    location /media/ {
-        alias %docroot%/media/;
-        access_log off;
-        expires 7d;
-        add_header Cache-Control "public";
     }
 
     location / {
