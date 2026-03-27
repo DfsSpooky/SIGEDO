@@ -45,14 +45,6 @@ if [ ! -f "$ENV_FILE" ]; then
     exit 1
 fi
 
-# --- Firebase: crear dummy si no existe ---
-FIREBASE_KEY=$(grep "^HOST_FIREBASE_KEY=" "$ENV_FILE" | cut -d= -f2)
-if [ -n "$FIREBASE_KEY" ] && [ ! -f "$FIREBASE_KEY" ]; then
-    echo "[i] Firebase key no encontrada en $FIREBASE_KEY — creando dummy..."
-    mkdir -p "$(dirname "$FIREBASE_KEY")"
-    echo '{"type":"service_account"}' > "$FIREBASE_KEY"
-    chmod 600 "$FIREBASE_KEY"
-fi
 
 # --- Levantar Docker ---
 echo "[1/3] Construyendo e iniciando contenedores..."

@@ -21,7 +21,6 @@ services:
     volumes:
       - static_data:/app/public_html/static
       - media_data:/app/public_html/media
-      - ${HOST_FIREBASE_KEY:-/home/sigedo/.secrets/serviceAccountKey.json}:/run/secrets/serviceAccountKey.json:ro
     depends_on:
       db:
         condition: service_healthy
