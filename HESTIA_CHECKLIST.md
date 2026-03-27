@@ -7,7 +7,7 @@ Escenario objetivo:
 - usuario web de Hestia: `sigedo`
 - dominio: `sigedo.ddnsgeek.com`
 - Hestia usa `nginx + apache`
-- Docker corre SIGEDO y Hestia hace reverse proxy al puerto `127.0.0.1:8000`
+- Docker corre SIGEDO y Hestia hace reverse proxy al puerto `127.0.0.1:8010`
 
 ## Rutas recomendadas
 
@@ -61,7 +61,7 @@ docker compose -f docker-compose.prod.yml --env-file .env up -d --build
 ## Verificación
 
 ```bash
-curl -I http://127.0.0.1:8000/health/
+curl -I http://127.0.0.1:8010/health/
 curl -I https://sigedo.ddnsgeek.com/health/
 docker compose -f /home/debian/SIGEDO/docker-compose.prod.yml --env-file /home/debian/SIGEDO/.env ps
 ```
@@ -69,6 +69,6 @@ docker compose -f /home/debian/SIGEDO/docker-compose.prod.yml --env-file /home/d
 ## Notas importantes
 
 - Hestia seguirá manejando SSL y el dominio.
-- Docker no expone nada público salvo `127.0.0.1:8000`.
+- Docker no expone nada público salvo `127.0.0.1:8010`.
 - `static` y `media` quedan en `public_html`, por eso Hestia puede servirlos con permisos del usuario web `sigedo`.
 - websockets quedan cubiertos por el template nginx porque se envían headers `Upgrade` y `Connection`.

@@ -6,7 +6,7 @@ services:
     restart: unless-stopped
     command: ["daphne", "-b", "0.0.0.0", "-p", "8000", "gestion_docentes.asgi:application"]
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:8010:8000"
     volumes:
       - ${HOST_STATIC_DIR}:/app/public_html/static
       - ${HOST_MEDIA_DIR}:/app/public_html/media

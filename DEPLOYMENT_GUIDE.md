@@ -5,7 +5,7 @@ Este proyecto queda pensado para:
 - Docker en el VPS
 - Hestia como panel del dominio y SSL
 - `nginx + apache` en Hestia
-- reverse proxy desde Hestia hacia `127.0.0.1:8000`
+- reverse proxy desde Hestia hacia `127.0.0.1:8010`
 - `static` y `media` persistidos en el `public_html` del usuario `sigedo`
 
 ## Arquitectura
@@ -13,7 +13,7 @@ Este proyecto queda pensado para:
 ```text
 Internet
   -> Hestia Nginx/SSL
-  -> proxy_pass 127.0.0.1:8000
+  -> proxy_pass 127.0.0.1:8010
   -> contenedor web (Daphne / Django ASGI)
   -> contenedor db (PostgreSQL)
   -> contenedor redis
@@ -41,12 +41,12 @@ docker compose -f docker-compose.prod.yml --env-file .env up -d --build
 
 ```bash
 docker compose -f docker-compose.prod.yml --env-file .env ps
-curl -I http://127.0.0.1:8000/health/
+curl -I http://127.0.0.1:8010/health/
 curl -I https://sigedo.ddnsgeek.com/health/
 ```
 
 ## Observaciones
 
 - Hestia sirve el dominio; Docker no necesita exponer puertos públicos distintos.
-- El template nginx de Hestia debe manejar `/static/`, `/media/` y el proxy a `127.0.0.1:8000`.
+- El template nginx de Hestia debe manejar `/static/`, `/media/` y el proxy a `127.0.0.1:8010`.
 - Si cambias credenciales o `.env`, reinicia con `docker compose ... up -d`.
