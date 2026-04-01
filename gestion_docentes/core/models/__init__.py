@@ -1,5 +1,6 @@
 from .academic import Carrera, Curso, Especialidad, Grupo, Semestre
 from .attendance import AdelantoClase, Asistencia, AsistenciaDiaria, Justificacion, TipoJustificacion, RecuperacionClase
+from .backups import RespaldoSistema
 from .communication import Anuncio, Notificacion
 from .documents import Documento, TipoDocumento, VersionDocumento
 from .inventory import Activo, Reserva, TipoActivo

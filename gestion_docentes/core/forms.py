@@ -5,8 +5,7 @@ from .models import (
     Docente,
     Documento,
     Justificacion,
-    SolicitudIntercambio,
-    TipoJustificacion,
+    RespaldoSistema,
     SolicitudIntercambio,
     TipoJustificacion,
     VersionDocumento,
@@ -129,3 +128,20 @@ class RecuperacionClaseForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if docente:
             self.fields['curso'].queryset = Curso.objects.filter(docente=docente)
+
+
+class RespaldoSistemaAdminForm(forms.ModelForm):
+    class Meta:
+        model = RespaldoSistema
+        fields = ["nombre", "descripcion", "archivo"]
+
+    def clean_archivo(self):
+        archivo = self.cleaned_data.get("archivo")
+        if archivo:
+            extension = archivo.name.lower().rsplit(".", 1)[-1] if "." in archivo.name else ""
+            permitidos = {"dump", "backup", "sql", "sqlite3", "db"}
+            if extension not in permitidos:
+                raise forms.ValidationError(
+                    "Solo se permiten archivos .dump, .backup, .sql, .sqlite3 o .db."
+                )
+        return archivo

@@ -17,6 +17,7 @@ from pathlib import Path
 
 from django.templatetags.static import static
 from django.urls import reverse_lazy
+from django.utils.translation import gettext_lazy as _
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -254,11 +255,17 @@ AUTHENTICATION_BACKENDS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = "es-pe"
+LANGUAGE_CODE = "es"
+
+LANGUAGES = (
+    ("es", _("Español")),
+)
 
 TIME_ZONE = "America/Lima"
 
 USE_I18N = True
+
+LOCALE_PATHS = [BASE_DIR / "locale"]
 
 USE_TZ = True
 
@@ -391,7 +398,7 @@ UNFOLD = {
                 "title": "Principal",
                 "items": [
                     {
-                        "title": "Dashboard",
+                        "title": "Panel principal",
                         "icon": "dashboard",
                         "link": reverse_lazy("admin:index"),
                     },
@@ -559,6 +566,13 @@ UNFOLD = {
                 "title": "Configuración",
                 "icon": "settings",
                 "items": [
+                    {
+                        "title": "Respaldos del Sistema",
+                        "icon": "backup",
+                        "link": reverse_lazy(
+                            "admin:core_respaldosistema_changelist"
+                        ),
+                    },
                     {
                         "title": "Configuración de la Institución",
                         "icon": "settings_applications",

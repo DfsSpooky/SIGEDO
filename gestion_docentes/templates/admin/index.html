@@ -1,129 +1,366 @@
 {% extends "unfold/layouts/base.html" %}
 {% load i18n unfold %}
 
-{% block title %}{% trans "Dashboard" %} | {{ site_title }}{% endblock %}
+{% block title %}Panel principal | {{ site_title }}{% endblock %}
 
 {% block content %}
-<div class="p-6">
-    <!-- Header -->
-    <div class="mb-8">
-        <h1 class="text-3xl font-bold">{% trans "Dashboard Principal" %}</h1>
-        <p class="text-gray-500">Resumen del estado del sistema para el semestre: <strong>{{ semestre_nombre }}</strong></p>
-    </div>
+<style>
+    .admin-dashboard {
+        --dash-hero-bg: radial-gradient(circle at top left, rgba(14, 165, 233, 0.22), transparent 32%),
+            radial-gradient(circle at top right, rgba(16, 185, 129, 0.18), transparent 28%),
+            linear-gradient(135deg, #0f172a 0%, #111827 52%, #1e293b 100%);
+        --dash-card-border: rgba(148, 163, 184, 0.18);
+        --dash-soft-bg: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,250,252,0.92));
+    }
 
-    <!-- KPIs -->
-    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-        {% for kpi in tracker_data %}
-            <a href="{{ kpi.link }}" class="block p-6 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                        {% with kpi.color as color %}
-                            {% if color == 'primary' %}<div class="bg-blue-100 text-blue-600 p-3 rounded-full">{% endif %}
-                            {% if color == 'success' %}<div class="bg-green-100 text-green-600 p-3 rounded-full">{% endif %}
-                            {% if color == 'warning' %}<div class="bg-yellow-100 text-yellow-600 p-3 rounded-full">{% endif %}
-                            {% if color == 'danger' %}<div class="bg-red-100 text-red-600 p-3 rounded-full">{% endif %}
-                                {% component "unfold/components/icon.html" with name=kpi.icon class="w-6 h-6" %}{% endcomponent %}
-                            </div>
-                        {% endwith %}
+    .admin-dashboard .hero-panel {
+        position: relative;
+        overflow: hidden;
+        border-radius: 1.75rem;
+        background: var(--dash-hero-bg);
+        color: #fff;
+        padding: 2rem;
+        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+    }
+
+    .admin-dashboard .hero-panel::after {
+        content: "";
+        position: absolute;
+        inset: auto -3rem -3rem auto;
+        width: 14rem;
+        height: 14rem;
+        border-radius: 9999px;
+        background: rgba(255, 255, 255, 0.08);
+        filter: blur(8px);
+    }
+
+    .admin-dashboard .hero-kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: .5rem;
+        padding: .45rem .8rem;
+        border-radius: 9999px;
+        background: rgba(255,255,255,.1);
+        color: rgba(255,255,255,.92);
+        font-size: .78rem;
+        font-weight: 700;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+    }
+
+    .admin-dashboard .glass-card {
+        border: 1px solid var(--dash-card-border);
+        background: rgba(255,255,255,.08);
+        backdrop-filter: blur(10px);
+        border-radius: 1.25rem;
+    }
+
+    .admin-dashboard .summary-card {
+        border-radius: 1.25rem;
+        border: 1px solid rgba(226, 232, 240, 0.9);
+        background: var(--dash-soft-bg);
+        padding: 1rem 1.1rem;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+    }
+
+    .admin-dashboard .metric-card {
+        position: relative;
+        overflow: hidden;
+        border-radius: 1.4rem;
+        border: 1px solid rgba(226, 232, 240, .95);
+        background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.95));
+        box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
+        transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+    }
+
+    .admin-dashboard .metric-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 24px 46px rgba(15, 23, 42, 0.12);
+    }
+
+    .admin-dashboard .metric-orb {
+        width: 3.25rem;
+        height: 3.25rem;
+        border-radius: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.4);
+    }
+
+    .admin-dashboard .metric-primary .metric-orb { background: linear-gradient(135deg, #dbeafe, #bfdbfe); color: #1d4ed8; }
+    .admin-dashboard .metric-success .metric-orb { background: linear-gradient(135deg, #dcfce7, #bbf7d0); color: #15803d; }
+    .admin-dashboard .metric-warning .metric-orb { background: linear-gradient(135deg, #fef3c7, #fde68a); color: #b45309; }
+    .admin-dashboard .metric-danger .metric-orb { background: linear-gradient(135deg, #fee2e2, #fecaca); color: #b91c1c; }
+
+    .admin-dashboard .section-card {
+        border-radius: 1.5rem;
+        border: 1px solid rgba(226, 232, 240, 0.95);
+        background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.96));
+        box-shadow: 0 18px 44px rgba(15, 23, 42, 0.08);
+    }
+
+    .admin-dashboard .soft-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: .4rem;
+        padding: .45rem .75rem;
+        border-radius: 9999px;
+        font-size: .78rem;
+        font-weight: 700;
+    }
+
+    .admin-dashboard .soft-pill.slate { background: #e2e8f0; color: #334155; }
+    .admin-dashboard .soft-pill.blue { background: #dbeafe; color: #1d4ed8; }
+    .admin-dashboard .soft-pill.amber { background: #fef3c7; color: #b45309; }
+
+    .admin-dashboard .quick-link {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1rem 1.1rem;
+        border-radius: 1rem;
+        border: 1px solid rgba(226,232,240,.9);
+        background: #fff;
+        transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+    }
+
+    .admin-dashboard .quick-link:hover {
+        transform: translateY(-2px);
+        border-color: #cbd5e1;
+        box-shadow: 0 16px 32px rgba(15, 23, 42, 0.08);
+    }
+
+    .admin-dashboard .activity-card {
+        display: block;
+        border-radius: 1.15rem;
+        border: 1px solid rgba(226, 232, 240, 0.95);
+        background: linear-gradient(180deg, #ffffff, #f8fafc);
+        padding: 1rem 1.05rem;
+        transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+    }
+
+    .admin-dashboard .activity-card:hover {
+        transform: translateY(-2px);
+        border-color: #cbd5e1;
+        box-shadow: 0 16px 34px rgba(15, 23, 42, 0.09);
+    }
+
+    .admin-dashboard .activity-icon {
+        width: 2.8rem;
+        height: 2.8rem;
+        border-radius: .9rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .admin-dashboard .activity-doc .activity-icon {
+        background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+        color: #1d4ed8;
+    }
+
+    .admin-dashboard .activity-just .activity-icon {
+        background: linear-gradient(135deg, #fef3c7, #fde68a);
+        color: #b45309;
+    }
+
+    .admin-dashboard .mini-stat {
+        border-radius: 1rem;
+        border: 1px solid rgba(226, 232, 240, .95);
+        background: #fff;
+        padding: .9rem 1rem;
+    }
+</style>
+
+<div class="admin-dashboard space-y-8 p-6">
+    <section class="hero-panel">
+        <div class="grid gap-8 xl:grid-cols-[1.5fr_.9fr] items-start">
+            <div class="space-y-5">
+                <span class="hero-kicker">
+                    {% component "unfold/components/icon.html" with name="space_dashboard" class="w-4 h-4" %}{% endcomponent %}
+                    Centro de control
+                </span>
+
+                <div class="space-y-3">
+                    <h1 class="text-4xl font-bold tracking-tight">
+                        Dashboard ejecutivo de {{ nombre_institucion }}
+                    </h1>
+                    <p class="max-w-3xl text-base text-white/80 leading-7">
+                        Vista rápida del estado operativo del sistema, con foco en carga académica,
+                        revisión documental y gestión pendiente del semestre actual.
+                    </p>
+                </div>
+
+                <div class="grid gap-3 sm:grid-cols-3">
+                    {% for item in summary_cards %}
+                    <div class="glass-card p-4">
+                        <div class="soft-pill {{ item.tone }}">{{ item.label }}</div>
+                        <div class="mt-4 text-lg font-semibold">{{ item.value }}</div>
                     </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-500 truncate">{{ kpi.title }}</p>
-                        <p class="text-2xl font-bold text-gray-900">{{ kpi.metric }}</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="section-card p-6">
+                <div class="flex items-center justify-between gap-3">
+                    <div>
+                        <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Acciones rápidas</p>
+                        <h2 class="mt-1 text-2xl font-bold text-slate-900">Operaciones frecuentes</h2>
+                    </div>
+                    <span class="soft-pill blue">Admin</span>
+                </div>
+
+                <div class="mt-5 space-y-3">
+                    {% url 'admin:core_docente_add' as add_docente_url %}
+                    <a href="{{ add_docente_url }}" class="quick-link">
+                        <div>
+                            <p class="font-semibold text-slate-900">Registrar docente</p>
+                            <p class="text-sm text-slate-500">Alta rápida de personal docente.</p>
+                        </div>
+                        {% component "unfold/components/icon.html" with name="person_add" class="w-5 h-5 text-slate-400" %}{% endcomponent %}
+                    </a>
+
+                    {% url 'admin:core_curso_add' as add_curso_url %}
+                    <a href="{{ add_curso_url }}" class="quick-link">
+                        <div>
+                            <p class="font-semibold text-slate-900">Crear curso</p>
+                            <p class="text-sm text-slate-500">Carga académica para el semestre.</p>
+                        </div>
+                        {% component "unfold/components/icon.html" with name="library_add" class="w-5 h-5 text-slate-400" %}{% endcomponent %}
+                    </a>
+
+                    {% url 'admin:core_anuncio_add' as add_anuncio_url %}
+                    <a href="{{ add_anuncio_url }}" class="quick-link">
+                        <div>
+                            <p class="font-semibold text-slate-900">Publicar anuncio</p>
+                            <p class="text-sm text-slate-500">Comunicación inmediata al personal.</p>
+                        </div>
+                        {% component "unfold/components/icon.html" with name="campaign" class="w-5 h-5 text-slate-400" %}{% endcomponent %}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="grid grid-cols-1 gap-6 xl:grid-cols-4">
+        {% for kpi in tracker_data %}
+        <a href="{{ kpi.link }}" class="metric-card metric-{{ kpi.color }} block p-6">
+            <div class="flex items-start justify-between gap-4">
+                <div class="space-y-3">
+                    <p class="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">{{ kpi.title }}</p>
+                    <p class="text-4xl font-bold tracking-tight text-slate-950">{{ kpi.metric }}</p>
+                    <p class="text-sm leading-6 text-slate-500">{{ kpi.description }}</p>
+                </div>
+                <div class="metric-orb">
+                    {% component "unfold/components/icon.html" with name=kpi.icon class="w-6 h-6" %}{% endcomponent %}
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </section>
+
+    <section class="grid grid-cols-1 gap-8 xl:grid-cols-[1.15fr_.85fr]">
+        <div class="section-card p-6">
+            <div class="flex items-center justify-between gap-3">
+                <div>
+                    <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Monitoreo documental</p>
+                    <h2 class="mt-1 text-2xl font-bold text-slate-900">Últimos documentos pendientes</h2>
+                </div>
+                <a href="{% url 'admin:core_documento_changelist' %}" class="soft-pill blue">Ver todos</a>
+            </div>
+
+            <div class="mt-6 grid gap-4 md:grid-cols-2">
+                {% for doc in ultimos_documentos %}
+                <a href="{% url 'admin:core_documento_change' doc.pk %}" class="activity-card activity-doc">
+                    <div class="flex items-start gap-4">
+                        <div class="activity-icon">
+                            {% component "unfold/components/icon.html" with name="description" class="w-5 h-5" %}{% endcomponent %}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-start justify-between gap-3">
+                                <p class="font-semibold text-slate-900 leading-6">{{ doc.titulo }}</p>
+                                <span class="soft-pill blue">Revisar</span>
+                            </div>
+                            <p class="mt-2 text-sm text-slate-500">{{ doc.docente.get_full_name }}</p>
+                            <div class="mt-4 flex items-center justify-between gap-2 text-xs text-slate-400">
+                                <span>Subido el {{ doc.fecha_subida|date:"d/m/Y" }}</span>
+                                <span class="soft-pill slate">{{ doc.get_estado_display }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+                {% empty %}
+                <div class="md:col-span-2 rounded-2xl border border-dashed border-slate-200 px-4 py-12 text-center text-slate-500">
+                    No hay documentos pendientes por revisar.
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="space-y-8">
+            <div class="section-card p-6">
+                <div class="flex items-center justify-between gap-3">
+                    <div>
+                        <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Justificaciones</p>
+                        <h2 class="mt-1 text-2xl font-bold text-slate-900">Solicitudes recientes</h2>
+                    </div>
+                    <a href="{% url 'admin:core_justificacion_changelist' %}" class="soft-pill amber">Pendientes</a>
+                </div>
+
+                <div class="mt-5 space-y-3">
+                    {% for just in ultimas_justificaciones %}
+                    <a href="{% url 'admin:core_justificacion_change' just.pk %}" class="activity-card activity-just">
+                        <div class="flex items-start gap-4">
+                            <div class="activity-icon">
+                                {% component "unfold/components/icon.html" with name="assignment_late" class="w-5 h-5" %}{% endcomponent %}
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div>
+                                        <p class="font-semibold text-slate-900">{{ just.docente.get_full_name }}</p>
+                                        <p class="text-sm text-slate-500">{{ just.tipo.nombre }}</p>
+                                    </div>
+                                    <span class="soft-pill amber">Pendiente</span>
+                                </div>
+                                <p class="mt-3 text-xs text-slate-400">{{ just.fecha_inicio|date:"d/m" }} - {{ just.fecha_fin|date:"d/m/Y" }}</p>
+                            </div>
+                        </div>
+                    </a>
+                    {% empty %}
+                    <div class="rounded-2xl border border-dashed border-slate-200 px-4 py-10 text-center text-slate-500">
+                        No hay justificaciones pendientes.
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="section-card p-6">
+                <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Estado general</p>
+                <h2 class="mt-1 text-2xl font-bold text-slate-900">Lectura rápida del sistema</h2>
+
+                <div class="mt-5 space-y-4">
+                    <div class="mini-stat">
+                        <p class="text-sm text-slate-500">Semestre operativo</p>
+                        <p class="mt-1 text-lg font-semibold text-slate-900">{{ semestre_nombre }}</p>
+                    </div>
+                    <div class="mini-stat">
+                        <p class="text-sm text-slate-500">Pendientes críticos</p>
+                        <p class="mt-1 text-lg font-semibold text-slate-900">
+                            {{ tracker_data.2.metric }} documentos y {{ tracker_data.3.metric }} justificaciones
+                        </p>
+                    </div>
+                    <div class="mini-stat">
+                        <p class="text-sm text-slate-500">Cobertura académica</p>
+                        <p class="mt-1 text-lg font-semibold text-slate-900">
+                            {{ tracker_data.1.metric }} cursos registrados para gestión.
+                        </p>
                     </div>
                 </div>
-            </a>
-        {% endfor %}
-    </div>
-
-    <!-- Quick Actions -->
-    <div class="my-8">
-        <h2 class="text-2xl font-semibold mb-4">Acciones Rápidas</h2>
-        <div class="flex flex-wrap gap-4">
-            {% url 'admin:core_docente_add' as add_docente_url %}
-            {% component "unfold/components/button.html" with title="Nuevo Docente" href=add_docente_url icon="person_add" class="bg-primary text-white" %}
-            {% endcomponent %}
-
-            {% url 'admin:core_curso_add' as add_curso_url %}
-            {% component "unfold/components/button.html" with title="Nuevo Curso" href=add_curso_url icon="add_box" class="bg-secondary text-white" %}
-            {% endcomponent %}
-
-            {% url 'admin:core_anuncio_add' as add_anuncio_url %}
-            {% component "unfold/components/button.html" with title="Nuevo Anuncio" href=add_anuncio_url icon="campaign" class="bg-accent text-white" %}
-            {% endcomponent %}
+            </div>
         </div>
-    </div>
-
-    <!-- Tables for recent activity -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <!-- Recent Documents Card -->
-        {% component "unfold/components/card.html" with title="Últimos Documentos Pendientes" %}
-            <div class="overflow-x-auto">
-                <table class="table w-full">
-                    <thead>
-                        <tr>
-                            <th>Título</th>
-                            <th>Docente</th>
-                            <th>Fecha</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for doc in ultimos_documentos %}
-                        <tr>
-                            <td>{{ doc.titulo }}</td>
-                            <td>{{ doc.docente.get_full_name }}</td>
-                            <td>{{ doc.fecha_subida|date:"d/m/Y" }}</td>
-                            <td>
-                                <a href="{% url 'admin:core_documento_change' doc.pk %}" class="btn btn-xs btn-outline">Revisar</a>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="4" class="text-center py-8 text-gray-500">
-                                <i class="fas fa-check-circle fa-2x mb-2"></i>
-                                <p>No hay documentos pendientes.</p>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% endcomponent %}
-
-        <!-- Recent Justifications Card -->
-        {% component "unfold/components/card.html" with title="Últimas Justificaciones Pendientes" %}
-            <div class="overflow-x-auto">
-                <table class="table w-full">
-                    <thead>
-                        <tr>
-                            <th>Docente</th>
-                            <th>Tipo</th>
-                            <th>Fechas</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for just in ultimas_justificaciones %}
-                        <tr>
-                            <td>{{ just.docente.get_full_name }}</td>
-                            <td>{{ just.tipo.nombre }}</td>
-                            <td>{{ just.fecha_inicio|date:"d/m" }} - {{ just.fecha_fin|date:"d/m/Y" }}</td>
-                            <td>
-                                <a href="{% url 'admin:core_justificacion_change' just.pk %}" class="btn btn-xs btn-outline">Revisar</a>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="4" class="text-center py-8 text-gray-500">
-                                <i class="fas fa-check-circle fa-2x mb-2"></i>
-                                <p>No hay justificaciones pendientes.</p>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% endcomponent %}
-    </div>
+    </section>
 </div>
 {% endblock %}

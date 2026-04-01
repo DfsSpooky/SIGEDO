@@ -34,29 +34,3 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
-
-function filterAdminTable() {
-    const input = document.getElementById("admin-list-search");
-    if (!input) return;
-
-    const filter = input.value.toLowerCase();
-    const table = document.getElementById("result_list");
-    if (!table) return;
-
-    const tbody = table.getElementsByTagName("tbody")[0];
-    const tr = tbody.getElementsByTagName("tr");
-
-    for (let i = 0; i < tr.length; i++) {
-        let rowVisible = false;
-        const tds = tr[i].getElementsByTagName("td");
-        // Check all cells except the first one which is usually a checkbox
-        for (let j = 1; j < tds.length; j++) {
-            const td = tds[j];
-            if (td && td.innerText.toLowerCase().indexOf(filter) > -1) {
-                rowVisible = true;
-                break;
-            }
-        }
-        tr[i].style.display = rowVisible ? "" : "none";
-    }
-}

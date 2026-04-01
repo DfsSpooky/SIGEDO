@@ -1,14 +1,23 @@
+from pathlib import Path
+
 from django.contrib import admin
+from django.contrib import messages
 from django.contrib.auth.admin import UserAdmin
+from django.core.exceptions import PermissionDenied
 from django.db import models
-from django.http import HttpResponseRedirect
-from django.urls import reverse
+from django.http import FileResponse, Http404, HttpResponseRedirect
+from django.shortcuts import redirect
+from django.template.response import TemplateResponse
+from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html
 from simple_history.admin import SimpleHistoryAdmin
 from unfold.admin import ModelAdmin, TabularInline
+from unfold.decorators import action
+from unfold.enums import ActionVariant
 from unfold.contrib.forms.widgets import WysiwygWidget
 
+from .forms import RespaldoSistemaAdminForm
 from .models import (
     Activo,
     Administrador,
@@ -29,6 +38,7 @@ from .models import (
     Notificacion,
     PersonalDocente,
     Reserva,
+    RespaldoSistema,
     Semestre,
     SolicitudIntercambio,
     TipoActivo,
@@ -37,8 +47,255 @@ from .models import (
     VersionDocumento,
     RecuperacionClase,
 )
+from .utils.backups import (
+    BackupError,
+    create_system_backup,
+    hydrate_backup_metadata,
+    restore_system_backup,
+)
 
 # --- CONFIGURACIÓN DE ADMINS ---
+
+
+@admin.register(RespaldoSistema)
+class RespaldoSistemaAdmin(ModelAdmin):
+    form = RespaldoSistemaAdminForm
+    actions_list = ["generate_backup_action"]
+    actions_row = ["download_backup_action", "restore_backup_action"]
+    list_display = (
+        "nombre",
+        "origen",
+        "formato",
+        "display_estado",
+        "display_tamano",
+        "creado_por",
+        "fecha_creacion",
+        "fecha_restauracion",
+    )
+    list_filter = ("origen", "formato", "estado")
+    search_fields = ("nombre", "checksum_sha256", "archivo")
+    search_as_command = True
+    readonly_fields = (
+        "origen",
+        "formato",
+        "estado",
+        "checksum_sha256",
+        "tamano_bytes",
+        "creado_por",
+        "restaurado_por",
+        "respaldo_previo",
+        "fecha_creacion",
+        "fecha_actualizacion",
+        "fecha_restauracion",
+        "log_restauracion",
+    )
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj is not None:
+            return self.readonly_fields + ("nombre", "descripcion", "archivo")
+        return self.readonly_fields
+
+    def has_module_permission(self, request):
+        return request.user.is_authenticated and request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_authenticated and request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return request.user.is_authenticated and request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_authenticated and request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_authenticated and request.user.is_superuser
+
+    def get_fields(self, request, obj=None):
+        if obj is None:
+            return ("nombre", "descripcion", "archivo")
+        return (
+            "nombre",
+            "descripcion",
+            "archivo",
+            "origen",
+            "formato",
+            "estado",
+            "checksum_sha256",
+            "tamano_bytes",
+            "creado_por",
+            "restaurado_por",
+            "respaldo_previo",
+            "fecha_creacion",
+            "fecha_actualizacion",
+            "fecha_restauracion",
+            "log_restauracion",
+        )
+
+    @admin.display(description="Estado", ordering="estado")
+    def display_estado(self, obj):
+        colors = {
+            "DISPONIBLE": "bg-green-500",
+            "RESTAURANDO": "bg-yellow-500",
+            "RESTAURADO": "bg-blue-500",
+            "ERROR": "bg-red-500",
+        }
+        color = colors.get(obj.estado, "bg-gray-400")
+        return format_html(
+            f'<span class="px-2 py-1 text-xs font-semibold text-white rounded-full {color}">{obj.get_estado_display()}</span>'
+        )
+
+    @admin.display(description="Tamano")
+    def display_tamano(self, obj):
+        size = obj.tamano_bytes or 0
+        for unit in ("B", "KB", "MB", "GB", "TB"):
+            if size < 1024 or unit == "TB":
+                return f"{size:.1f} {unit}" if unit != "B" else f"{int(size)} {unit}"
+            size /= 1024
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                "<int:backup_id>/download/",
+                self.admin_site.admin_view(self.download_backup_view),
+                name="core_respaldosistema_download",
+            ),
+            path(
+                "<int:backup_id>/restore/",
+                self.admin_site.admin_view(self.restore_backup_view),
+                name="core_respaldosistema_restore",
+            ),
+        ]
+        return custom_urls + urls
+
+    @action(
+        description="Crear backup ahora",
+        url_path="generar-backup",
+        permissions=["generate_backup_action"],
+        icon="backup",
+        variant=ActionVariant.SUCCESS,
+    )
+    def generate_backup_action(self, request):
+        try:
+            respaldo = create_system_backup(
+                created_by=request.user,
+                descripcion="Respaldo generado desde el panel de administracion.",
+                origen="GENERADO",
+            )
+            self.message_user(
+                request,
+                f"Respaldo creado correctamente: {respaldo.nombre}",
+                level=messages.SUCCESS,
+            )
+        except Exception as exc:
+            self.message_user(
+                request,
+                f"No se pudo crear el respaldo: {exc}",
+                level=messages.ERROR,
+            )
+        return redirect("admin:core_respaldosistema_changelist")
+
+    def has_generate_backup_action_permission(self, request):
+        return request.user.is_authenticated and request.user.is_superuser
+
+    @action(
+        description="Descargar",
+        permissions=["download_backup_action"],
+        icon="download",
+        variant=ActionVariant.INFO,
+    )
+    def download_backup_action(self, request, object_id):
+        return redirect("admin:core_respaldosistema_download", backup_id=object_id)
+
+    def has_download_backup_action_permission(self, request, object_id=None):
+        return request.user.is_authenticated and request.user.is_superuser
+
+    @action(
+        description="Restaurar",
+        permissions=["restore_backup_action"],
+        icon="restore",
+        variant=ActionVariant.DANGER,
+    )
+    def restore_backup_action(self, request, object_id):
+        return redirect("admin:core_respaldosistema_restore", backup_id=object_id)
+
+    def has_restore_backup_action_permission(self, request, object_id=None):
+        return request.user.is_authenticated and request.user.is_superuser
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.creado_por = request.user
+            obj.origen = "SUBIDO"
+            obj.estado = "DISPONIBLE"
+
+        super().save_model(request, obj, form, change)
+
+        if obj.archivo:
+            hydrate_backup_metadata(obj)
+            obj.save(
+                update_fields=[
+                    "tamano_bytes",
+                    "checksum_sha256",
+                    "formato",
+                    "fecha_actualizacion",
+                ]
+            )
+
+    def download_backup_view(self, request, backup_id):
+        if not request.user.is_superuser:
+            raise PermissionDenied
+
+        respaldo = self.get_object(request, backup_id)
+        if respaldo is None or not respaldo.archivo:
+            raise Http404("Respaldo no encontrado.")
+
+        file_path = Path(respaldo.archivo.path)
+        if not file_path.exists():
+            raise Http404("El archivo del respaldo no existe.")
+
+        return FileResponse(
+            open(file_path, "rb"),
+            as_attachment=True,
+            filename=respaldo.nombre_archivo,
+        )
+
+    def restore_backup_view(self, request, backup_id):
+        if not request.user.is_superuser:
+            raise PermissionDenied
+
+        respaldo = self.get_object(request, backup_id)
+        if respaldo is None:
+            raise Http404("Respaldo no encontrado.")
+
+        if request.method == "POST":
+            try:
+                restaurado, previo = restore_system_backup(
+                    respaldo, restored_by=request.user
+                )
+                mensaje = f"Restauracion completada correctamente para {restaurado.nombre}."
+                if previo:
+                    mensaje += f" Se genero respaldo previo: {previo.nombre}."
+                self.message_user(request, mensaje, level=messages.SUCCESS)
+                return redirect("admin:core_respaldosistema_changelist")
+            except Exception as exc:
+                self.message_user(
+                    request,
+                    f"La restauracion fallo: {exc}",
+                    level=messages.ERROR,
+                )
+
+        context = {
+            **self.admin_site.each_context(request),
+            "opts": self.model._meta,
+            "original": respaldo,
+            "title": "Confirmar restauracion de respaldo",
+            "backup": respaldo,
+        }
+        return TemplateResponse(
+            request,
+            "admin/core/respaldosistema/restore_confirm.html",
+            context,
+        )
 
 
 @admin.register(Docente)

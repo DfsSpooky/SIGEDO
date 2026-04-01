@@ -571,23 +571,44 @@
     diasSemana: {{ dias_semana_json | safe }}
     };
 
-    // --- Script simple para el botón de Exportar ---
+    // --- Script para exportar distintas vistas del horario ---
     document.getElementById('btn-export-pdf').addEventListener('click', function () {
         const especialidad = document.getElementById('especialidad').value;
         const semestre = document.getElementById('semestre_cursado').value;
 
-        if (!especialidad || !semestre) {
-            Swal.fire({
-                icon: 'warning',
-                title: 'Selección Incompleta',
-                text: 'Por favor, selecciona una especialidad y un semestre para exportar.'
-            });
-            return;
-        }
+        Swal.fire({
+            title: 'Exportar horario',
+            text: 'Selecciona el tipo de documento que deseas generar.',
+            icon: 'question',
+            showCancelButton: true,
+            showDenyButton: true,
+            confirmButtonText: 'Horario actual',
+            denyButtonText: 'Por carrera',
+            cancelButtonText: 'Por docente',
+            reverseButtons: true
+        }).then((result) => {
+            let url = null;
 
-        // Abrir la URL de generación de PDF en una nueva pestaña
-        const url = `/api/exportar-horario/?especialidad_id=${especialidad}&semestre=${semestre}`;
-        window.open(url, '_blank');
+            if (result.isConfirmed) {
+                if (!especialidad || !semestre) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Selección incompleta',
+                        text: 'Selecciona una especialidad y un semestre para exportar el horario actual.'
+                    });
+                    return;
+                }
+                url = `/api/exportar-horario/?tipo=actual&especialidad_id=${especialidad}&semestre=${semestre}`;
+            } else if (result.isDenied) {
+                url = '/api/exportar-horario/?tipo=carrera';
+            } else if (result.dismiss === Swal.DismissReason.cancel) {
+                url = '/api/exportar-horario/?tipo=docente';
+            }
+
+            if (url) {
+                window.open(url, '_blank');
+            }
+        });
     });
 </script>
 <script src="{% static 'js/planner.js' %}?v={% now 'U' %}"></script>

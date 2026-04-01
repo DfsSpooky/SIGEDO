@@ -1,6 +1,14 @@
 from django.urls import reverse
 
-from .models import Curso, Documento, Justificacion, PersonalDocente, Semestre
+from .models import (
+    ConfiguracionInstitucion,
+    Curso,
+    Documento,
+    Justificacion,
+    PersonalDocente,
+    Reserva,
+    Semestre,
+)
 
 
 def dashboard_callback(request, context):
@@ -19,6 +27,11 @@ def dashboard_callback(request, context):
     justificaciones_pendientes = Justificacion.objects.filter(
         estado="PENDIENTE"
     ).count()
+    reservas_activas = Reserva.objects.filter(estado__in=["PENDIENTE", "APROBADA"]).count()
+    configuracion = ConfiguracionInstitucion.objects.first()
+    nombre_institucion = (
+        configuracion.nombre_institucion if configuracion else "Gestión de Docentes"
+    )
 
     # --- Data for Tracker Component ---
     tracker_data = [
@@ -28,6 +41,7 @@ def dashboard_callback(request, context):
             "icon": "group",
             "color": "primary",
             "link": reverse("admin:core_personaldocente_changelist"),
+            "description": "Personal docente habilitado en el sistema.",
         },
         {
             "title": "Cursos del Semestre",
@@ -35,6 +49,7 @@ def dashboard_callback(request, context):
             "icon": "book",
             "color": "success",
             "link": reverse("admin:core_curso_changelist"),
+            "description": "Carga académica registrada para el semestre activo.",
         },
         {
             "title": "Documentos Pendientes",
@@ -43,6 +58,7 @@ def dashboard_callback(request, context):
             "color": "warning",
             "link": reverse("admin:core_documento_changelist")
             + "?estado__exact=RECIBIDO",
+            "description": "Documentos por revisar o validar.",
         },
         {
             "title": "Justificaciones Pendientes",
@@ -51,6 +67,25 @@ def dashboard_callback(request, context):
             "color": "danger",
             "link": reverse("admin:core_justificacion_changelist")
             + "?estado__exact=PENDIENTE",
+            "description": "Solicitudes que requieren respuesta.",
+        },
+    ]
+
+    summary_cards = [
+        {
+            "label": "Semestre activo",
+            "value": semestre_actual.nombre if semestre_actual else "Sin semestre",
+            "tone": "slate",
+        },
+        {
+            "label": "Reservas activas",
+            "value": reservas_activas,
+            "tone": "amber",
+        },
+        {
+            "label": "Institución",
+            "value": nombre_institucion,
+            "tone": "blue",
         },
     ]
 
@@ -68,6 +103,8 @@ def dashboard_callback(request, context):
             "ultimos_documentos": ultimos_documentos,
             "ultimas_justificaciones": ultimas_justificaciones,
             "semestre_nombre": semestre_actual.nombre if semestre_actual else "Ninguno",
+            "nombre_institucion": nombre_institucion,
+            "summary_cards": summary_cards,
         }
     )
 

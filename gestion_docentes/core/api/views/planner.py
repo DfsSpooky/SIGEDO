@@ -1,7 +1,7 @@
 import json
 import random
 from collections import defaultdict
-from datetime import datetime  # <--- NUEVO IMPORT
+from datetime import datetime
 
 from django.shortcuts import render
 from django.http import JsonResponse
@@ -16,6 +16,7 @@ from core.models import (
     BloqueNoLectivo,
     ConfiguracionInstitucion,
     Curso,
+    Docente,
     Especialidad,
     FranjaHoraria,
     Grupo,
@@ -461,6 +462,198 @@ def _get_planner_data(especialidad_id, semestre_cursado):
         },
         "cursos_asignados": cursos_asignados_json,
     }
+
+
+def _build_grid_from_blocks(franjas, dias, bloques):
+    """
+    Construye una grilla imprimible marcando celdas cubiertas por bloques de duración > 1.
+    """
+    grid = []
+    franja_map = {f.id: i for i, f in enumerate(franjas)}
+
+    for franja in franjas:
+        grid.append({"franja": franja, "dias": {dia: None for dia in dias}})
+
+    for bloque in bloques:
+        franja_inicio_id = bloque.get("franja_id_inicio")
+        if franja_inicio_id not in franja_map:
+            continue
+
+        fila_idx = franja_map[franja_inicio_id]
+        dia = bloque.get("dia")
+        duracion = bloque.get("duracion_bloques", 1)
+
+        if dia not in dias:
+            continue
+
+        grid[fila_idx]["dias"][dia] = bloque
+
+        for offset in range(1, duracion):
+            if fila_idx + offset < len(grid):
+                grid[fila_idx + offset]["dias"][dia] = "SKIP"
+
+    return grid
+
+
+def _build_schedule_section(
+    *,
+    section_type,
+    title,
+    subtitle,
+    bloques,
+    franjas_manana,
+    franjas_tarde,
+    dias,
+):
+    return {
+        "section_type": section_type,
+        "title": title,
+        "subtitle": subtitle,
+        "grid_manana": _build_grid_from_blocks(franjas_manana, dias, bloques),
+        "grid_tarde": _build_grid_from_blocks(franjas_tarde, dias, bloques),
+    }
+
+
+def _get_current_schedule_sections(especialidad_id, semestre_cursado):
+    planner_data = _get_planner_data(especialidad_id, semestre_cursado)
+    especialidad = Especialidad.objects.get(id=especialidad_id)
+    carrera_nombre = (
+        Curso.objects.filter(
+            semestre__estado="ACTIVO",
+            semestre_cursado=semestre_cursado,
+            especialidades=especialidad,
+        )
+        .values_list("carrera__nombre", flat=True)
+        .distinct()
+        .first()
+    )
+
+    title = especialidad.nombre
+    subtitle_parts = [f"Semestre {semestre_cursado}"]
+    if carrera_nombre:
+        subtitle_parts.insert(0, carrera_nombre)
+
+    return planner_data, [
+        {
+            "section_type": "actual",
+            "title": title,
+            "subtitle": " - ".join(subtitle_parts),
+            "bloques": planner_data["cursos_asignados"],
+        }
+    ]
+
+
+def _get_career_schedule_sections():
+    try:
+        semestre_activo = Semestre.objects.get(estado="ACTIVO")
+    except Semestre.DoesNotExist:
+        raise ValueError("No hay un semestre activo configurado.")
+
+    combinaciones = (
+        Curso.objects.filter(
+            semestre=semestre_activo,
+            bloques_horario__isnull=False,
+            especialidades__isnull=False,
+            semestre_cursado__isnull=False,
+        )
+        .values(
+            "carrera__nombre",
+            "especialidades__id",
+            "especialidades__nombre",
+            "semestre_cursado",
+        )
+        .distinct()
+        .order_by("carrera__nombre", "especialidades__nombre", "semestre_cursado")
+    )
+
+    sections = []
+    for combo in combinaciones:
+        especialidad_id = combo["especialidades__id"]
+        semestre_cursado = combo["semestre_cursado"]
+        planner_data = _get_planner_data(especialidad_id, semestre_cursado)
+        bloques = planner_data["cursos_asignados"]
+        if not bloques:
+            continue
+
+        sections.append(
+            {
+                "section_type": "carrera",
+                "title": combo["carrera__nombre"] or "Sin carrera",
+                "subtitle": (
+                    f'{combo["especialidades__nombre"]} - Semestre {semestre_cursado}'
+                ),
+                "bloques": bloques,
+            }
+        )
+
+    return sections
+
+
+def _get_teacher_schedule_sections():
+    try:
+        semestre_activo = Semestre.objects.get(estado="ACTIVO")
+    except Semestre.DoesNotExist:
+        raise ValueError("No hay un semestre activo configurado.")
+
+    docentes = (
+        Docente.objects.filter(cursos__semestre=semestre_activo, cursos__bloques_horario__isnull=False)
+        .distinct()
+        .order_by("first_name", "last_name")
+    )
+
+    sections = []
+    for docente in docentes:
+        bloques = []
+        bloques_qs = (
+            BloqueHorario.objects.filter(curso__docente=docente, curso__semestre=semestre_activo)
+            .select_related("curso__carrera", "franja_inicio", "aula")
+            .prefetch_related("curso__especialidades")
+            .order_by("dia_semana", "horario_inicio")
+        )
+
+        for bloque in bloques_qs:
+            especialidades = list(
+                bloque.curso.especialidades.values_list("nombre", flat=True)
+            )
+            especialidades_label = ", ".join(especialidades) if especialidades else "Sin especialidad"
+            semestre_label = (
+                f"Semestre {bloque.curso.semestre_cursado}"
+                if bloque.curso.semestre_cursado
+                else "Semestre no definido"
+            )
+
+            bloques.append(
+                {
+                    "bloque_id": bloque.id,
+                    "curso_id": bloque.curso.id,
+                    "nombre": bloque.curso.nombre,
+                    "subtitulo": f"{bloque.curso.carrera.nombre} - {especialidades_label}",
+                    "meta": (
+                        f"{semestre_label}"
+                        + (
+                            f" | Aula: {bloque.aula.nombre}"
+                            if bloque.aula
+                            else ""
+                        )
+                    ),
+                    "dia": bloque.dia,
+                    "franja_id_inicio": bloque.franja_inicio.id,
+                    "duracion_bloques": bloque.duracion_bloques,
+                    "tipo_curso": bloque.curso.tipo_curso,
+                }
+            )
+
+        if bloques:
+            sections.append(
+                {
+                    "section_type": "docente",
+                    "title": f"{docente.first_name} {docente.last_name}".strip() or docente.username,
+                    "subtitle": f"Horario docente - {semestre_activo.nombre}",
+                    "bloques": bloques,
+                }
+            )
+
+    return sections
 
 
 @staff_member_required
@@ -1075,60 +1268,67 @@ def api_exportar_horario(request):
     """
     Genera una vista imprimible del horario manejando correctamente los rowspans.
     """
+    export_type = request.GET.get("tipo", "actual")
     especialidad_id = request.GET.get("especialidad_id")
     semestre_cursado = request.GET.get("semestre")
 
-    if not especialidad_id or not semestre_cursado:
-        return error_response("Faltan parámetros.")
-
     try:
-        planner_data = _get_planner_data(especialidad_id, semestre_cursado)
-        especialidad = Especialidad.objects.get(id=especialidad_id)
-        
         franjas_manana = list(FranjaHoraria.objects.filter(turno='MANANA').order_by('hora_inicio'))
         franjas_tarde = list(FranjaHoraria.objects.filter(turno='TARDE').order_by('hora_inicio'))
         dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
-        
-        def build_grid(franjas):
-            # 1. Crear estructura base vacía
-            # grid es una lista de filas, cada fila tiene la franja y un diccionario de días
-            grid = []
-            for f in franjas:
-                grid.append({'franja': f, 'dias': {d: None for d in dias}})
-            
-            # Mapa auxiliar para encontrar el índice de la fila (franja) rápidamente
-            franja_map = {f.id: i for i, f in enumerate(franjas)}
+        configuracion = ConfiguracionInstitucion.load()
 
-            # 2. Llenar la grilla con los bloques
-            for bloque in planner_data['cursos_asignados']:
-                # Verificamos si el bloque empieza en alguna franja de este turno
-                if bloque['franja_id_inicio'] in franja_map:
-                    f_idx = franja_map[bloque['franja_id_inicio']]
-                    dia = bloque['dia']
-                    duracion = bloque['duracion_bloques']
-                    
-                    # Asignamos el bloque en su celda de inicio
-                    grid[f_idx]['dias'][dia] = bloque
-                    
-                    # 3. MARCAR CELDAS OCUPADAS (SKIP)
-                    # Si dura más de 1 hora, marcamos las filas de abajo como 'SKIP'
-                    # para que el template sepa que NO debe dibujar un <td> ahí.
-                    for i in range(1, duracion):
-                        if f_idx + i < len(grid):
-                            grid[f_idx + i]['dias'][dia] = 'SKIP'
-            return grid
+        report_titles = {
+            "actual": "Horario de Clases",
+            "carrera": "Horarios por Carrera",
+            "docente": "Horarios por Docente",
+        }
+
+        if export_type == "actual":
+            if not especialidad_id or not semestre_cursado:
+                return error_response("Faltan parámetros.")
+
+            _, raw_sections = _get_current_schedule_sections(especialidad_id, semestre_cursado)
+        elif export_type == "carrera":
+            raw_sections = _get_career_schedule_sections()
+        elif export_type == "docente":
+            raw_sections = _get_teacher_schedule_sections()
+        else:
+            return error_response("Tipo de exportación no válido.", status_code=400)
+
+        sections = [
+            _build_schedule_section(
+                section_type=section["section_type"],
+                title=section["title"],
+                subtitle=section["subtitle"],
+                bloques=section["bloques"],
+                franjas_manana=franjas_manana,
+                franjas_tarde=franjas_tarde,
+                dias=dias,
+            )
+            for section in raw_sections
+        ]
+
+        if not sections:
+            return error_response("No hay horarios asignados para exportar.")
 
         context = {
-            'especialidad': especialidad,
-            'semestre_cursado': semestre_cursado,
-            'grid_manana': build_grid(franjas_manana),
-            'grid_tarde': build_grid(franjas_tarde),
+            'report_title': report_titles.get(export_type, "Horario de Clases"),
+            'sections': sections,
             'dias': dias,
-            'fecha_generacion': datetime.now()
+            'fecha_generacion': datetime.now(),
+            'configuracion': configuracion,
+            'logo_url': configuracion.logo.url if getattr(configuracion, "logo", None) else None,
+            'nombre_institucion': getattr(configuracion, "nombre_institucion", "Institución"),
+            'semestre_activo': Semestre.objects.filter(estado="ACTIVO").first(),
         }
-        
+
         return render(request, 'reporte_horario_pdf.html', context)
 
+    except Especialidad.DoesNotExist:
+        return not_found_response("Especialidad no encontrada.")
+    except ValueError as e:
+        return error_response(str(e))
     except Exception as e:
         import traceback
         traceback.print_exc()
