@@ -1,0 +1,51 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">Inicio</a>
+    &rsaquo;
+    <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+    &rsaquo;
+    <a href="{% url 'admin:core_respaldosistema_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+    &rsaquo;
+    Confirmar restauracion
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="p-6 max-w-3xl">
+    <h1 class="text-2xl font-bold mb-4">Confirmar restauracion</h1>
+
+    <div class="mb-6 rounded border border-red-300 bg-red-50 p-4">
+        <p class="font-semibold text-red-700">Advertencia critica</p>
+        <p class="mt-2">
+            Esta accion reemplazara completamente la base de datos actual.
+            Antes de restaurar se generara automaticamente un respaldo previo.
+        </p>
+        <p class="mt-2">
+            Solo continua si confirmaste que este archivo es el correcto.
+        </p>
+    </div>
+
+    <div class="mb-6 rounded border border-gray-200 bg-white p-4">
+        <p><strong>Nombre:</strong> {{ backup.nombre }}</p>
+        <p><strong>Archivo:</strong> {{ backup.nombre_archivo }}</p>
+        <p><strong>Formato:</strong> {{ backup.get_formato_display }}</p>
+        <p><strong>Checksum:</strong> {{ backup.checksum_sha256|default:"No disponible" }}</p>
+        <p><strong>Creado:</strong> {{ backup.fecha_creacion }}</p>
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="flex gap-3">
+            <button type="submit" class="button" style="background-color: #dc2626; color: white;">
+                Restaurar respaldo
+            </button>
+            <a href="{% url 'admin:core_respaldosistema_changelist' %}" class="button">
+                Cancelar
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}

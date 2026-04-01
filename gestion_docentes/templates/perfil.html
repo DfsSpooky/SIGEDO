@@ -1,123 +1,412 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% load static %}
-{% block title %}Mi Perfil - {{ user.first_name }}{% endblock %}
+
+{% block title %}Mi Perfil{% endblock title %}
+{% block breadcrumb %}Mi Perfil{% endblock breadcrumb %}
 
 {% block content %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    /* ── CORE & VARIABLES ── */
+    :root {
+        --gl-primary: #6366f1;
+        --gl-secondary: #ec4899;
+        --gl-text: #0f172a;
+        --gl-muted: #64748b;
+        --gl-bg: #f1f5f9;
+        --font-main: 'Inter', system-ui, sans-serif;
+    }
 
-<div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+    body { font-family: var(--font-main); }
 
-    <div class="lg:col-span-4 space-y-8">
+    /* ── AMBIENT BACKGROUNDS ── */
+    .page-backdrop {
+        position: fixed; inset: 0; z-index: -10;
+        background-color: #f8fafc;
+        background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+        background-size: 32px 32px;
+    }
+    .ambient-blob {
+        position: fixed; border-radius: 50%; filter: blur(80px); opacity: 0.5; z-index: -9;
+        mix-blend-mode: multiply; pointer-events: none;
+    }
+    .blob-1 {
+        width: 60vw; height: 60vw; background: rgba(99,102,241,0.25);
+        top: -20%; left: -10%; animation: drift 20s ease-in-out infinite alternate;
+    }
+    .blob-2 {
+        width: 50vw; height: 50vw; background: rgba(236,72,153,0.2);
+        bottom: -10%; right: -10%; animation: drift 25s ease-in-out infinite alternate-reverse;
+    }
+    @keyframes drift {
+        0% { transform: translate(0,0) scale(1); }
+        100% { transform: translate(60px, 40px) scale(1.1); }
+    }
+
+    /* ── LAYOUT ── */
+    .glass-layout {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 40px 20px;
+        display: grid;
+        grid-template-columns: 340px 1fr;
+        gap: 40px;
+        align-items: start;
+    }
+    @media (max-width: 960px) {
+        .glass-layout { grid-template-columns: 1fr; padding: 20px 16px; gap: 24px; }
+    }
+
+    /* ── PANELS (Glassmorphism) ── */
+    .glass-panel {
+        background: rgba(255, 255, 255, 0.75);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        border-radius: 32px;
+        box-shadow: 0 20px 40px -10px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,1);
+    }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+        padding: 40px 32px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        position: sticky;
+        top: 24px;
+    }
+    @media (max-width: 960px) {
+        .sidebar { position: relative; top: 0; padding: 32px 24px; }
+    }
+
+    /* Avatar */
+    .avatar-wrap { position: relative; width: 160px; height: 160px; margin-bottom: 24px; }
+    .avatar-glow {
+        position: absolute; inset: -6px; border-radius: 50%;
+        background: linear-gradient(135deg, var(--gl-primary), var(--gl-secondary));
+        filter: blur(12px); opacity: 0.6;
+        animation: pulseAvatar 4s ease-in-out infinite alternate;
+    }
+    @keyframes pulseAvatar { 0% { opacity: 0.4; transform: scale(0.95); } 100% { opacity: 0.7; transform: scale(1.05); } }
+    .avatar-img {
+        position: relative; width: 100%; height: 100%; border-radius: 50%;
+        object-fit: cover; border: 6px solid #fff; background: #fff; z-index: 2;
+    }
+    .status-dot {
+        position: absolute; bottom: 8px; right: 8px; width: 28px; height: 28px;
+        background: #10b981; border: 4px solid #fff; border-radius: 50%; z-index: 3;
+        box-shadow: 0 4px 10px rgba(16,185,129,0.4);
+    }
+
+    /* User details */
+    .user-name {
+        font-size: 1.8rem; font-weight: 800; color: var(--gl-text);
+        margin: 0 0 4px; letter-spacing: -0.04em; line-height: 1.1;
+        display: flex; align-items: center; gap: 8px; justify-content: center;
+    }
+    .user-name i { color: #3b82f6; font-size: 1.2rem; }
+    .user-handle { font-size: 1.05rem; font-weight: 500; color: var(--gl-muted); margin-bottom: 24px; }
+
+    /* Badges */
+    .u-badges { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 32px; width: 100%; }
+    .u-badge {
+        padding: 6px 16px; border-radius: 20px; font-size: 0.75rem; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.05em; display: inline-flex; align-items: center;
+    }
+    .u-badge.role { background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; }
+    .u-badge.dni { background: #fdf4ff; color: #c026d3; border: 1px solid #f5d0fe; }
+
+    /* Nav Menu */
+    .nav-menu { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+    @media (max-width: 960px) {
+        .nav-menu { flex-direction: row; flex-wrap: wrap; }
+        .nav-menu button { flex: 1; min-width: 140px; justify-content: center; }
+    }
+    .nav-btn {
+        width: 100%; padding: 16px 24px; border-radius: 20px; border: none; background: transparent;
+        color: var(--gl-muted); font-size: 1.05rem; font-weight: 700; text-align: left;
+        display: flex; align-items: center; gap: 14px; cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .nav-btn i { font-size: 1.3rem; opacity: 0.7; transition: opacity 0.3s; }
+    .nav-btn:hover { background: rgba(255,255,255,0.6); color: var(--gl-text); transform: translateX(4px); }
+    @media (max-width: 960px) { .nav-btn:hover { transform: translateY(-2px); } }
+    .nav-btn.active {
+        background: var(--gl-text); color: #fff;
+        box-shadow: 0 10px 24px rgba(15,23,42,0.25); transform: none;
+    }
+    .nav-btn.active i { opacity: 1; }
+
+    /* ── TABS AND CONTENT ── */
+    .tab-view {
+        display: none; flex-direction: column; gap: 32px;
+    }
+    .tab-view.active {
+        display: flex;
+        animation: floatIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes floatIn {
+        0% { opacity: 0; transform: translateY(20px); }
+        100% { opacity: 1; transform: translateY(0); }
+    }
+
+    .content-card { padding: 40px; }
+    @media (max-width: 600px) { .content-card { padding: 24px; } }
+    .section-header { margin-bottom: 32px; display: flex; align-items: center; gap: 16px; }
+    .sec-icon {
+        width: 52px; height: 52px; border-radius: 16px; background: #eef2ff; color: var(--gl-primary);
+        display: flex; align-items: center; justify-content: center; font-size: 1.3rem;
+        box-shadow: inset 0 2px 4px rgba(255,255,255,1);
+    }
+    .sec-title { font-size: 1.4rem; font-weight: 800; color: var(--gl-text); letter-spacing: -0.02em; }
+
+    /* Info Grids */
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    @media (max-width: 600px) { .info-grid { grid-template-columns: 1fr; } }
+    .info-cell {
+        background: rgba(255,255,255,0.5); padding: 20px 24px; border-radius: 20px;
+        border: 1px solid rgba(255,255,255,0.8); display: flex; flex-direction: column; gap: 8px;
+    }
+    .lbl { font-size: 0.75rem; font-weight: 700; color: var(--gl-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+    .val { font-size: 1.05rem; font-weight: 700; color: var(--gl-text); display: flex; align-items: center; gap: 10px; }
+    .val i { color: var(--gl-primary); opacity: 0.8;}
+
+    /* Specialties */
+    .spec-cloud { display: flex; flex-wrap: wrap; gap: 12px; }
+    .spec-pill {
+        background: #fff; padding: 12px 24px; border-radius: 16px; border: 1px solid #e2e8f0;
+        color: #4338ca; font-weight: 700; font-size: 0.95rem; box-shadow: 0 4px 12px rgba(99,102,241,0.06);
+        display: flex; align-items: center; gap: 10px; transition: all 0.3s;
+    }
+    .spec-pill:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(99,102,241,0.15); border-color: #c7d2fe; }
+    .spec-pill i { background: #eef2ff; padding: 6px; border-radius: 8px; font-size: 0.8rem; }
+
+    /* RFID PHYSICAL CARD 3D */
+    .rfid-3d-wrapper { perspective: 1200px; margin-top: 16px; }
+    .rfid-card {
+        background: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMSIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjA4KSIvPjwvc3ZnPg=='),
+                    linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        border-radius: 24px; padding: 32px; color: #fff;
+        box-shadow: 0 24px 48px rgba(15,23,42,0.4), inset 0 1px 1px rgba(255,255,255,0.2);
+        position: relative; overflow: hidden; transform-style: preserve-3d;
+        transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .rfid-card:hover { transform: rotateX(8deg) rotateY(-6deg) scale(1.03); }
+    .rfid-shine {
+        position: absolute; top: 0; left: -100%; width: 50%; height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+        transform: skewX(-20deg); pointer-events: none;
+    }
+    .rfid-card:hover .rfid-shine { animation: shineRun 1.5s; }
+    @keyframes shineRun { 0%{left:-100%;} 100%{left:200%;} }
+
+    .chip-gold { width: 54px; height: 42px; background: linear-gradient(135deg, #fcd34d, #b45309); border-radius: 8px; margin-bottom: 24px; position: relative; box-shadow: inset 0 0 6px rgba(0,0,0,0.6); overflow: hidden; }
+    .chip-gold::after { content:''; position:absolute; inset:0; background: linear-gradient(90deg, transparent 40%, rgba(0,0,0,0.3) 50%, transparent 60%), linear-gradient(0deg, transparent 40%, rgba(0,0,0,0.3) 50%, transparent 60%); }
+    
+    .rfid-num { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 1.6rem; font-weight: 700; letter-spacing: 0.15em; text-shadow: 0 2px 4px rgba(0,0,0,0.8); margin-bottom: 24px; text-transform: uppercase;}
+    .rfid-footer { display: flex; justify-content: space-between; align-items: flex-end; }
+    .r-titular { font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 4px; }
+    .r-name-val { font-size: 1.15rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; }
+
+    /* Security Tab specific */
+    .sec-hero-wrapper { text-align: center; padding: 60px 20px; max-width: 500px; margin: 0 auto; }
+    .sec-shield {
+        width: 100px; height: 100px; border-radius: 32px; background: linear-gradient(135deg, #eef2ff, #fae8ff);
+        color: var(--gl-primary); display: flex; align-items: center; justify-content: center;
+        font-size: 2.5rem; margin: 0 auto 32px; box-shadow: 0 20px 40px rgba(99,102,241,0.15), inset 0 2px 0 #fff;
+    }
+    .sec-heading { font-size: 2rem; font-weight: 900; color: var(--gl-text); margin-bottom: 16px; letter-spacing: -0.04em; }
+    .sec-desc { font-size: 1.1rem; color: var(--gl-muted); line-height: 1.6; margin-bottom: 40px; }
+    
+    .btn-super {
+        display: inline-flex; align-items: center; gap: 12px;
+        background: var(--gl-text); color: #fff;
+        padding: 16px 40px; border-radius: 20px;
+        font-weight: 800; font-size: 1.1rem; display: inline-flex; text-decoration: none;
+        box-shadow: 0 12px 30px rgba(15,23,42,0.3); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .btn-super:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(15,23,42,0.45); background: #000; color: #fff; }
+    .badge-icon { margin-right:6px; }
+    .tab-content-container { position: relative; }
+    .sec-icon-spec { background:#fdf2f8;color:#ec4899; }
+    .empty-msg { text-align:center; padding: 20px; color: var(--gl-muted); font-weight: 500; }
+    .rfid-header { margin-bottom: 16px; }
+    .sec-icon-rfid { background:#ecfdf5;color:#10b981; }
+    .rotate-45 { transform:rotate(45deg); }
+    .rfid-title { margin-bottom:4px; }
+    .rfid-subtitle { color:var(--gl-muted); font-size:0.9rem; font-weight:500; }
+    .rfid-card-header { display:flex; justify-content:space-between; align-items:flex-start; }
+    .opacity-06 { opacity:0.6; }
+    .opacity-04 { opacity:0.4; }
+    .opacity-03 { opacity:0.3; }
+</style>
+
+<!-- AMBIENT LAYER -->
+<div class="page-backdrop"></div>
+<div class="ambient-blob blob-1"></div>
+<div class="ambient-blob blob-2"></div>
+
+<!-- MAIN LAYOUT -->
+<div class="glass-layout">
+    
+    <!-- LEFT: SIDEBAR -->
+    <div class="glass-panel sidebar">
+        <div class="avatar-wrap">
+            <div class="avatar-glow"></div>
+            <img class="avatar-img" src="{% if user.foto %}{{ user.foto.url }}{% else %}https://ui-avatars.com/api/?name={{ user.first_name }}+{{ user.last_name }}&background=6366f1&color=fff&size=200&font-weight=700{% endif %}" alt="Foto de {{ user.first_name }}" width="160" height="160">
+            <div class="status-dot" title="Usuario activo"></div>
+        </div>
         
-        <div class="card bg-base-100 shadow-xl sticky top-8">
-            <div class="card-body items-center text-center">
-                <div class="avatar online">
-                    <div class="w-24 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2">
-                        <img src="{% if user.foto %}{{ user.foto.url }}{% else %}{% static 'placeholder.png' %}{% endif %}" alt="Foto de {{ user.first_name }}">
+        <h1 class="user-name">
+            {{ user.first_name }} {{ user.last_name }}
+            <i class="fas fa-certificate" title="Verificado"></i>
+        </h1>
+        <p class="user-handle">@{{ user.username }}</p>
+        
+        <div class="u-badges">
+            <span class="u-badge role">
+                <i class="fas fa-shield-alt badge-icon"></i>
+                {% if user.is_superuser %}Super Admin{% elif user.is_staff %}Administrativo{% else %}Docente{% endif %}
+            </span>
+            {% if user.dni %}
+            <span class="u-badge dni">DNI: {{ user.dni }}</span>
+            {% endif %}
+        </div>
+        
+        <div class="nav-menu">
+            <button class="nav-btn active" onclick="switchTab('general', this)">
+                <i class="far fa-user"></i> <span>Datos Personales</span>
+            </button>
+            <button class="nav-btn" onclick="switchTab('security', this)">
+                <i class="fas fa-fingerprint"></i> <span>Ajustes de Acceso</span>
+            </button>
+        </div>
+    </div>
+    
+    <!-- RIGHT: CONTENT VIEWS -->
+    <div class="tab-content-container">
+        
+        <!-- GENERAL TAB -->
+        <div id="tab-general" class="tab-view active">
+            <!-- Detalles -->
+            <div class="glass-panel content-card">
+                <div class="section-header">
+                    <div class="sec-icon"><i class="far fa-id-card"></i></div>
+                    <h2 class="sec-title">Información Básica</h2>
+                </div>
+                <div class="info-grid">
+                    <div class="info-cell">
+                        <span class="lbl">Correo Electrónico</span>
+                        <span class="val"><i class="far fa-envelope"></i> {{ user.email }}</span>
+                    </div>
+                    <div class="info-cell">
+                        <span class="lbl">Miembro Desde</span>
+                        <span class="val"><i class="far fa-calendar-alt"></i> {{ user.date_joined|date:"d M, Y" }}</span>
+                    </div>
+                    <div class="info-cell">
+                        <span class="lbl">Disponibilidad</span>
+                        <span class="val"><i class="far fa-clock"></i> {{ user.get_disponibilidad_display|default:'No especificada' }}</span>
+                    </div>
+                    <div class="info-cell">
+                        <span class="lbl">Última Conexión</span>
+                        <span class="val"><i class="fas fa-plug"></i> {{ user.last_login|date:"d M, Y H:i" }}</span>
                     </div>
                 </div>
-                <h2 class="card-title text-2xl mt-4">{{ user.first_name }} {{ user.last_name }}</h2>
-                <p class="text-base-content/70">DNI: {{ user.dni }}</p>
-                <div class="divider">Especialidades</div>
-                <div class="flex flex-wrap justify-center gap-2">
-                    {% for especialidad in user.especialidades.all %}
-                        <div class="badge badge-info badge-outline">{{ especialidad.nombre }}</div>
-                    {% empty %}
-                        <p class="text-sm text-base-content/50">Sin especialidades asignadas.</p>
+            </div>
+            
+            <!-- Especialidades -->
+            <div class="glass-panel content-card">
+                <div class="section-header">
+                    <div class="sec-icon sec-icon-spec"><i class="fas fa-graduation-cap"></i></div>
+                    <h2 class="sec-title">Áreas de Especialización</h2>
+                </div>
+                {% if user.especialidades.all %}
+                <div class="spec-cloud">
+                    {% for esp in user.especialidades.all %}
+                    <div class="spec-pill">
+                        <i class="fas fa-book-open"></i> {{ esp.nombre }}
+                    </div>
                     {% endfor %}
                 </div>
+                {% else %}
+                <div class="empty-msg">
+                    No tienes especialidades asignadas.
+                </div>
+                {% endif %}
             </div>
-        </div>
 
-        <div class="card bg-base-100 shadow-xl">
-            <div class="card-body">
-                <h3 class="card-title">Estado de mi Carpeta ({{ total_documentos }} Doc(s))</h3>
-                <canvas id="documentosChart"></canvas>
-            </div>
-        </div>
-
-    </div>
-    <div class="lg:col-span-8">
-        <div class="card bg-base-100 shadow-xl">
-            <div class="card-body">
-                <h3 class="card-title mb-6">Actividad Reciente</h3>
+            <!-- Llave RFID -->
+            <div class="glass-panel content-card">
+                <div class="section-header rfid-header">
+                    <div class="sec-icon sec-icon-rfid"><i class="fas fa-wifi rotate-45"></i></div>
+                    <div>
+                        <h2 class="sec-title rfid-title">Llave Institucional Kiosco</h2>
+                        <p class="rfid-subtitle">Escanea esta tarjeta en los terminales físicos.</p>
+                    </div>
+                </div>
                 
-                <ul class="timeline timeline-snap-icon max-md:timeline-compact timeline-vertical">
-                    {% for item in timeline %}
-                    <li>
-                        <div class="timeline-middle">
-                            {% if item.tipo == 'asistencia_entrada' %}<i class="fas fa-sign-in-alt bg-success text-success-content text-xl p-2 rounded-full"></i>
-                            {% elif item.tipo == 'asistencia_salida' %}<i class="fas fa-sign-out-alt bg-error text-error-content text-xl p-2 rounded-full"></i>
-                            {% elif item.tipo == 'documento' %}<i class="fas fa-file-upload bg-info text-info-content text-xl p-2 rounded-full"></i>
-                            {% endif %}
+                <div class="rfid-3d-wrapper">
+                    <div class="rfid-card">
+                        <div class="rfid-shine"></div>
+                        <div class="rfid-card-header">
+                            <div class="chip-gold"></div>
+                            <i class="fas fa-signal opacity-06" style="font-size:1.4rem;"></i>
                         </div>
-                        <div class="timeline-end mb-10 p-4 bg-base-200 rounded-lg shadow">
-                            <time class="font-mono italic text-sm opacity-70">{{ item.fecha|date:"d/m/Y, h:i A" }}</time>
-                            <div class="text-lg font-black">{{ item.texto }}</div>
-                            {% if item.tipo == 'documento' and item.documento.estado == 'OBSERVADO' %}
-                                <div class="mt-2 text-warning font-semibold">
-                                    <i class="fas fa-exclamation-triangle mr-1"></i> Este documento tiene observaciones.
-                                    <a href="{% url 'lista_documentos' %}" class="link link-warning ml-2">Revisar</a>
-                                </div>
-                            {% endif %}
+                        <div class="rfid-num">
+                            {% if user.rfid_uid %}{{ user.rfid_uid }}{% else %}<span class="opacity-04">XXXX - XXXX</span>{% endif %}
                         </div>
-                        <hr/>
-                    </li>
-                    {% empty %}
-                    <li class="text-center p-8 text-base-content/60">
-                        <i class="fas fa-history fa-2x mb-4"></i><br>
-                        No hay actividad reciente para mostrar.
-                    </li>
-                    {% endfor %}
-                </ul>
+                        <div class="rfid-footer">
+                            <div>
+                                <div class="r-titular">Titular de Tarjeta</div>
+                                <div class="r-name-val">{{ user.first_name }} {{ user.last_name }}</div>
+                            </div>
+                            <i class="fas fa-shield-alt opacity-03" style="font-size:1.8rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+        
+        <!-- SECURITY TAB -->
+        <div id="tab-security" class="tab-view">
+            <div class="glass-panel content-card sec-hero-wrapper">
+                <div class="sec-shield">
+                    <i class="fas fa-lock"></i>
+                </div>
+                <h2 class="sec-heading">Centro de Seguridad</h2>
+                <p class="sec-desc">Asegura tu cuenta y cambia tu clave de acceso regularmente para proteger tu información dentro y fuera del SIGEDO.</p>
+                
+                <a href="{% url 'admin:password_change' %}" class="btn-super">
+                    <i class="fas fa-key"></i> Actualizar Credenciales
+                </a>
             </div>
         </div>
-    </div>
-    </div>
 
+    </div>
+</div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const ctx = document.getElementById('documentosChart');
-        if (!ctx) return;
-
-        const data = {
-            labels: {{ documentos_labels_json|safe }},
-            datasets: [{
-                label: 'Cantidad de Documentos',
-                data: {{ documentos_status_json|safe }},
-                backgroundColor: [
-                    'rgba(34, 197, 94, 0.6)',  // APROBADO (Verde)
-                    'rgba(245, 158, 11, 0.6)', // EN_REVISION (Ámbar)
-                    'rgba(239, 68, 68, 0.6)',   // OBSERVADO (Rojo)
-                    'rgba(59, 130, 246, 0.6)'  // RECIBIDO (Azul)
-                ],
-                borderColor: [
-                    'rgba(34, 197, 94, 1)',
-                    'rgba(245, 158, 11, 1)',
-                    'rgba(239, 68, 68, 1)',
-                    'rgba(59, 130, 246, 1)'
-                ],
-                borderWidth: 1
-            }]
-        };
-
-        new Chart(ctx, {
-            type: 'doughnut', // Tipo de gráfico: dona
-            data: data,
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        position: 'top',
-                    },
-                    title: {
-                        display: false,
-                        text: 'Estado de Documentos'
-                    }
-                }
-            }
+    function switchTab(tabId, elBtn) {
+        // Quitar active a todos los botones
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        // Poner active al boton presionado
+        elBtn.classList.add('active');
+        
+        // Esconder todos los views
+        const views = document.querySelectorAll('.tab-view');
+        views.forEach(v => {
+            v.style.display = 'none';
+            v.classList.remove('active');
         });
-    });
+        
+        // Mostrar solo el objetivo
+        const targetView = document.getElementById('tab-' + tabId);
+        targetView.style.display = 'flex';
+        // Hack para forzar reflow y que la animación CSS se ejecute desde cero
+        void targetView.offsetWidth; 
+        targetView.classList.add('active');
+    }
 </script>
-{% endblock %}
+{% endblock content %}

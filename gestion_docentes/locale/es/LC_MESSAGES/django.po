@@ -1,0 +1,106 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: SIGEDO\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-03-31 00:00+0000\n"
+"PO-Revision-Date: 2026-03-31 00:00+0000\n"
+"Last-Translator: SIGEDO\n"
+"Language: es\n"
+"Language-Team: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Type to search"
+msgstr "Escribe para buscar"
+
+msgid "Dashboard"
+msgstr "Panel"
+
+msgid "Filters"
+msgstr "Filtros"
+
+msgid "Search"
+msgstr "Buscar"
+
+msgid "Actions"
+msgstr "Acciones"
+
+msgid "Select all"
+msgstr "Seleccionar todo"
+
+msgid "Show all"
+msgstr "Mostrar todo"
+
+msgid "Add"
+msgstr "Agregar"
+
+msgid "Save"
+msgstr "Guardar"
+
+msgid "Delete"
+msgstr "Eliminar"
+
+msgid "Yes"
+msgstr "Sí"
+
+msgid "No"
+msgstr "No"
+
+msgid "History"
+msgstr "Historial"
+
+msgid "Change"
+msgstr "Editar"
+
+msgid "View"
+msgstr "Ver"
+
+msgid "View on site"
+msgstr "Ver en el sitio"
+
+msgid "Recent actions"
+msgstr "Acciones recientes"
+
+msgid "Log out"
+msgstr "Cerrar sesión"
+
+msgid "Log in"
+msgstr "Iniciar sesión"
+
+msgid "Close"
+msgstr "Cerrar"
+
+msgid "Show"
+msgstr "Mostrar"
+
+msgid "Select"
+msgstr "Seleccionar"
+
+msgid "Choose"
+msgstr "Elegir"
+
+msgid "No items selected"
+msgstr "No hay elementos seleccionados"
+
+msgid "Save and continue editing"
+msgstr "Guardar y continuar editando"
+
+msgid "Save and add another"
+msgstr "Guardar y agregar otro"
+
+msgid "Save as new"
+msgstr "Guardar como nuevo"
+
+msgid "Delete selected"
+msgstr "Eliminar seleccionados"
+
+msgid "Are you sure?"
+msgstr "¿Estás seguro?"
+
+msgid "Welcome,"
+msgstr "Bienvenido,"
+
+msgid "Documentation"
+msgstr "Documentación"

@@ -1,0 +1,65 @@
+name: sigedo_mobile
+description: "A new Flutter project."
+# Refreshed dependencies at 2026-01-02
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # Peticiones HTTP
+  dio: ^5.4.0
+  http: ^1.6.0
+  # Manejo de Estado
+  provider: ^6.1.1
+  # Seguridad
+  flutter_secure_storage: ^10.0.0
+  jwt_decoder: ^2.0.1
+  # Camara y Archivos
+  image_picker: ^1.0.7
+  flutter_image_compress: ^2.1.0 # Optimized image compression
+  camera: ^0.11.3
+  file_picker: ^10.3.8
+  path_provider: ^2.1.5
+  # Permisos y Ubicacion
+  permission_handler: ^12.0.1
+  geolocator: ^14.0.2
+  # UI
+  cupertino_icons: ^1.0.8
+  google_fonts: ^6.1.0
+  lottie: ^3.3.2
+  shimmer: ^3.0.0
+  flutter_html: ^3.0.0
+  flutter_pdfview: ^1.4.3
+  # Biometria
+  local_auth: ^3.0.0
+  local_auth_android: ^2.0.4
+  local_auth_darwin: ^2.0.1
+  # Notificaciones
+  firebase_core: ^4.3.0
+  firebase_messaging: ^16.1.0
+  flutter_local_notifications: ^19.5.0
+  # Utilidades
+  qr_flutter: ^4.1.0
+  shared_preferences: ^2.2.2
+  connectivity_plus: ^7.0.0
+  cached_network_image: ^3.4.1
+  fl_chart: ^1.1.1
+  web_socket_channel: ^3.0.3
+  carousel_slider: ^5.1.1
+  table_calendar: ^3.1.2
+  intl: ^0.19.0
+  timezone: ^0.10.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/

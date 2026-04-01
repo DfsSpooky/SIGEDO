@@ -1,38 +1,452 @@
+from pathlib import Path
+
 from django.contrib import admin
+from django.contrib import messages
 from django.contrib.auth.admin import UserAdmin
+from django.core.exceptions import PermissionDenied
+from django.db import models
+from django.http import FileResponse, Http404, HttpResponseRedirect
+from django.shortcuts import redirect
+from django.template.response import TemplateResponse
+from django.urls import path, reverse
+from django.utils import timezone
 from django.utils.html import format_html
+from simple_history.admin import SimpleHistoryAdmin
+from unfold.admin import ModelAdmin, TabularInline
+from unfold.decorators import action
+from unfold.enums import ActionVariant
+from unfold.contrib.forms.widgets import WysiwygWidget
+
+from .forms import RespaldoSistemaAdminForm
 from .models import (
-    Grupo, Carrera, Especialidad, TipoDocumento, Docente, Curso,
-    Documento, Asistencia, SolicitudIntercambio,
-    PersonalDocente, Administrador, AsistenciaDiaria,
-    ConfiguracionInstitucion, Semestre, FranjaHoraria, DiaEspecial, VersionDocumento
+    Activo,
+    Administrador,
+    Anuncio,
+    Asistencia,
+    Aula,
+    AsistenciaDiaria,
+    Carrera,
+    ConfiguracionInstitucion,
+    Curso,
+    DiaEspecial,
+    Docente,
+    Documento,
+    Especialidad,
+    FranjaHoraria,
+    Grupo,
+    Justificacion,
+    Notificacion,
+    PersonalDocente,
+    Reserva,
+    RespaldoSistema,
+    Semestre,
+    SolicitudIntercambio,
+    TipoActivo,
+    TipoDocumento,
+    TipoJustificacion,
+    VersionDocumento,
+    RecuperacionClase,
+)
+from .utils.backups import (
+    BackupError,
+    create_system_backup,
+    hydrate_backup_metadata,
+    restore_system_backup,
 )
 
 # --- CONFIGURACIÓN DE ADMINS ---
 
-class DocenteAdmin(UserAdmin):
+
+@admin.register(RespaldoSistema)
+class RespaldoSistemaAdmin(ModelAdmin):
+    form = RespaldoSistemaAdminForm
+    actions_list = ["generate_backup_action"]
+    actions_row = ["download_backup_action", "restore_backup_action"]
+    list_display = (
+        "nombre",
+        "origen",
+        "formato",
+        "display_estado",
+        "display_tamano",
+        "creado_por",
+        "fecha_creacion",
+        "fecha_restauracion",
+    )
+    list_filter = ("origen", "formato", "estado")
+    search_fields = ("nombre", "checksum_sha256", "archivo")
+    search_as_command = True
+    readonly_fields = (
+        "origen",
+        "formato",
+        "estado",
+        "checksum_sha256",
+        "tamano_bytes",
+        "creado_por",
+        "restaurado_por",
+        "respaldo_previo",
+        "fecha_creacion",
+        "fecha_actualizacion",
+        "fecha_restauracion",
+        "log_restauracion",
+    )
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj is not None:
+            return self.readonly_fields + ("nombre", "descripcion", "archivo")
+        return self.readonly_fields
+
+    def has_module_permission(self, request):
+        return request.user.is_authenticated and request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_authenticated and request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return request.user.is_authenticated and request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_authenticated and request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_authenticated and request.user.is_superuser
+
+    def get_fields(self, request, obj=None):
+        if obj is None:
+            return ("nombre", "descripcion", "archivo")
+        return (
+            "nombre",
+            "descripcion",
+            "archivo",
+            "origen",
+            "formato",
+            "estado",
+            "checksum_sha256",
+            "tamano_bytes",
+            "creado_por",
+            "restaurado_por",
+            "respaldo_previo",
+            "fecha_creacion",
+            "fecha_actualizacion",
+            "fecha_restauracion",
+            "log_restauracion",
+        )
+
+    @admin.display(description="Estado", ordering="estado")
+    def display_estado(self, obj):
+        colors = {
+            "DISPONIBLE": "bg-green-500",
+            "RESTAURANDO": "bg-yellow-500",
+            "RESTAURADO": "bg-blue-500",
+            "ERROR": "bg-red-500",
+        }
+        color = colors.get(obj.estado, "bg-gray-400")
+        return format_html(
+            f'<span class="px-2 py-1 text-xs font-semibold text-white rounded-full {color}">{obj.get_estado_display()}</span>'
+        )
+
+    @admin.display(description="Tamano")
+    def display_tamano(self, obj):
+        size = obj.tamano_bytes or 0
+        for unit in ("B", "KB", "MB", "GB", "TB"):
+            if size < 1024 or unit == "TB":
+                return f"{size:.1f} {unit}" if unit != "B" else f"{int(size)} {unit}"
+            size /= 1024
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                "<int:backup_id>/download/",
+                self.admin_site.admin_view(self.download_backup_view),
+                name="core_respaldosistema_download",
+            ),
+            path(
+                "<int:backup_id>/restore/",
+                self.admin_site.admin_view(self.restore_backup_view),
+                name="core_respaldosistema_restore",
+            ),
+        ]
+        return custom_urls + urls
+
+    @action(
+        description="Crear backup ahora",
+        url_path="generar-backup",
+        permissions=["generate_backup_action"],
+        icon="backup",
+        variant=ActionVariant.SUCCESS,
+    )
+    def generate_backup_action(self, request):
+        try:
+            respaldo = create_system_backup(
+                created_by=request.user,
+                descripcion="Respaldo generado desde el panel de administracion.",
+                origen="GENERADO",
+            )
+            self.message_user(
+                request,
+                f"Respaldo creado correctamente: {respaldo.nombre}",
+                level=messages.SUCCESS,
+            )
+        except Exception as exc:
+            self.message_user(
+                request,
+                f"No se pudo crear el respaldo: {exc}",
+                level=messages.ERROR,
+            )
+        return redirect("admin:core_respaldosistema_changelist")
+
+    def has_generate_backup_action_permission(self, request):
+        return request.user.is_authenticated and request.user.is_superuser
+
+    @action(
+        description="Descargar",
+        permissions=["download_backup_action"],
+        icon="download",
+        variant=ActionVariant.INFO,
+    )
+    def download_backup_action(self, request, object_id):
+        return redirect("admin:core_respaldosistema_download", backup_id=object_id)
+
+    def has_download_backup_action_permission(self, request, object_id=None):
+        return request.user.is_authenticated and request.user.is_superuser
+
+    @action(
+        description="Restaurar",
+        permissions=["restore_backup_action"],
+        icon="restore",
+        variant=ActionVariant.DANGER,
+    )
+    def restore_backup_action(self, request, object_id):
+        return redirect("admin:core_respaldosistema_restore", backup_id=object_id)
+
+    def has_restore_backup_action_permission(self, request, object_id=None):
+        return request.user.is_authenticated and request.user.is_superuser
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.creado_por = request.user
+            obj.origen = "SUBIDO"
+            obj.estado = "DISPONIBLE"
+
+        super().save_model(request, obj, form, change)
+
+        if obj.archivo:
+            hydrate_backup_metadata(obj)
+            obj.save(
+                update_fields=[
+                    "tamano_bytes",
+                    "checksum_sha256",
+                    "formato",
+                    "fecha_actualizacion",
+                ]
+            )
+
+    def download_backup_view(self, request, backup_id):
+        if not request.user.is_superuser:
+            raise PermissionDenied
+
+        respaldo = self.get_object(request, backup_id)
+        if respaldo is None or not respaldo.archivo:
+            raise Http404("Respaldo no encontrado.")
+
+        file_path = Path(respaldo.archivo.path)
+        if not file_path.exists():
+            raise Http404("El archivo del respaldo no existe.")
+
+        return FileResponse(
+            open(file_path, "rb"),
+            as_attachment=True,
+            filename=respaldo.nombre_archivo,
+        )
+
+    def restore_backup_view(self, request, backup_id):
+        if not request.user.is_superuser:
+            raise PermissionDenied
+
+        respaldo = self.get_object(request, backup_id)
+        if respaldo is None:
+            raise Http404("Respaldo no encontrado.")
+
+        if request.method == "POST":
+            try:
+                restaurado, previo = restore_system_backup(
+                    respaldo, restored_by=request.user
+                )
+                mensaje = f"Restauracion completada correctamente para {restaurado.nombre}."
+                if previo:
+                    mensaje += f" Se genero respaldo previo: {previo.nombre}."
+                self.message_user(request, mensaje, level=messages.SUCCESS)
+                return redirect("admin:core_respaldosistema_changelist")
+            except Exception as exc:
+                self.message_user(
+                    request,
+                    f"La restauracion fallo: {exc}",
+                    level=messages.ERROR,
+                )
+
+        context = {
+            **self.admin_site.each_context(request),
+            "opts": self.model._meta,
+            "original": respaldo,
+            "title": "Confirmar restauracion de respaldo",
+            "backup": respaldo,
+        }
+        return TemplateResponse(
+            request,
+            "admin/core/respaldosistema/restore_confirm.html",
+            context,
+        )
+
+
+@admin.register(Docente)
+class DocenteAdmin(UserAdmin, ModelAdmin):
     model = Docente
-    list_display = ['username', 'first_name', 'last_name', 'get_especialidades', 'disponibilidad', 'is_staff']
-    
-    fieldsets = UserAdmin.fieldsets + (
-        ('Información Adicional', {'fields': ('dni', 'especialidades', 'disponibilidad', 'id_qr', 'foto', 'vista_previa_foto')}),
+    list_display = [
+        "username",
+        "first_name",
+        "last_name",
+        "get_especialidades_prettified",
+        "disponibilidad",
+        "display_is_staff",
+        "display_is_active",
+        "acciones",
+    ]
+    list_display_links = None
+    search_as_command = True
+
+    fieldsets = (
+        (None, {"fields": ("username", "password")}),
+        (
+            "Información Personal",
+            {
+                "classes": ("tab",),
+                "fields": ("first_name", "last_name", "email", "dni"),
+            },
+        ),
+        (
+            "Perfil Docente",
+            {
+                "classes": ("tab",),
+                "fields": (
+                    "especialidades",
+                    "disponibilidad",
+                    "foto",
+                    "vista_previa_foto",
+                ),
+            },
+        ),
+        (
+            "Permisos",
+            {
+                "classes": ("tab",),
+                "fields": (
+                    "is_active",
+                    "is_staff",
+                    "is_superuser",
+                    "groups",
+                    "user_permissions",
+                ),
+            },
+        ),
+        (
+            "Credenciales",
+            {
+                "classes": ("tab",),
+                "fields": ("id_qr", "rotate_qr_code_button", "rfid_uid"),
+            },
+        ),
+        (
+            "Fechas Importantes",
+            {"classes": ("tab",), "fields": ("date_joined", "last_login")},
+        ),
     )
+
     add_fieldsets = UserAdmin.add_fieldsets + (
-        ('Información Adicional', {'fields': ('dni', 'especialidades', 'disponibilidad', 'foto')}),
+        (
+            "Información Adicional",
+            {"fields": ("dni", "especialidades", "disponibilidad", "foto")},
+        ),
     )
-    
-    readonly_fields = ('id_qr', 'vista_previa_foto',)
-    filter_horizontal = ('especialidades',)
+    readonly_fields = (
+        "id_qr",
+        "vista_previa_foto",
+        "rotate_qr_code_button",
+        "date_joined",
+        "last_login",
+    )
+    filter_horizontal = ("especialidades", "groups", "user_permissions")
+    list_filter = ("is_staff", "is_superuser", "is_active", "groups", "disponibilidad")
+    search_fields = ("username", "first_name", "last_name", "email", "dni")
+    ordering = ("username",)
+
+    @admin.display(description="Acciones")
+    def acciones(self, obj):
+        # Para el cambio normal, mantenemos el contexto del modelo actual (proxy o base)
+        change_url = reverse(
+            f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change", args=[obj.pk]
+        )
+        
+        # Para la contraseña, usamos SIEMPRE el modelo base (Docente/User)
+        # Esto evita errores "NoReverseMatch" en modelos proxy (PersonalDocente, Administrador)
+        # ya que UserAdmin a veces no registra las URLs de password para proxies.
+        password_url = reverse(
+            f"admin:{obj._meta.concrete_model._meta.app_label}_{obj._meta.concrete_model._meta.model_name}_password_change",
+            args=[obj.pk]
+        )
+        
+        return format_html(
+            f'<a href="{change_url}" class="button" title="Editar Info">Editar</a> '
+            f'<a href="{password_url}" class="button" style="background-color: #f59e0b; color: white;" title="Cambiar Contraseña">🔒 Clave</a>'
+        )
+
+    def get_urls(self):
+        from django.urls import path
+        
+        urls = super().get_urls()
+        my_urls = [
+            path(
+                "<id>/password/",
+                self.admin_site.admin_view(self.user_change_password),
+                name=f"{self.model._meta.app_label}_{self.model._meta.model_name}_password_change",
+            ),
+        ]
+        return my_urls + urls
+
+    @admin.display(description="Especialidades", ordering="especialidades")
+    def get_especialidades_prettified(self, obj):
+        html = [
+            f'<span class="badge badge-sm badge-outline">{e.nombre}</span>'
+            for e in obj.especialidades.all()
+        ]
+        return format_html(" ".join(html))
+
+    @admin.display(boolean=True, description="Es Staff")
+    def display_is_staff(self, obj):
+        return obj.is_staff
+
+    @admin.display(boolean=True, description="Está Activo")
+    def display_is_active(self, obj):
+        return obj.is_active
+
+    def rotate_qr_code_button(self, obj):
+        if obj.pk:
+            url = reverse("rotate_qr_code", args=[obj.pk])
+            return format_html(
+                '<a class="button" href="{}">Generar Nuevo Código QR</a>', url
+            )
+        return "No disponible para nuevos docentes"
+
+    rotate_qr_code_button.short_description = "Regenerar QR"
 
     def vista_previa_foto(self, obj):
-        if obj.foto and hasattr(obj.foto, 'url'):
-            return format_html('<img src="{}" width="150" height="150" style="object-fit: cover; border-radius: 8px;" />', obj.foto.url)
+        if obj.foto and hasattr(obj.foto, "url"):
+            return format_html(
+                '<img src="{}" width="150" height="150" style="object-fit: cover; border-radius: 8px;" />',
+                obj.foto.url,
+            )
         return "(Sin foto)"
-    vista_previa_foto.short_description = 'Vista Previa de la Foto'
 
-    def get_especialidades(self, obj):
-        return ", ".join([e.nombre for e in obj.especialidades.all()])
-    get_especialidades.short_description = 'Especialidades'
+    vista_previa_foto.short_description = "Vista Previa de la Foto"
 
 
 @admin.register(PersonalDocente)
@@ -40,86 +454,696 @@ class PersonalDocenteAdmin(DocenteAdmin):
     def get_queryset(self, request):
         return super().get_queryset(request).filter(is_staff=False)
 
+
 @admin.register(Administrador)
 class AdministradorAdmin(DocenteAdmin):
     def get_queryset(self, request):
         return super().get_queryset(request).filter(is_staff=True)
 
+
 @admin.register(Especialidad)
-class EspecialidadAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'grupo')
-    list_filter = ('grupo',)
+class EspecialidadAdmin(ModelAdmin):
+    list_display = ("nombre", "grupo", "acciones")
+    list_display_links = None
+    list_filter = ("grupo",)
+    search_fields = ("nombre",)
+    search_as_command = True
+
+    @admin.display(description="Acciones")
+    def acciones(self, obj):
+        change_url = reverse(
+            f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change", args=[obj.pk]
+        )
+        return format_html(f'<a href="{change_url}" class="button">Editar</a>')
+
+
+@admin.register(Grupo)
+class GrupoAdmin(ModelAdmin):
+    list_display = (
+        "nombre",
+        "dia_preferido_especialidad_1",
+        "dia_preferido_especialidad_2",
+        "acciones",
+    )
+    list_display_links = None
+    search_fields = ("nombre",)
+    search_as_command = True
+
+    @admin.display(description="Acciones")
+    def acciones(self, obj):
+        change_url = reverse(
+            f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change", args=[obj.pk]
+        )
+        return format_html(f'<a href="{change_url}" class="button">Editar</a>')
+
+
+@admin.register(Carrera)
+class CarreraAdmin(ModelAdmin):
+    list_display = ("nombre", "acciones")
+    list_display_links = None
+    search_fields = ("nombre",)
+    search_as_command = True
+
+    @admin.display(description="Acciones")
+    def acciones(self, obj):
+        change_url = reverse(
+            f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change", args=[obj.pk]
+        )
+        return format_html(f'<a href="{change_url}" class="button">Editar</a>')
+
+
+@admin.register(TipoDocumento)
+class TipoDocumentoAdmin(ModelAdmin):
+    list_display = ("nombre", "acciones")
+    list_display_links = None
+    search_fields = ("nombre",)
+    search_as_command = True
+
+    @admin.display(description="Acciones")
+    def acciones(self, obj):
+        change_url = reverse(
+            f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change", args=[obj.pk]
+        )
+        return format_html(f'<a href="{change_url}" class="button">Editar</a>')
+
 
 @admin.register(Semestre)
-class SemestreAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'estado', 'tipo', 'fecha_inicio', 'fecha_fin')
-    list_filter = ('estado', 'tipo')
-    ordering = ('-fecha_inicio',)
+class SemestreAdmin(ModelAdmin):
+    list_display = (
+        "nombre",
+        "display_estado",
+        "tipo",
+        "fecha_inicio",
+        "fecha_fin",
+        "acciones",
+    )
+    list_display_links = None
+    list_filter = ("estado", "tipo")
+    ordering = ("-fecha_inicio",)
+    search_fields = ("nombre",)
+    search_as_command = True
+
+    @admin.display(description="Estado", ordering="estado")
+    def display_estado(self, obj):
+        colors = {
+            "PLANIFICACION": "bg-blue-500",
+            "ACTIVO": "bg-green-500",
+            "CERRADO": "bg-gray-500",
+        }
+        color = colors.get(obj.estado, "bg-gray-400")
+        return format_html(
+            f'<span class="px-2 py-1 text-xs font-semibold text-white rounded-full {color}">{obj.get_estado_display()}</span>'
+        )
+
+    @admin.display(description="Acciones")
+    def acciones(self, obj):
+        change_url = reverse(
+            f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change", args=[obj.pk]
+        )
+        return format_html(f'<a href="{change_url}" class="button">Editar</a>')
+
+
+from .models import BloqueHorario
+
 
 @admin.register(Curso)
-class CursoAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'tipo_curso', 'docente', 'especialidad', 'semestre', 'semestre_cursado')
-    list_filter = ('semestre', 'tipo_curso', 'especialidad', 'semestre_cursado')
-    search_fields = ('nombre', 'docente__first_name', 'docente__last_name')
-    ordering = ('semestre', 'semestre_cursado', 'nombre')
-    
-    fieldsets = (
-        (None, {'fields': ('nombre', 'tipo_curso', 'docente')}),
-        ('Organización Académica', {'fields': ('carrera', 'especialidad', 'semestre', 'semestre_cursado')}),
-        ('Horario', {'fields': ('dia', 'horario_inicio', 'horario_fin', 'duracion_bloques')}),
+class CursoAdmin(ModelAdmin):
+    list_display = (
+        "nombre",
+        "tipo_curso",
+        "docente",
+        "get_especialidades_prettified",
+        "semestre",
+        "semestre_cursado",
+        "acciones",
     )
+    list_display_links = None
+    list_filter = (
+        "semestre",
+        "tipo_curso",
+        "especialidades",
+        "semestre_cursado",
+        "carrera",
+    )
+    search_fields = ("nombre", "docente__first_name", "docente__last_name")
+    search_as_command = True
+    ordering = ("semestre", "semestre_cursado", "nombre")
+    autocomplete_fields = ["docente", "carrera", "semestre"]
+    filter_horizontal = ("especialidades",)
+    fieldsets = (
+        (
+            "Información General",
+            {"fields": ("nombre", "tipo_curso", "horas_academicas_semanales")},
+        ),
+        (
+            "Organización Académica",
+            {
+                "fields": (
+                    "docente",
+                    "carrera",
+                    "especialidades",
+                    "semestre",
+                    "semestre_cursado",
+                    "excepcion_horario",
+                    "tolerancia_tardanza_minutos",
+                )
+            },
+        ),
+    )
+
+    @admin.display(description="Especialidades")
+    def get_especialidades_prettified(self, obj):
+        html = [
+            f'<span class="badge badge-sm badge-outline">{e.nombre}</span>'
+            for e in obj.especialidades.all()
+        ]
+        return format_html(" ".join(html))
+
+    @admin.display(description="Acciones")
+    def acciones(self, obj):
+        change_url = reverse(
+            f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change", args=[obj.pk]
+        )
+        return format_html(f'<a href="{change_url}" class="button">Editar</a>')
+
 
 @admin.register(DiaEspecial)
-class DiaEspecialAdmin(admin.ModelAdmin):
-    list_display = ('fecha', 'motivo', 'tipo', 'semestre')
-    list_filter = ('tipo', 'semestre')
-    ordering = ('-fecha',)
-    
-@admin.register(FranjaHoraria)
-class FranjaHorariaAdmin(admin.ModelAdmin):
-    list_display = ('turno', 'hora_inicio', 'hora_fin')
-    list_filter = ('turno',)
-    ordering = ('hora_inicio',)
+class DiaEspecialAdmin(ModelAdmin):
+    list_display = ("fecha", "motivo", "tipo", "semestre", "acciones")
+    list_display_links = None
+    list_filter = ("tipo", "semestre")
+    ordering = ("-fecha",)
 
-class VersionDocumentoInline(admin.TabularInline):
+    @admin.display(description="Acciones")
+    def acciones(self, obj):
+        change_url = reverse(
+            f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change", args=[obj.pk]
+        )
+        return format_html(f'<a href="{change_url}" class="button">Editar</a>')
+
+
+@admin.register(Aula)
+class AulaAdmin(ModelAdmin):
+    list_display = ("nombre", "ubicacion", "es_laboratorio", "acciones")
+    list_display_links = None
+    search_fields = ("nombre", "ubicacion")
+    search_as_command = True
+    list_filter = ("es_laboratorio",)
+
+    @admin.display(description="Acciones")
+    def acciones(self, obj):
+        change_url = reverse(
+            f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change", args=[obj.pk]
+        )
+        return format_html(f'<a href="{change_url}" class="button">Editar</a>')
+
+
+@admin.register(FranjaHoraria)
+class FranjaHorariaAdmin(ModelAdmin):
+    list_display = ("__str__", "turno", "hora_inicio", "hora_fin", "acciones")
+    list_display_links = None
+    list_filter = ("turno",)
+    ordering = ("hora_inicio",)
+    search_fields = ("turno", "hora_inicio")
+    search_as_command = True
+
+    @admin.display(description="Acciones")
+    def acciones(self, obj):
+        change_url = reverse(
+            f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change", args=[obj.pk]
+        )
+        return format_html(f'<a href="{change_url}" class="button">Editar</a>')
+
+
+class VersionDocumentoInline(TabularInline):
     model = VersionDocumento
     extra = 1
-    readonly_fields = ('fecha_version', 'numero_version')
+    readonly_fields = ("fecha_version", "numero_version")
+    classes = ("collapse",)
+
 
 @admin.register(Documento)
-class DocumentoAdmin(admin.ModelAdmin):
-    list_display = ('titulo', 'docente', 'tipo_documento', 'estado', 'fecha_vencimiento')
-    list_filter = ('estado', 'tipo_documento', 'docente')
-    search_fields = ('titulo', 'docente__first_name', 'docente__last_name')
-    readonly_fields = ('fecha_subida',)
+class DocumentoAdmin(ModelAdmin):
+    list_display = (
+        "titulo",
+        "docente",
+        "tipo_documento",
+        "display_estado",
+        "fecha_vencimiento",
+        "acciones",
+    )
+    list_display_links = None
+    list_filter = ("estado", "tipo_documento", "docente")
+    search_fields = ("titulo", "docente__first_name", "docente__last_name")
+    search_as_command = True
+    readonly_fields = ("fecha_subida",)
     inlines = [VersionDocumentoInline]
-
-@admin.register(VersionDocumento)
-class VersionDocumentoAdmin(admin.ModelAdmin):
-    list_display = ('__str__', 'fecha_version')
-
-@admin.register(ConfiguracionInstitucion)
-class ConfiguracionInstitucionAdmin(admin.ModelAdmin):
-    """
-    Panel de administración personalizado para la Configuración de la Institución.
-    """
+    autocomplete_fields = ["docente", "tipo_documento"]
     fieldsets = (
-        ('Información Principal', {
-            'fields': ('nombre_institucion', 'logo', 'facultad')
-        }),
-        ('Datos de Contacto (Opcional)', {
-            'fields': ('direccion', 'telefono', 'email_contacto'),
-            'classes': ('collapse',),
-        }),
+        (
+            "Detalles del Documento",
+            {
+                "classes": ("tab",),
+                "fields": ("titulo", "tipo_documento", "docente", "fecha_vencimiento"),
+            },
+        ),
+        (
+            "Revisión",
+            {
+                "classes": ("tab",),
+                "fields": ("estado", "observaciones"),
+            },
+        ),
     )
 
-    def has_add_permission(self, request):
-        return not ConfiguracionInstitucion.objects.exists()
+    @admin.display(description="Estado", ordering="estado")
+    def display_estado(self, obj):
+        colors = {
+            "RECIBIDO": "bg-blue-500",
+            "EN_REVISION": "bg-yellow-500",
+            "APROBADO": "bg-green-500",
+            "OBSERVADO": "bg-orange-500",
+            "VENCIDO": "bg-red-500",
+        }
+        color = colors.get(obj.estado, "bg-gray-400")
+        return format_html(
+            f'<span class="px-2 py-1 text-xs font-semibold text-white rounded-full {color}">{obj.get_estado_display()}</span>'
+        )
+
+    @admin.display(description="Acciones")
+    def acciones(self, obj):
+        change_url = reverse(
+            f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change", args=[obj.pk]
+        )
+        return format_html(f'<a href="{change_url}" class="button">Editar</a>')
+
+
+@admin.register(VersionDocumento)
+class VersionDocumentoAdmin(ModelAdmin):
+    list_display = ("__str__", "fecha_version")
+    search_fields = ("documento__titulo",)
+    search_as_command = True
+
+
+@admin.register(ConfiguracionInstitucion)
+class ConfiguracionInstitucionAdmin(ModelAdmin):
+    fieldsets = (
+        (
+            "Información Principal",
+            {"fields": ("nombre_institucion", "logo", "facultad", "nombre_dashboard")},
+        ),
+        (
+            "Parámetros del Sistema",
+            {
+                "fields": (
+                    "tiempo_limite_tardanza",
+                    "validar_geolocalizacion",
+                    "hora_inicio_asistencia_general",
+                    "hora_fin_asistencia_general",
+                )
+            },
+        ),
+        (
+            "Reglas del Planificador",
+            {
+                "fields": (
+                    "max_horas_diarias_docente",
+                    "max_horas_diarias_especialidad",
+                    "max_bloques_consecutivos_docente",
+                )
+            },
+        ),
+        (
+            "Datos de Contacto (Opcional)",
+            {
+                "fields": ("direccion", "telefono", "email_contacto"),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+
+    def add_view(self, request, form_url="", extra_context=None):
+        if ConfiguracionInstitucion.objects.exists():
+            obj = ConfiguracionInstitucion.objects.first()
+            return HttpResponseRedirect(
+                reverse("admin:core_configuracioninstitucion_change", args=[obj.pk])
+            )
+        return super().add_view(request, form_url, extra_context)
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(Notificacion)
+class NotificacionAdmin(ModelAdmin):
+    list_display = ("destinatario", "mensaje", "leido", "fecha_creacion", "acciones")
+    list_display_links = None
+    list_filter = ("leido", "fecha_creacion")
+    search_fields = ("destinatario__username", "mensaje")
+    search_as_command = True
+
+    @admin.display(description="Acciones")
+    def acciones(self, obj):
+        change_url = reverse(
+            f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change", args=[obj.pk]
+        )
+        return format_html(f'<a href="{change_url}" class="button">Ver</a>')
+
+
+@admin.register(Anuncio)
+class AnuncioAdmin(ModelAdmin):
+    list_display = ("titulo", "autor", "fecha_publicacion", "acciones")
+    list_display_links = None
+    search_fields = ("titulo", "contenido")
+    search_as_command = True
+    list_filter = ("autor", "fecha_publicacion")
+    formfield_overrides = {
+        models.TextField: {"widget": WysiwygWidget},
+    }
+    fieldsets = ((None, {"fields": ("titulo", "contenido")}),)
+
+    def save_model(self, request, obj, form, change):
+        if not obj.autor:
+            obj.autor = request.user
+        super().save_model(request, obj, form, change)
+
+    @admin.display(description="Acciones")
+    def acciones(self, obj):
+        change_url = reverse(
+            f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change", args=[obj.pk]
+        )
+        return format_html(f'<a href="{change_url}" class="button">Editar</a>')
+
+
+@admin.register(TipoJustificacion)
+class TipoJustificacionAdmin(ModelAdmin):
+    list_display = ("nombre", "acciones")
+    list_display_links = None
+    search_fields = ("nombre",)
+    search_as_command = True
+
+    @admin.display(description="Acciones")
+    def acciones(self, obj):
+        change_url = reverse(
+            f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change", args=[obj.pk]
+        )
+        return format_html(f'<a href="{change_url}" class="button">Editar</a>')
+
+
+@admin.register(Justificacion)
+class JustificacionAdmin(ModelAdmin):
+    list_display = (
+        "docente",
+        "tipo",
+        "fecha_inicio",
+        "fecha_fin",
+        "display_estado",
+        "acciones",
+    )
+    list_display_links = None
+    list_filter = ("estado", "tipo", "fecha_inicio")
+    search_fields = ("docente__first_name", "docente__last_name", "motivo")
+    search_as_command = True
+    ordering = ("-fecha_creacion",)
+    readonly_fields = ("fecha_creacion", "fecha_revision", "revisado_por")
+    autocomplete_fields = ["docente", "tipo", "revisado_por"]
+    fieldsets = (
+        (
+            "Datos de la Justificación",
+            {
+                "classes": ("tab",),
+                "fields": (
+                    "docente",
+                    "tipo",
+                    ("fecha_inicio", "fecha_fin"),
+                    "motivo",
+                    "documento_adjunto",
+                ),
+            },
+        ),
+        (
+            "Revisión Administrativa",
+            {
+                "classes": ("tab",),
+                "fields": (
+                    "estado",
+                    "observaciones_revision",
+                    "revisado_por",
+                    "fecha_revision",
+                ),
+            },
+        ),
+    )
+
+    @admin.display(description="Estado", ordering="estado")
+    def display_estado(self, obj):
+        colors = {
+            "PENDIENTE": "bg-yellow-500",
+            "APROBADO": "bg-green-500",
+            "RECHAZADO": "bg-red-500",
+        }
+        color = colors.get(obj.estado, "bg-gray-400")
+        return format_html(
+            f'<span class="px-2 py-1 text-xs font-semibold text-white rounded-full {color}">{obj.get_estado_display()}</span>'
+        )
+
+    def save_model(self, request, obj, form, change):
+        if "estado" in form.changed_data and obj.estado != "PENDIENTE":
+            obj.revisado_por = request.user
+            obj.fecha_revision = timezone.now()
+        super().save_model(request, obj, form, change)
+
+    @admin.display(description="Acciones")
+    def acciones(self, obj):
+        change_url = reverse(
+            f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change", args=[obj.pk]
+        )
+        return format_html(f'<a href="{change_url}" class="button">Revisar</a>')
+
+
+@admin.register(RecuperacionClase)
+class RecuperacionClaseAdmin(ModelAdmin):
+    list_display = (
+        "docente",
+        "curso",
+        "fecha_a_recuperar",
+        "fecha_propuesta",
+        "display_estado",
+        "acciones",
+    )
+    list_display_links = None
+    list_filter = ("estado", "fecha_propuesta")
+    search_fields = ("docente__first_name", "docente__last_name", "curso__nombre")
+    search_as_command = True
+    ordering = ("-fecha_creacion",)
+    autocomplete_fields = ["docente", "curso", "aula_solicitada"]
+    
+    fieldsets = (
+        (
+            "Detalles de la Solicitud",
+            {
+                "classes": ("tab",),
+                "fields": (
+                    "docente",
+                    "curso",
+                    "fecha_a_recuperar",
+                    "motivo",
+                ),
+            },
+        ),
+        (
+            "Propuesta de Recuperación",
+            {
+                "classes": ("tab",),
+                "fields": (
+                    "fecha_propuesta",
+                    "duracion_minutos",
+                    "aula_solicitada",
+                ),
+            },
+        ),
+        (
+            "Revisión Administrativa",
+            {
+                "classes": ("tab",),
+                "fields": (
+                    "estado",
+                    "observaciones",
+                ),
+            },
+        ),
+    )
+
+    @admin.display(description="Estado", ordering="estado")
+    def display_estado(self, obj):
+        colors = {
+            "PENDIENTE": "bg-yellow-500",
+            "APROBADO": "bg-green-500",
+            "RECHAZADO": "bg-red-500",
+        }
+        color = colors.get(obj.estado, "bg-gray-400")
+        return format_html(
+            f'<span class="px-2 py-1 text-xs font-semibold text-white rounded-full {color}">{obj.get_estado_display()}</span>'
+        )
+
+    @admin.display(description="Acciones")
+    def acciones(self, obj):
+        change_url = reverse(
+            f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change", args=[obj.pk]
+        )
+        return format_html(f'<a href="{change_url}" class="button">Revisar</a>')
+
+
+@admin.register(TipoActivo)
+class TipoActivoAdmin(ModelAdmin):
+    list_display = ("nombre", "acciones")
+    list_display_links = None
+    search_fields = ("nombre",)
+    search_as_command = True
+
+    @admin.display(description="Acciones")
+    def acciones(self, obj):
+        change_url = reverse(
+            f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change", args=[obj.pk]
+        )
+        return format_html(f'<a href="{change_url}" class="button">Editar</a>')
+
+
+@admin.register(Activo)
+class ActivoAdmin(ModelAdmin):
+    list_display = (
+        "nombre",
+        "codigo_patrimonial",
+        "tipo",
+        "estado",
+        "asignado_a",
+        "acciones",
+    )
+    list_display_links = None
+    list_filter = ("estado", "tipo")
+    search_fields = (
+        "nombre",
+        "codigo_patrimonial",
+        "asignado_a__first_name",
+        "asignado_a__last_name",
+        "asignado_a__username",
+    )
+    search_as_command = True
+    autocomplete_fields = ("asignado_a", "tipo")
+
+    @admin.display(description="Acciones")
+    def acciones(self, obj):
+        change_url = reverse(
+            f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change", args=[obj.pk]
+        )
+        return format_html(f'<a href="{change_url}" class="button">Editar</a>')
+
+
+@admin.register(Reserva)
+class ReservaAdmin(ModelAdmin):
+    list_display = (
+        "id",
+        "activo",
+        "docente",
+        "fecha_reserva",
+        "franja_horaria_inicio",
+        "franja_horaria_fin",
+        "estado",
+        "acciones",
+    )
+    list_display_links = None
+    list_filter = ("estado", "fecha_reserva")
+    search_fields = ("activo__nombre", "docente__username", "docente__first_name")
+    search_as_command = True
+    autocomplete_fields = (
+        "activo",
+        "docente",
+        "franja_horaria_inicio",
+        "franja_horaria_fin",
+    )
+    readonly_fields = ("fecha_creacion", "fecha_confirmacion", "fecha_finalizacion")
+    list_per_page = 20
+
+    @admin.display(description="Acciones")
+    def acciones(self, obj):
+        change_url = reverse(
+            f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change", args=[obj.pk]
+        )
+        return format_html(f'<a href="{change_url}" class="button">Ver</a>')
+
+
+@admin.register(Asistencia)
+class AsistenciaAdmin(SimpleHistoryAdmin, ModelAdmin):
+    list_display = (
+        "docente",
+        "curso",
+        "fecha",
+        "hora_entrada",
+        "hora_salida",
+        "acciones",
+    )
+    list_display_links = None
+    list_filter = ("fecha", "curso__semestre", "docente")
+    search_fields = ("docente__first_name", "docente__last_name", "curso__nombre")
+    search_as_command = True
+    readonly_fields = (
+        "hora_entrada",
+        "hora_salida",
+        "hora_salida_permitida",
+        "foto_entrada",
+        "foto_salida",
+    )
+    autocomplete_fields = ["docente", "curso"]
+
+    @admin.display(description="Acciones")
+    def acciones(self, obj):
+        change_url = reverse(
+            f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change", args=[obj.pk]
+        )
+        return format_html(f'<a href="{change_url}" class="button">Ver Detalles</a>')
+
+
+@admin.register(SolicitudIntercambio)
+class SolicitudIntercambioAdmin(ModelAdmin):
+    list_display = (
+        "docente_solicitante",
+        "curso_solicitante",
+        "docente_destino",
+        "curso_destino",
+        "display_estado",
+        "acciones",
+    )
+    list_display_links = None
+    list_filter = ("estado",)
+    search_fields = ("docente_solicitante__first_name", "docente_destino__first_name")
+    search_as_command = True
+    autocomplete_fields = [
+        "docente_solicitante",
+        "curso_solicitante",
+        "docente_destino",
+        "curso_destino",
+    ]
+
+    @admin.display(description="Estado", ordering="estado")
+    def display_estado(self, obj):
+        colors = {
+            "pendiente": "bg-yellow-500",
+            "aprobado": "bg-green-500",
+            "rechazado": "bg-red-500",
+        }
+        color = colors.get(obj.estado, "bg-gray-400")
+        return format_html(
+            f'<span class="px-2 py-1 text-xs font-semibold text-white rounded-full {color}">{obj.get_estado_display()}</span>'
+        )
+
+    @admin.display(description="Acciones")
+    def acciones(self, obj):
+        change_url = reverse(
+            f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change", args=[obj.pk]
+        )
+        return format_html(f'<a href="{change_url}" class="button">Revisar</a>')
+
 
 # --- REGISTRO DEL RESTO DE MODELOS ---
-admin.site.register(Grupo)
-admin.site.register(Carrera)
-admin.site.register(TipoDocumento)
-admin.site.register(Asistencia)
-admin.site.register(SolicitudIntercambio)
 admin.site.register(AsistenciaDiaria)
+admin.site.register(BloqueHorario)
