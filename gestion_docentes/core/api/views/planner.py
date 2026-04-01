@@ -562,7 +562,13 @@ def _get_current_schedule_sections(especialidad_id, semestre_cursado):
     ]
 
 
-def _serialize_block_for_export(bloque, *, include_docente=True, include_especialidades=True):
+def _serialize_block_for_export(
+    bloque,
+    *,
+    include_docente=True,
+    include_especialidades=True,
+    include_semestre_meta=False,
+):
     especialidades = list(bloque.curso.especialidades.values_list("nombre", flat=True))
     especialidades_label = ", ".join(especialidades) if especialidades else "Sin especialidad"
     docente_nombre = (
@@ -584,6 +590,11 @@ def _serialize_block_for_export(bloque, *, include_docente=True, include_especia
         "docente_nombre": docente_nombre,
         "subtitulo": subtitulo,
         "meta": bloque.curso.tipo_curso,
+        "meta_secondary": (
+            f"(Semestre {bloque.curso.semestre_cursado})"
+            if include_semestre_meta and bloque.curso.semestre_cursado
+            else ""
+        ),
         "dia": bloque.dia,
         "franja_id_inicio": bloque.franja_inicio.id,
         "duracion_bloques": bloque.duracion_bloques,
@@ -677,6 +688,7 @@ def _get_teacher_schedule_sections():
                     bloque,
                     include_docente=False,
                     include_especialidades=True,
+                    include_semestre_meta=True,
                 )
             )
 

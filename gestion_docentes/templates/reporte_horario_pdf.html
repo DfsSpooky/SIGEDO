@@ -32,6 +32,7 @@
         .curso-nombre { font-weight: bold; font-size: 9px; display: block; margin-bottom: 1px; }
         .curso-subtitulo { font-size: 8px; font-style: italic; display: block; color: #444; }
         .curso-meta { display:block; font-size:7px; margin-top:1px; opacity:0.8; }
+        .curso-meta-secondary { display:block; font-size:7px; margin-top:1px; font-style: italic; opacity:0.75; }
         .turno-header { background-color: #333; color: white; text-align: left; padding: 4px 5px; font-size: 10px; font-weight: bold; margin-top: 6px; border: 1px solid #333; }
         @media print {
             body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -121,6 +122,9 @@
                             {% else %}
                             <span class="curso-meta">{{ bloque.tipo_curso }}</span>
                             {% endif %}
+                            {% if bloque.meta_secondary %}
+                            <span class="curso-meta-secondary">{{ bloque.meta_secondary }}</span>
+                            {% endif %}
                         </div>
                         {% endif %}
                     </td>
@@ -162,6 +166,9 @@
                             <span class="curso-meta">{{ bloque.meta }}</span>
                             {% else %}
                             <span class="curso-meta">{{ bloque.tipo_curso }}</span>
+                            {% endif %}
+                            {% if bloque.meta_secondary %}
+                            <span class="curso-meta-secondary">{{ bloque.meta_secondary }}</span>
                             {% endif %}
                         </div>
                         {% endif %}
