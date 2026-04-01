@@ -550,27 +550,13 @@ def _build_schedule_section(
 def _get_current_schedule_sections(especialidad_id, semestre_cursado):
     planner_data = _get_planner_data(especialidad_id, semestre_cursado)
     especialidad = Especialidad.objects.get(id=especialidad_id)
-    carrera_nombre = (
-        Curso.objects.filter(
-            semestre__estado="ACTIVO",
-            semestre_cursado=semestre_cursado,
-            especialidades=especialidad,
-        )
-        .values_list("carrera__nombre", flat=True)
-        .distinct()
-        .first()
-    )
-
     title = especialidad.nombre
-    subtitle_parts = [f"Semestre {semestre_cursado}"]
-    if carrera_nombre:
-        subtitle_parts.insert(0, carrera_nombre)
 
     return planner_data, [
         {
             "section_type": "actual",
             "title": title,
-            "subtitle": " - ".join(subtitle_parts),
+            "subtitle": f"Semestre {semestre_cursado}",
             "bloques": planner_data["cursos_asignados"],
         }
     ]
@@ -585,26 +571,19 @@ def _serialize_block_for_export(bloque, *, include_docente=True, include_especia
         else "N/A"
     )
 
-    subtitulo_parts = []
+    subtitulo = ""
     if include_docente and docente_nombre:
-        subtitulo_parts.append(docente_nombre)
-    if include_especialidades:
-        subtitulo_parts.append(especialidades_label)
-
-    meta_parts = []
-    if bloque.curso.semestre_cursado:
-        meta_parts.append(f"Semestre {bloque.curso.semestre_cursado}")
-    meta_parts.append(bloque.curso.tipo_curso)
-    if bloque.aula:
-        meta_parts.append(f"Aula: {bloque.aula.nombre}")
+        subtitulo = docente_nombre
+    elif include_especialidades:
+        subtitulo = especialidades_label
 
     return {
         "bloque_id": bloque.id,
         "curso_id": bloque.curso.id,
         "nombre": bloque.curso.nombre,
         "docente_nombre": docente_nombre,
-        "subtitulo": " - ".join([part for part in subtitulo_parts if part]),
-        "meta": " | ".join(meta_parts),
+        "subtitulo": subtitulo,
+        "meta": bloque.curso.tipo_curso,
         "dia": bloque.dia,
         "franja_id_inicio": bloque.franja_inicio.id,
         "duracion_bloques": bloque.duracion_bloques,
@@ -645,7 +624,11 @@ def _get_program_schedule_sections(especialidad_id=None, semestre_cursado=None):
     sections = []
     for combo in combinaciones:
         bloques = [
-            _serialize_block_for_export(bloque)
+            _serialize_block_for_export(
+                bloque,
+                include_docente=True,
+                include_especialidades=False,
+            )
             for bloque in bloques_qs.filter(
                 curso__especialidades__id=combo["curso__especialidades__id"],
                 curso__semestre_cursado=combo["curso__semestre_cursado"],
