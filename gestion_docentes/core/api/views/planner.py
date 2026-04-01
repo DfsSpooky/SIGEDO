@@ -496,6 +496,20 @@ def _build_grid_from_blocks(franjas, dias, bloques):
     return grid
 
 
+def _format_export_label(value):
+    if not value:
+        return value
+
+    replacements = {
+        "ESCUELA PROFESIONAL": "PROGRAMA DE ESTUDIOS",
+        "Escuela Profesional": "Programa de Estudios",
+    }
+
+    for old, new in replacements.items():
+        value = value.replace(old, new)
+    return value
+
+
 def _build_schedule_section(
     *,
     section_type,
@@ -508,8 +522,8 @@ def _build_schedule_section(
 ):
     return {
         "section_type": section_type,
-        "title": title,
-        "subtitle": subtitle,
+        "title": _format_export_label(title),
+        "subtitle": _format_export_label(subtitle),
         "grid_manana": _build_grid_from_blocks(franjas_manana, dias, bloques),
         "grid_tarde": _build_grid_from_blocks(franjas_tarde, dias, bloques),
     }
@@ -581,15 +595,15 @@ def _serialize_block_for_export(bloque, *, include_docente=True, include_especia
     }
 
 
-def _get_career_schedule_sections(carrera_id=None, semestre_cursado=None):
+def _get_program_schedule_sections(especialidad_id=None, semestre_cursado=None):
     try:
         semestre_activo = Semestre.objects.get(estado="ACTIVO")
     except Semestre.DoesNotExist:
         raise ValueError("No hay un semestre activo configurado.")
 
     filtros = Q(curso__semestre=semestre_activo)
-    if carrera_id:
-        filtros &= Q(curso__carrera_id=carrera_id)
+    if especialidad_id:
+        filtros &= Q(curso__especialidades__id=especialidad_id)
     if semestre_cursado:
         filtros &= Q(curso__semestre_cursado=semestre_cursado)
 
@@ -597,17 +611,17 @@ def _get_career_schedule_sections(carrera_id=None, semestre_cursado=None):
         BloqueHorario.objects.filter(filtros)
         .select_related("curso__carrera", "curso__docente", "franja_inicio", "aula")
         .prefetch_related("curso__especialidades")
-        .order_by("curso__carrera__nombre", "curso__semestre_cursado", "dia_semana", "horario_inicio")
+        .order_by("curso__especialidades__nombre", "curso__semestre_cursado", "dia_semana", "horario_inicio")
     )
 
     combinaciones = (
         bloques_qs.values(
-            "curso__carrera_id",
-            "curso__carrera__nombre",
+            "curso__especialidades__id",
+            "curso__especialidades__nombre",
             "curso__semestre_cursado",
         )
         .distinct()
-        .order_by("curso__carrera__nombre", "curso__semestre_cursado")
+        .order_by("curso__especialidades__nombre", "curso__semestre_cursado")
     )
 
     sections = []
@@ -615,7 +629,7 @@ def _get_career_schedule_sections(carrera_id=None, semestre_cursado=None):
         bloques = [
             _serialize_block_for_export(bloque)
             for bloque in bloques_qs.filter(
-                curso__carrera_id=combo["curso__carrera_id"],
+                curso__especialidades__id=combo["curso__especialidades__id"],
                 curso__semestre_cursado=combo["curso__semestre_cursado"],
             )
         ]
@@ -624,8 +638,8 @@ def _get_career_schedule_sections(carrera_id=None, semestre_cursado=None):
 
         sections.append(
             {
-                "section_type": "carrera",
-                "title": combo["curso__carrera__nombre"] or "Sin carrera",
+                "section_type": "programa",
+                "title": combo["curso__especialidades__nombre"] or "Sin programa de estudios",
                 "subtitle": f'Semestre {combo["curso__semestre_cursado"]}',
                 "bloques": bloques,
             }
@@ -1302,26 +1316,26 @@ def api_exportar_horario(request):
 
         report_titles = {
             "actual": "Horario de Clases",
-            "carrera": "Horarios por Carrera",
-            "carrera_semestre": "Horarios por Carrera y Semestre",
+            "programa": "Horarios por Programa de Estudios",
+            "programa_semestre": "Horarios por Programa de Estudios y Semestre",
             "docente": "Horarios por Docente",
         }
-        carrera_id = request.GET.get("carrera_id")
+        especialidad_param = request.GET.get("especialidad_export_id")
 
         if export_type == "actual":
             if not especialidad_id or not semestre_cursado:
                 return error_response("Faltan parámetros.")
 
             _, raw_sections = _get_current_schedule_sections(especialidad_id, semestre_cursado)
-        elif export_type == "carrera":
-            if not carrera_id:
-                return error_response("Falta la carrera para exportar.")
-            raw_sections = _get_career_schedule_sections(carrera_id=carrera_id)
-        elif export_type == "carrera_semestre":
-            if not carrera_id or not semestre_cursado:
-                return error_response("Faltan parámetros para carrera y semestre.")
-            raw_sections = _get_career_schedule_sections(
-                carrera_id=carrera_id,
+        elif export_type == "programa":
+            if not especialidad_param:
+                return error_response("Falta el programa de estudios para exportar.")
+            raw_sections = _get_program_schedule_sections(especialidad_id=especialidad_param)
+        elif export_type == "programa_semestre":
+            if not especialidad_param or not semestre_cursado:
+                return error_response("Faltan parámetros para programa de estudios y semestre.")
+            raw_sections = _get_program_schedule_sections(
+                especialidad_id=especialidad_param,
                 semestre_cursado=semestre_cursado,
             )
         elif export_type == "docente":

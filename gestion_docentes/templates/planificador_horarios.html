@@ -569,9 +569,9 @@
         franjasManana: {{ franjas_manana_json | safe }},
     franjasTarde: {{ franjas_tarde_json | safe }},
     diasSemana: {{ dias_semana_json | safe }},
-    carreras: [
-        {% for carrera in carreras %}
-        { id: '{{ carrera.id }}', nombre: '{{ carrera.nombre|escapejs }}' }{% if not forloop.last %},{% endif %}
+    programasEstudio: [
+        {% for programa in programas_estudio %}
+        { id: '{{ programa.id }}', nombre: '{{ programa.nombre|escapejs }}' }{% if not forloop.last %},{% endif %}
         {% endfor %}
     ]
     };
@@ -580,9 +580,9 @@
     document.getElementById('btn-export-pdf').addEventListener('click', function () {
         const especialidad = document.getElementById('especialidad').value;
         const semestre = document.getElementById('semestre_cursado').value;
-        const carreras = window.PlannerConfig.carreras || [];
-        const carreraOptions = carreras.reduce((acc, carrera) => {
-            acc[carrera.id] = carrera.nombre;
+        const programas = window.PlannerConfig.programasEstudio || [];
+        const programaOptions = programas.reduce((acc, programa) => {
+            acc[programa.id] = programa.nombre;
             return acc;
         }, {});
 
@@ -607,17 +607,17 @@
                             </div>
                         </label>
                         <label style="display:flex; gap:10px; align-items:flex-start; padding:12px; border:1px solid #dbe2ea; border-radius:12px; cursor:pointer;">
-                            <input type="radio" name="export_mode" value="carrera" style="margin-top:4px;">
+                            <input type="radio" name="export_mode" value="programa" style="margin-top:4px;">
                             <div>
-                                <div style="font-weight:700; color:#0f172a;">Horarios por carrera</div>
-                                <div style="font-size:13px; color:#64748b;">Incluye todos los semestres de la carrera seleccionada.</div>
+                                <div style="font-weight:700; color:#0f172a;">Horarios por programa de estudios</div>
+                                <div style="font-size:13px; color:#64748b;">Incluye todos los semestres del programa de estudios seleccionado.</div>
                             </div>
                         </label>
                         <label style="display:flex; gap:10px; align-items:flex-start; padding:12px; border:1px solid #dbe2ea; border-radius:12px; cursor:pointer;">
-                            <input type="radio" name="export_mode" value="carrera_semestre" style="margin-top:4px;">
+                            <input type="radio" name="export_mode" value="programa_semestre" style="margin-top:4px;">
                             <div>
-                                <div style="font-weight:700; color:#0f172a;">Horarios por carrera y semestre</div>
-                                <div style="font-size:13px; color:#64748b;">Genera solo el semestre elegido dentro de una carrera.</div>
+                                <div style="font-weight:700; color:#0f172a;">Horarios por programa de estudios y semestre</div>
+                                <div style="font-size:13px; color:#64748b;">Genera solo el semestre elegido dentro de un programa de estudios.</div>
                             </div>
                         </label>
                     </div>
@@ -658,35 +658,35 @@
                 url = '/api/exportar-horario/?tipo=docente';
             }
 
-            if (exportMode === 'carrera' || exportMode === 'carrera_semestre') {
-                const { value: carreraId } = await Swal.fire({
-                    title: 'Selecciona la carrera',
-                    text: 'Escoge la carrera que deseas exportar.',
+            if (exportMode === 'programa' || exportMode === 'programa_semestre') {
+                const { value: programaId } = await Swal.fire({
+                    title: 'Selecciona el programa de estudios',
+                    text: 'Escoge el programa de estudios que deseas exportar.',
                     input: 'select',
-                    inputOptions: carreraOptions,
-                    inputPlaceholder: 'Selecciona una carrera',
+                    inputOptions: programaOptions,
+                    inputPlaceholder: 'Selecciona un programa de estudios',
                     showCancelButton: true,
                     confirmButtonText: 'Continuar',
                     cancelButtonText: 'Cancelar',
-                    inputValidator: (value) => !value && 'Selecciona una carrera'
+                    inputValidator: (value) => !value && 'Selecciona un programa de estudios'
                 });
 
-                if (!carreraId) return;
+                if (!programaId) return;
 
-                if (exportMode === 'carrera') {
-                    url = `/api/exportar-horario/?tipo=carrera&carrera_id=${carreraId}`;
+                if (exportMode === 'programa') {
+                    url = `/api/exportar-horario/?tipo=programa&especialidad_export_id=${programaId}`;
                 }
 
-                if (exportMode === 'carrera_semestre') {
+                if (exportMode === 'programa_semestre') {
                     if (!semestre) {
                         Swal.fire({
                             icon: 'warning',
                             title: 'Falta el semestre',
-                            text: 'Para exportar por carrera y semestre, primero selecciona un semestre en el planificador.'
+                            text: 'Para exportar por programa de estudios y semestre, primero selecciona un semestre en el planificador.'
                         });
                         return;
                     }
-                    url = `/api/exportar-horario/?tipo=carrera_semestre&carrera_id=${carreraId}&semestre=${semestre}`;
+                    url = `/api/exportar-horario/?tipo=programa_semestre&especialidad_export_id=${programaId}&semestre=${semestre}`;
                 }
             }
 
