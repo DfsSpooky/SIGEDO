@@ -155,6 +155,7 @@ def planificador_horarios(request):
     context = {
         "semestre_activo": semestre_activo,
         "especialidades": Especialidad.objects.all(),
+        "carreras": Carrera.objects.all().order_by("nombre"),
         "franjas_manana_json": franjas_manana_json,
         "franjas_tarde_json": franjas_tarde_json,
         "dias_semana_json": dias_semana_json,

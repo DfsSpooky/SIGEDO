@@ -94,8 +94,16 @@
                         {% if bloque %}
                         <div class="{% if bloque.tipo_curso == 'GENERAL' %}curso-cell-general{% else %}curso-cell-especialidad{% endif %}">
                             <span class="curso-nombre">{{ bloque.nombre }}</span>
-                            <span class="curso-subtitulo">{{ bloque.subtitulo|default:bloque.docente_nombre }}</span>
-                            <span class="curso-meta">{{ bloque.meta|default:bloque.tipo_curso }}</span>
+                            {% if bloque.subtitulo %}
+                            <span class="curso-subtitulo">{{ bloque.subtitulo }}</span>
+                            {% elif bloque.docente_nombre %}
+                            <span class="curso-subtitulo">{{ bloque.docente_nombre }}</span>
+                            {% endif %}
+                            {% if bloque.meta %}
+                            <span class="curso-meta">{{ bloque.meta }}</span>
+                            {% else %}
+                            <span class="curso-meta">{{ bloque.tipo_curso }}</span>
+                            {% endif %}
                         </div>
                         {% endif %}
                     </td>
@@ -128,8 +136,16 @@
                         {% if bloque %}
                         <div class="{% if bloque.tipo_curso == 'GENERAL' %}curso-cell-general{% else %}curso-cell-especialidad{% endif %}">
                             <span class="curso-nombre">{{ bloque.nombre }}</span>
-                            <span class="curso-subtitulo">{{ bloque.subtitulo|default:bloque.docente_nombre }}</span>
-                            <span class="curso-meta">{{ bloque.meta|default:bloque.tipo_curso }}</span>
+                            {% if bloque.subtitulo %}
+                            <span class="curso-subtitulo">{{ bloque.subtitulo }}</span>
+                            {% elif bloque.docente_nombre %}
+                            <span class="curso-subtitulo">{{ bloque.docente_nombre }}</span>
+                            {% endif %}
+                            {% if bloque.meta %}
+                            <span class="curso-meta">{{ bloque.meta }}</span>
+                            {% else %}
+                            <span class="curso-meta">{{ bloque.tipo_curso }}</span>
+                            {% endif %}
                         </div>
                         {% endif %}
                     </td>
