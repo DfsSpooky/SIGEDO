@@ -520,10 +520,28 @@ def _build_schedule_section(
     franjas_tarde,
     dias,
 ):
+    formatted_title = _format_export_label(title)
+    formatted_subtitle = _format_export_label(subtitle)
+    subtitle_text = formatted_subtitle
+    semester_badge = ""
+
+    if formatted_subtitle:
+        separator = " - "
+        if separator in formatted_subtitle:
+            possible_text, possible_badge = formatted_subtitle.rsplit(separator, 1)
+            if possible_badge.startswith("Semestre "):
+                subtitle_text = possible_text
+                semester_badge = possible_badge
+        elif formatted_subtitle.startswith("Semestre "):
+            subtitle_text = ""
+            semester_badge = formatted_subtitle
+
     return {
         "section_type": section_type,
-        "title": _format_export_label(title),
-        "subtitle": _format_export_label(subtitle),
+        "title": formatted_title,
+        "subtitle": formatted_subtitle,
+        "subtitle_text": subtitle_text,
+        "semester_badge": semester_badge,
         "grid_manana": _build_grid_from_blocks(franjas_manana, dias, bloques),
         "grid_tarde": _build_grid_from_blocks(franjas_tarde, dias, bloques),
     }
@@ -1367,6 +1385,12 @@ def api_exportar_horario(request):
             'configuracion': configuracion,
             'logo_url': configuracion.logo.url if getattr(configuracion, "logo", None) else None,
             'nombre_institucion': getattr(configuracion, "nombre_institucion", "Institución"),
+            'nombre_carrera': getattr(getattr(configuracion, "facultad", None), "nombre", ""),
+            'header_report_title': (
+                "Horario General de la Especialidad"
+                if export_type in {"actual", "programa", "programa_semestre"}
+                else report_titles.get(export_type, "Horario de Clases")
+            ),
             'semestre_activo': Semestre.objects.filter(estado="ACTIVO").first(),
         }
 

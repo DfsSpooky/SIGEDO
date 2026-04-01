@@ -15,12 +15,15 @@
         .logo { max-width: 90px; max-height: 90px; object-fit: contain; }
         .header-content { flex: 1; text-align: center; }
         .institution-name { margin: 0; font-size: 20px; font-weight: 700; text-transform: uppercase; }
-        .report-name { margin: 4px 0 0; font-size: 16px; font-weight: 700; }
-        .report-subtitle { margin: 4px 0 0; font-size: 13px; font-weight: normal; }
+        .career-name { margin: 6px 0 0; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: #1f2937; }
+        .report-name { margin: 8px 0 0; font-size: 16px; font-weight: 700; color: #0f172a; }
+        .report-subtitle { margin: 4px 0 0; font-size: 13px; font-weight: normal; color: #475569; }
         .info { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 15px; font-weight: bold; }
-        .section-summary { margin-bottom: 12px; }
-        .section-title { margin: 0; font-size: 18px; text-transform: uppercase; }
-        .section-subtitle { margin: 4px 0 0; font-size: 13px; color: #555; }
+        .section-summary { margin-bottom: 14px; padding: 10px 14px; background: #f8fafc; border: 1px solid #dbe3ef; border-radius: 12px; }
+        .section-title { margin: 0; font-size: 19px; font-weight: 700; text-transform: uppercase; color: #0f172a; }
+        .section-meta { margin-top: 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .section-subtitle { margin: 0; font-size: 12px; color: #475569; font-weight: 600; letter-spacing: 0.2px; }
+        .semester-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; background: #e0ecff; border: 1px solid #8ab4ff; color: #123c7a; font-size: 12px; font-weight: 700; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed; }
         th, td { border: 1px solid #999; padding: 5px; text-align: center; vertical-align: middle; }
         th { background-color: #f0f0f0; font-size: 11px; }
@@ -54,7 +57,10 @@
             </div>
             <div class="header-content">
                 <h1 class="institution-name">{{ nombre_institucion }}</h1>
-                <h2 class="report-name">{{ report_title }}</h2>
+                {% if nombre_carrera %}
+                <p class="career-name">{{ nombre_carrera }}</p>
+                {% endif %}
+                <h2 class="report-name">{{ header_report_title|default:report_title }}</h2>
                 {% if semestre_activo %}
                 <p class="report-subtitle">Semestre activo: {{ semestre_activo.nombre }}</p>
                 {% endif %}
@@ -69,8 +75,19 @@
 
         <div class="section-summary">
             <h3 class="section-title">{{ section.title }}</h3>
-            {% if section.subtitle %}
-            <p class="section-subtitle">{{ section.subtitle }}</p>
+            {% if section.subtitle_text or section.semester_badge %}
+            <div class="section-meta">
+                {% if section.subtitle_text %}
+                <p class="section-subtitle">{{ section.subtitle_text }}</p>
+                {% endif %}
+                {% if section.semester_badge %}
+                <span class="semester-badge">{{ section.semester_badge }}</span>
+                {% endif %}
+            </div>
+            {% elif section.subtitle %}
+            <div class="section-meta">
+                <p class="section-subtitle">{{ section.subtitle }}</p>
+            </div>
             {% endif %}
         </div>
 
