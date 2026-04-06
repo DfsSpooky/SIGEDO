@@ -1,5 +1,7 @@
 import json
+
 from channels.generic.websocket import AsyncWebsocketConsumer
+
 
 class NotificationConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -8,28 +10,23 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             await self.close()
             return
 
-        self.room_group_name = f'notifications_{self.user.id}'
+        self.room_group_name = f"notifications_{self.user.id}"
 
-        await self.channel_layer.group_add(
-            self.room_group_name,
-            self.channel_name
-        )
+        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
 
         await self.accept()
 
     async def disconnect(self, close_code):
-        await self.channel_layer.group_discard(
-            self.room_group_name,
-            self.channel_name
-        )
+        await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
 
     async def send_notification(self, event):
         # El frontend espera un payload con una clave 'type' y 'message'.
         # Reconstruimos el payload aquí para que coincida con las expectativas del cliente.
-        await self.send(text_data=json.dumps({
-            'type': 'send_notification',
-            'message': event['message']
-        }))
+        await self.send(
+            text_data=json.dumps(
+                {"type": "send_notification", "message": event["message"]}
+            )
+        )
 
 
 class KioskConsumer(AsyncWebsocketConsumer):
@@ -37,13 +34,10 @@ class KioskConsumer(AsyncWebsocketConsumer):
         """
         Se llama cuando el websocket es conectado por un cliente.
         """
-        self.room_group_name = 'kiosk_group'
+        self.room_group_name = "kiosk_group"
 
         # Unirse al grupo de la sala
-        await self.channel_layer.group_add(
-            self.room_group_name,
-            self.channel_name
-        )
+        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
 
         await self.accept()
         print(f"WebSocket Kiosk client connected: {self.channel_name}")
@@ -53,10 +47,7 @@ class KioskConsumer(AsyncWebsocketConsumer):
         Se llama cuando el websocket se desconecta.
         """
         # Salir del grupo de la sala
-        await self.channel_layer.group_discard(
-            self.room_group_name,
-            self.channel_name
-        )
+        await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
         print(f"WebSocket Kiosk client disconnected: {self.channel_name}")
 
     # Este método no se usará para recibir mensajes de los clientes,
@@ -69,13 +60,12 @@ class KioskConsumer(AsyncWebsocketConsumer):
         Recibe un mensaje del grupo de la sala y lo envía al cliente.
         Este es el "manejador de eventos" que será llamado desde la vista de Django.
         """
-        message_data = event['data']
+        message_data = event["data"]
 
         # Enviar el mensaje al WebSocket
-        await self.send(text_data=json.dumps({
-            'type': 'kiosk.update',
-            'data': message_data
-        }))
+        await self.send(
+            text_data=json.dumps({"type": "kiosk.update", "data": message_data})
+        )
         print(f"Sent message to {self.channel_name}: {message_data}")
 
 
@@ -86,26 +76,24 @@ class CalendarConsumer(AsyncWebsocketConsumer):
             await self.close()
             return
 
-        self.room_group_name = f'horario_{self.user.id}'
+        self.room_group_name = f"horario_{self.user.id}"
 
-        await self.channel_layer.group_add(
-            self.room_group_name,
-            self.channel_name
-        )
+        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
 
         await self.accept()
 
     async def disconnect(self, close_code):
-        await self.channel_layer.group_discard(
-            self.room_group_name,
-            self.channel_name
-        )
+        await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
 
     async def horario_update(self, event):
         """
         Envía un mensaje al cliente indicando que el horario ha sido actualizado.
         """
-        await self.send(text_data=json.dumps({
-            'type': 'horario.update',
-            'message': event.get('message', 'Tu horario ha sido actualizado.')
-        }))
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "type": "horario.update",
+                    "message": event.get("message", "Tu horario ha sido actualizado."),
+                }
+            )
+        )

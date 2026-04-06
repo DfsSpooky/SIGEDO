@@ -12,18 +12,20 @@
 # Fecha: 2025-08-09
 # -----------------------------------------------------------------------------
 
-# Importar las librerías necesarias
-from machine import Pin, SPI
 from time import sleep
+
 import network
-import urequests # Asegúrate de que tu firmware de MicroPython incluya 'urequests'
-from mfrc522 import MFRC522 # Esta librería debe estar en la memoria del ESP32
+import urequests  # Asegúrate de que tu firmware de MicroPython incluya 'urequests'
+
+# Importar las librerías necesarias
+from machine import SPI, Pin
+from mfrc522 import MFRC522  # Esta librería debe estar en la memoria del ESP32
 
 # --- CONFIGURACIÓN (MODIFICAR SEGÚN SEA NECESARIO) ---
 
 # 1. Configuración de la Red WiFi
 WIFI_SSID = "NOMBRE_DE_TU_WIFI"  # Reemplaza con el nombre de tu red WiFi
-WIFI_PASSWORD = "PASSWORD_DE_TU_WIFI" # Reemplaza con tu contraseña
+WIFI_PASSWORD = "PASSWORD_DE_TU_WIFI"  # Reemplaza con tu contraseña
 
 # 2. Configuración del Servidor Django
 # Reemplaza la IP con la dirección de tu ordenador donde corre el servidor Django.
@@ -55,16 +57,16 @@ def conectar_wifi():
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
     if not wlan.isconnected():
-        print('Conectando a la red WiFi...')
+        print("Conectando a la red WiFi...")
         wlan.connect(WIFI_SSID, WIFI_PASSWORD)
         # Espera hasta que la conexión sea exitosa
         while not wlan.isconnected():
             sleep(1)
-            print('.')
-    print('---')
+            print(".")
+    print("---")
     print(f"Conexión exitosa. IP del ESP32: {wlan.ifconfig()[0]}")
     print(f"Endpoint del servidor: {SERVER_URL}")
-    print('---')
+    print("---")
 
 
 # Función principal
@@ -96,8 +98,8 @@ def main():
                 print(f"UID encontrado: {uid}")
 
                 # Preparar los datos para enviar al servidor
-                payload = {'uid': uid}
-                headers = {'Content-Type': 'application/json'}
+                payload = {"uid": uid}
+                headers = {"Content-Type": "application/json"}
 
                 try:
                     print("Enviando datos al servidor...")
@@ -107,7 +109,9 @@ def main():
                     # Procesar la respuesta del servidor
                     if response.status_code == 200:
                         server_data = response.json()
-                        print(f"Respuesta del servidor: {server_data.get('status', 'sin_status')} - {server_data.get('message', 'sin_mensaje')}")
+                        print(
+                            f"Respuesta del servidor: {server_data.get('status', 'sin_status')} - {server_data.get('message', 'sin_mensaje')}"
+                        )
                     else:
                         print(f"Error del servidor. Código: {response.status_code}")
                         print(f"Respuesta: {response.text}")

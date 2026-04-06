@@ -1,5 +1,7 @@
 from django.urls import reverse
-from .models import PersonalDocente, Semestre, Curso, Documento, Justificacion
+
+from .models import Curso, Documento, Justificacion, PersonalDocente, Semestre
+
 
 def dashboard_callback(request, context):
     """
@@ -7,10 +9,16 @@ def dashboard_callback(request, context):
     """
     # --- KPI Calculations ---
     docentes_activos = PersonalDocente.objects.filter(is_active=True).count()
-    semestre_actual = Semestre.objects.filter(estado='ACTIVO').first()
-    cursos_semestre_actual = Curso.objects.filter(semestre=semestre_actual).count() if semestre_actual else 0
-    documentos_pendientes = Documento.objects.filter(estado__in=['RECIBIDO', 'EN_REVISION']).count()
-    justificaciones_pendientes = Justificacion.objects.filter(estado='PENDIENTE').count()
+    semestre_actual = Semestre.objects.filter(estado="ACTIVO").first()
+    cursos_semestre_actual = (
+        Curso.objects.filter(semestre=semestre_actual).count() if semestre_actual else 0
+    )
+    documentos_pendientes = Documento.objects.filter(
+        estado__in=["RECIBIDO", "EN_REVISION"]
+    ).count()
+    justificaciones_pendientes = Justificacion.objects.filter(
+        estado="PENDIENTE"
+    ).count()
 
     # --- Data for Tracker Component ---
     tracker_data = [
@@ -33,26 +41,34 @@ def dashboard_callback(request, context):
             "metric": documentos_pendientes,
             "icon": "folder_open",
             "color": "warning",
-            "link": reverse("admin:core_documento_changelist") + "?estado__exact=RECIBIDO",
+            "link": reverse("admin:core_documento_changelist")
+            + "?estado__exact=RECIBIDO",
         },
         {
             "title": "Justificaciones Pendientes",
             "metric": justificaciones_pendientes,
             "icon": "assignment_late",
             "color": "danger",
-            "link": reverse("admin:core_justificacion_changelist") + "?estado__exact=PENDIENTE",
+            "link": reverse("admin:core_justificacion_changelist")
+            + "?estado__exact=PENDIENTE",
         },
     ]
 
     # --- Data for Tables ---
-    ultimos_documentos = Documento.objects.filter(estado__in=['RECIBIDO', 'EN_REVISION']).order_by('-fecha_subida')[:5]
-    ultimas_justificaciones = Justificacion.objects.filter(estado='PENDIENTE').order_by('-fecha_creacion')[:5]
+    ultimos_documentos = Documento.objects.filter(
+        estado__in=["RECIBIDO", "EN_REVISION"]
+    ).order_by("-fecha_subida")[:5]
+    ultimas_justificaciones = Justificacion.objects.filter(estado="PENDIENTE").order_by(
+        "-fecha_creacion"
+    )[:5]
 
-    context.update({
-        "tracker_data": tracker_data,
-        "ultimos_documentos": ultimos_documentos,
-        "ultimas_justificaciones": ultimas_justificaciones,
-        "semestre_nombre": semestre_actual.nombre if semestre_actual else "Ninguno"
-    })
+    context.update(
+        {
+            "tracker_data": tracker_data,
+            "ultimos_documentos": ultimos_documentos,
+            "ultimas_justificaciones": ultimas_justificaciones,
+            "semestre_nombre": semestre_actual.nombre if semestre_actual else "Ninguno",
+        }
+    )
 
     return context
