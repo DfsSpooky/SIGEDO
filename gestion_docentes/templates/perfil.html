@@ -18,6 +18,11 @@
                 </div>
                 <h2 class="card-title text-2xl mt-4">{{ user.first_name }} {{ user.last_name }}</h2>
                 <p class="text-base-content/70">DNI: {{ user.dni }}</p>
+                <div class="card-actions justify-center mt-4">
+                    <a href="{% url 'generar_ficha_docente' user.id %}" class="btn btn-primary btn-outline">
+                        <i class="fas fa-file-pdf mr-2"></i>Generar Ficha Integral
+                    </a>
+                </div>
                 <div class="divider">Especialidades</div>
                 <div class="flex flex-wrap justify-center gap-2">
                     {% for especialidad in user.especialidades.all %}
