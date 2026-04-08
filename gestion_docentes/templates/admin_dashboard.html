@@ -1,0 +1,113 @@
+{% load static %}
+<div class="space-y-8">
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="card bg-white shadow-lg border-l-4 border-blue-500">
+            <div class="card-body">
+                <p class="text-sm font-medium text-gray-500">Docentes Activos</p>
+                <p class="text-3xl font-extrabold">{{ module.children.0.kpis.total_docentes }}</p>
+            </div>
+        </div>
+        <div class="card bg-white shadow-lg border-l-4 border-green-500">
+            <div class="card-body">
+                <p class="text-sm font-medium text-gray-500">Cursos Hoy</p>
+                <p class="text-3xl font-extrabold">{{ module.children.0.kpis.cursos_hoy }}</p>
+            </div>
+        </div>
+        <div class="card bg-white shadow-lg border-l-4 border-yellow-500">
+            <div class="card-body">
+                <p class="text-sm font-medium text-gray-500">Justificaciones Pendientes</p>
+                <p class="text-3xl font-extrabold">{{ module.children.0.kpis.justificaciones_pendientes }}</p>
+            </div>
+        </div>
+        <div class="card bg-white shadow-lg border-l-4 border-red-500">
+            <div class="card-body">
+                <p class="text-sm font-medium text-gray-500">Documentos Observados</p>
+                <p class="text-3xl font-extrabold">{{ module.children.0.kpis.documentos_observados }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-8">
+        <div class="lg:col-span-3 card bg-white shadow-lg p-6">
+            <h2 class="text-lg font-semibold mb-4">Asistencia de la Última Semana</h2>
+            <canvas id="asistenciaSemanalChart"></canvas>
+        </div>
+        <div class="lg:col-span-2 card bg-white shadow-lg p-6">
+            <h2 class="text-lg font-semibold mb-4">Estado General de Documentos</h2>
+            <canvas id="documentosStatusChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Quick Access Lists -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div class="card bg-white shadow-lg">
+            <div class="card-body">
+                <h2 class="text-lg font-semibold">Justificaciones Pendientes</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <tbody>
+                            {% for justificacion in module.children.0.justificaciones_recientes %}
+                            <tr class="border-b">
+                                <td class="py-2">{{ justificacion.docente.get_full_name }}</td>
+                                <td class="py-2 text-gray-600">{{ justificacion.tipo.nombre }}</td>
+                                <td class="py-2"><a href="{% url 'admin:core_justificacion_change' justificacion.id %}" class="text-blue-500 hover:underline">Revisar</a></td>
+                            </tr>
+                            {% empty %}
+                            <tr><td class="py-4 text-center text-gray-500" colspan="3">No hay justificaciones pendientes.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="card bg-white shadow-lg">
+            <div class="card-body">
+                <h2 class="text-lg font-semibold">Últimos Documentos en Revisión</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <tbody>
+                            {% for doc in module.children.0.documentos_recientes %}
+                            <tr class="border-b">
+                                <td class="py-2">{{ doc.titulo }}</td>
+                                <td class="py-2 text-gray-600">{{ doc.docente.get_full_name }}</td>
+                                <td class="py-2"><a href="{% url 'admin:core_documento_change' doc.id %}" class="text-blue-500 hover:underline">Revisar</a></td>
+                            </tr>
+                            {% empty %}
+                            <tr><td class="py-4 text-center text-gray-500" colspan="3">No hay documentos en revisión.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const asistenciaData = {{ module.children.0.charts_data.asistencia_semanal_json|safe }};
+    const documentosData = {{ module.children.0.charts_data.documentos_status_json|safe }};
+
+    new Chart(document.getElementById('asistenciaSemanalChart'), {
+        type: 'bar',
+        data: {
+            labels: asistenciaData.labels,
+            datasets: [{ label: 'Presentes', data: asistenciaData.presentes, backgroundColor: 'rgba(54, 162, 235, 0.6)' }]
+        },
+        options: { responsive: true, scales: { y: { beginAtZero: true } } }
+    });
+
+    new Chart(document.getElementById('documentosStatusChart'), {
+        type: 'doughnut',
+        data: {
+            labels: documentosData.labels,
+            datasets: [{ data: documentosData.data, backgroundColor: ['#4ade80', '#facc15', '#f87171', '#60a5fa'] }]
+        },
+        options: { responsive: true }
+    });
+});
+</script>
