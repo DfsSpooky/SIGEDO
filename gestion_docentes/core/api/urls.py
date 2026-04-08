@@ -1,0 +1,29 @@
+from django.urls import path
+from . import views
+
+# Define el espacio de nombres para estas URLs de API
+app_name = 'api'
+
+urlpatterns = [
+    # --- URLs para el Kiosco ---
+    path('get-teacher-info/', views.TeacherInfoView.as_view(), name='get_teacher_info'),
+    path('mark-attendance/', views.MarkAttendanceView.as_view(), name='mark_attendance'),
+    path('asistencia_rfid/', views.RegistrarAsistenciaRfidView.as_view(), name='asistencia_rfid'),
+
+    # --- URLs para el Planificador de Horarios ---
+    path('asignar-horario/', views.api_asignar_horario, name='asignar_horario'),
+    path('desasignar-horario/', views.api_desasignar_horario, name='desasignar_horario'),
+    path('get-teacher-conflicts/', views.api_get_teacher_conflicts, name='get_teacher_conflicts'),
+    path('auto-asignar/', views.api_auto_asignar, name='auto_asignar'),
+    path('generar-horario-automatico/', views.generar_horario_automatico, name='generar_horario_automatico'),
+    path('get-cursos-no-asignados/', views.api_get_cursos_no_asignados, name='get_cursos_no_asignados'),
+
+    # --- URLs para la API de Reportes ---
+    path('reporte/chart-data/', views.api_get_report_chart_data, name='report_chart_data'),
+    path('reporte/detalle/<int:docente_id>/', views.detalle_asistencia_docente_ajax, name='detalle_asistencia_docente_ajax'),
+
+    # --- URLs para Notificaciones ---
+    path('notificaciones/json/', views.notificaciones_json, name='notificaciones_json'),
+    path('notificaciones/<int:notificacion_id>/marcar-leida/', views.marcar_notificacion_como_leida, name='marcar_notificacion_leida'),
+    path('notificaciones/marcar-todas-leidas/', views.marcar_todas_como_leidas, name='marcar_todas_leidas'),
+]
