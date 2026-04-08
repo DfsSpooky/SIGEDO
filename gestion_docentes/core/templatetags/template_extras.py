@@ -1,5 +1,7 @@
 # core/templatetags/template_extras.py
 from django import template
+from ..utils.encryption import encrypt_id
+
 register = template.Library()
 
 @register.filter
@@ -33,3 +35,22 @@ def roman(number):
             number -= val[i]
         i += 1
     return roman_num
+
+@register.filter(name='encrypt')
+def encrypt(value):
+    """
+    Encrypts a value using the encrypt_id utility.
+    """
+    return encrypt_id(value)
+
+@register.filter(name='widget_type')
+def widget_type(field):
+    return field.field.widget.__class__.__name__
+
+@register.filter(name='is_boolean')
+def is_boolean(value):
+    return isinstance(value, bool)
+
+@register.filter(name='add_class')
+def add_class(field, css_class):
+    return field.as_widget(attrs={'class': css_class})

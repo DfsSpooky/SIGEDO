@@ -1,0 +1,95 @@
+/* gestion_docentes/static/css/custom_styles.css */
+
+/* Material Design Inspired Color Palette */
+:root {
+  --md-primary: #6200EE;
+  --md-primary-variant: #3700B3;
+  --md-secondary: #03DAC6;
+  --md-secondary-variant: #018786;
+  --md-background: #FFFFFF;
+  --md-surface: #FFFFFF;
+  --md-error: #B00020;
+  --md-on-primary: #FFFFFF;
+  --md-on-secondary: #000000;
+  --md-on-background: #000000;
+  --md-on-surface: #000000;
+  --md-on-error: #FFFFFF;
+}
+
+/* Applying the new colors to DaisyUI components */
+[data-theme="winter"] {
+  --p: var(--md-primary);
+  --pf: var(--md-primary-variant);
+  --s: var(--md-secondary);
+  --sf: var(--md-secondary-variant);
+  --b1: var(--md-background);
+  --b2: #F2F2F2; /* A slightly darker background for some elements */
+  --b3: #E0E0E0; /* A darker shade for borders and dividers */
+  --bc: var(--md-on-background);
+  --pc: var(--md-on-primary);
+  --sc: var(--md-on-secondary);
+  --er: var(--md-error);
+}
+
+/* Material Design Inspired Typography */
+body {
+    font-family: 'Roboto', 'Inter', sans-serif;
+}
+
+/* Floating Label Styles */
+.form-control-material {
+    position: relative;
+    margin-top: 1.5rem;
+}
+
+.form-control-material label {
+    position: absolute;
+    top: 0.75rem;
+    left: 1rem;
+    color: #9ca3af;
+    pointer-events: none;
+    transition: all 0.2s ease-in-out;
+}
+
+.form-control-material input:focus ~ label,
+.form-control-material input:not(:placeholder-shown) ~ label,
+.form-control-material textarea:focus ~ label,
+.form-control-material textarea:not(:placeholder-shown) ~ label,
+.form-control-material select:focus ~ label,
+.form-control-material select:not([value=""]) ~ label,
+.form-control-material label.active {
+    top: -0.75rem;
+    left: 0.75rem;
+    font-size: 0.75rem;
+    color: var(--md-primary);
+    background-color: var(--md-surface);
+    padding: 0 0.25rem;
+}
+
+/* Ripple Effect Styles */
+.btn {
+    position: relative;
+    overflow: hidden;
+}
+
+.btn span {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.4);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    border-radius: 50%;
+    animation: ripple-animation 1s linear;
+}
+
+@keyframes ripple-animation {
+    0% {
+        width: 0;
+        height: 0;
+        opacity: 0.5;
+    }
+    100% {
+        width: 500px;
+        height: 500px;
+        opacity: 0;
+    }
+}

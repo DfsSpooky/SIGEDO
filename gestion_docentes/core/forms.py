@@ -1,5 +1,5 @@
 from django import forms
-from .models import Documento, SolicitudIntercambio, Curso, Docente, VersionDocumento
+from .models import Documento, SolicitudIntercambio, Curso, Docente, VersionDocumento, Justificacion, TipoJustificacion
 
 class DocumentoForm(forms.ModelForm):
     archivo = forms.FileField(label="Archivo (PDF o DOCX)", required=True)
@@ -62,3 +62,26 @@ class SolicitudIntercambioForm(forms.ModelForm):
         if curso_destino and curso_destino.docente != docente_destino:
             raise forms.ValidationError("El curso destino no pertenece al docente seleccionado.")
         return cleaned_data
+
+class JustificacionForm(forms.ModelForm):
+    class Meta:
+        model = Justificacion
+        fields = ['tipo', 'fecha_inicio', 'fecha_fin', 'motivo', 'documento_adjunto']
+        widgets = {
+            'fecha_inicio': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'fecha_fin': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'motivo': forms.Textarea(attrs={'rows': 4, 'class': 'form-control'}),
+            'tipo': forms.Select(attrs={'class': 'form-control'}),
+            'documento_adjunto': forms.FileInput(attrs={'class': 'form-control'}),
+        }
+        labels = {
+            'tipo': 'Tipo de Justificación',
+            'fecha_inicio': 'Fecha de Inicio',
+            'fecha_fin': 'Fecha de Fin',
+            'motivo': 'Motivo de la Ausencia',
+            'documento_adjunto': 'Documento de Respaldo (Opcional)',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['tipo'].queryset = TipoJustificacion.objects.all()
