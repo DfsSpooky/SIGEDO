@@ -1,0 +1,31 @@
+/*
+ * Custom CSS for Django Unfold Admin
+ * This file addresses styling issues, starting with input fields.
+ */
+
+/* Add a visible border to standard text-based inputs in admin forms */
+.form-row input[type="text"],
+.form-row input[type="password"],
+.form-row input[type="email"],
+.form-row input[type="url"],
+.form-row input[type="number"],
+.form-row select,
+.form-row .vLargeTextField,
+.form-row .vTextField {
+    border: 1px solid #4a5568; /* A visible gray border (Tailwind's gray-600) */
+    border-radius: 0.375rem; /* 6px */
+}
+
+/* Specifically target the password confirmation widget in the admin */
+.form-row .password-strength-meter,
+.form-row .password-input {
+     border: 1px solid #4a5568;
+     border-radius: 0.375rem;
+}
+
+/* Improve focus visibility for accessibility */
+.form-row input:focus,
+.form-row select:focus {
+    outline: 2px solid #2563eb; /* A blue outline on focus */
+    outline-offset: 1px;
+}
