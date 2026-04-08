@@ -159,6 +159,7 @@ class ConfiguracionInstitucion(models.Model):
         blank=True, 
         help_text="Seleccione la facultad o carrera principal para la cual se está configurando el sistema."
     )
+    tiempo_limite_tardanza = models.PositiveIntegerField(default=10, help_text="Minutos de tolerancia para considerar una asistencia como tardanza.")
     
     class Meta:
         verbose_name = "Configuración de la Institución"; verbose_name_plural = "Configuración de la Institución"
@@ -177,3 +178,32 @@ class PersonalDocente(Docente):
 class Administrador(Docente):
     class Meta:
         proxy = True; verbose_name = 'Administrador'; verbose_name_plural = 'Administradores'
+
+class Notificacion(models.Model):
+    destinatario = models.ForeignKey(Docente, on_delete=models.CASCADE, related_name='notificaciones')
+    mensaje = models.CharField(max_length=255)
+    leido = models.BooleanField(default=False)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    url = models.CharField(max_length=255, blank=True, help_text="URL a la que la notificación debe dirigir.")
+
+    class Meta:
+        ordering = ['-fecha_creacion']
+        verbose_name = "Notificación"
+        verbose_name_plural = "Notificaciones"
+
+    def __str__(self):
+        return f"Notificación para {self.destinatario.username}: {self.mensaje[:30]}..."
+
+class Anuncio(models.Model):
+    titulo = models.CharField(max_length=200)
+    contenido = models.TextField()
+    fecha_publicacion = models.DateTimeField(auto_now_add=True)
+    autor = models.ForeignKey(Docente, on_delete=models.SET_NULL, null=True, limit_choices_to={'is_staff': True})
+
+    class Meta:
+        ordering = ['-fecha_publicacion']
+        verbose_name = "Anuncio"
+        verbose_name_plural = "Anuncios"
+
+    def __str__(self):
+        return self.titulo
