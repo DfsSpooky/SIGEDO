@@ -1,0 +1,23 @@
+{% extends 'panel/panel_base.html' %}
+
+{% block title %}Confirmar Eliminación{% endblock %}
+
+{% block panel_content %}
+<h1 class="text-2xl font-semibold text-gray-900">Confirmar Eliminación</h1>
+
+<div class="mt-8 bg-white p-6 rounded-lg shadow">
+    <p class="text-sm text-gray-600">
+        ¿Estás seguro de que quieres eliminar el {{ object.Meta.verbose_name|lower }} <strong>"{{ object }}"</strong>?
+    </p>
+    <p class="mt-2 text-sm text-red-600">
+        Esta acción no se puede deshacer.
+    </p>
+    <form method="post" class="mt-6">
+        {% csrf_token %}
+        <div class="flex items-center justify-end gap-x-6">
+            <a href="{% url 'panel:model_list' app_label=object.Meta.app_label model_name=object.Meta.model_name %}" class="text-sm font-semibold leading-6 text-gray-900">Cancelar</a>
+            <button type="submit" class="rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500">Sí, eliminar</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
